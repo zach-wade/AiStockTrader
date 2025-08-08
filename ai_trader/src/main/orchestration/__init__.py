@@ -5,8 +5,12 @@ This module contains orchestrators that coordinate between different system comp
 """
 
 from .ml_orchestrator import MLOrchestrator, MLOrchestratorStatus
+from .job_scheduler import JobScheduler, JobExecution, JobStatus
 
 __all__ = [
     'MLOrchestrator',
-    'MLOrchestratorStatus'
+    'MLOrchestratorStatus',
+    'JobScheduler',
+    'JobExecution',
+    'JobStatus'
 ]

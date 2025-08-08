@@ -39,6 +39,10 @@ class VolatilityCalculator(BaseRiskCalculator):
         
         logger.debug(f"Initialized VolatilityCalculator with {self.lookback_window}d lookback")
     
+    def get_required_columns(self) -> List[str]:
+        """Get list of required input columns."""
+        return ['close']
+    
     def get_feature_names(self) -> List[str]:
         """Return list of volatility feature names."""
         feature_names = []

@@ -41,6 +41,10 @@ class PerformanceCalculator(BaseRiskCalculator):
         
         logger.debug(f"Initialized PerformanceCalculator with {self.lookback_window}d lookback")
     
+    def get_required_columns(self) -> List[str]:
+        """Get list of required input columns."""
+        return ['close']
+    
     def get_feature_names(self) -> List[str]:
         """Return list of performance feature names."""
         feature_names = [

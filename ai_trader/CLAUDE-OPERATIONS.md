@@ -75,6 +75,38 @@ redis-cli -h localhost ping
 
 ---
 
+## 📅 Job Scheduling Operations
+
+### JobScheduler Location (Updated 2025-08-08)
+**Important**: JobScheduler has been relocated from `/scripts/scheduler/` to proper module location:
+- **Class Location**: `/src/main/orchestration/job_scheduler.py`
+- **CLI Script**: `/scripts/scheduler/master_scheduler.py` (thin wrapper)
+- **Config File**: `/scripts/scheduler/job_definitions.yaml`
+
+### Running Scheduled Jobs
+```bash
+# Start job scheduler daemon
+python scripts/scheduler/master_scheduler.py
+
+# Run specific job once
+python scripts/scheduler/master_scheduler.py --run-job data_backfill
+
+# Check job status
+python scripts/scheduler/master_scheduler.py --status
+
+# Using from Python code
+from main.orchestration import JobScheduler
+scheduler = JobScheduler()
+scheduler.run_job("data_backfill")
+```
+
+### Managing Job Definitions
+- Edit `/scripts/scheduler/job_definitions.yaml`
+- Jobs support dependencies, retries, and market hours awareness
+- Resource limits enforced (CPU, memory)
+
+---
+
 ## 🗄️ Database Operations
 
 ### Connecting to Database
@@ -680,5 +712,6 @@ python scripts/audit_trades.py --start-date 2024-01-01
 
 ---
 
-*Last Updated: 2025-08-08*
-*Version: 1.0*
+*Last Updated: 2025-08-08 22:30 (Phase 3.0 - All systems operational)*  
+*System Status: FULLY FUNCTIONAL (10/10 components passing)*
+*Version: 1.2*

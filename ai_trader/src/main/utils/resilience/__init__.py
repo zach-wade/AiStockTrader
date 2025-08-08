@@ -27,7 +27,13 @@ from .error_recovery import (
     API_RETRY_CONFIG
 )
 
-from .strategies import ResilienceStrategies
+from .strategies import (
+    ResilienceStrategies, 
+    ResilienceConfig,
+    ResilienceStrategiesFactory,
+    get_resilience_strategies_factory,
+    create_resilience_strategies
+)
 
 __all__ = [
     # Circuit breaker
@@ -56,5 +62,9 @@ __all__ = [
     'API_RETRY_CONFIG',
     
     # Resilience strategies
-    'ResilienceStrategies'
+    'ResilienceStrategies',
+    'ResilienceConfig',
+    'ResilienceStrategiesFactory',
+    'get_resilience_strategies_factory',
+    'create_resilience_strategies'
 ]

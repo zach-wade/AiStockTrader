@@ -1,143 +1,217 @@
 {
-  "timestamp": "2025-08-08T19:04:04.414118",
+  "timestamp": "2025-08-08T22:05:56.385449",
   "components": {
     "Configuration": {
       "Load unified_config": {
+        "status": "PASS",
+        "details": "Config loaded with 4 settings",
+        "timestamp": "2025-08-08T22:05:57.462964"
+      },
+      "Environment POLYGON_API_KEY": {
+        "status": "PASS",
+        "details": "Set",
+        "timestamp": "2025-08-08T22:05:57.462978"
+      },
+      "Environment ALPACA_API_KEY": {
+        "status": "PASS",
+        "details": "Set",
+        "timestamp": "2025-08-08T22:05:57.462983"
+      },
+      "Environment DATABASE_URL": {
         "status": "FAIL",
-        "details": "Configuration file not found: /Users/zachwade/StockMonitoring/ai_trader/src/main/config/yaml/unified_config.yaml",
-        "timestamp": "2025-08-08T19:04:06.733386"
+        "details": "Not set",
+        "timestamp": "2025-08-08T22:05:57.462986"
       }
     },
     "Database": {
-      "Module Import": {
-        "status": "FAIL",
-        "details": "Configuration file not found: /Users/zachwade/StockMonitoring/ai_trader/src/main/config/yaml/unified_config.yaml",
-        "timestamp": "2025-08-08T19:04:06.741348"
+      "PostgreSQL Connection": {
+        "status": "PASS",
+        "details": "Connected successfully",
+        "timestamp": "2025-08-08T22:05:57.574232"
+      },
+      "Table companies": {
+        "status": "PASS",
+        "details": "Exists",
+        "timestamp": "2025-08-08T22:05:57.580135"
+      },
+      "Table market_data_1h": {
+        "status": "PASS",
+        "details": "Exists",
+        "timestamp": "2025-08-08T22:05:57.580150"
+      },
+      "Table features": {
+        "status": "PASS",
+        "details": "Exists",
+        "timestamp": "2025-08-08T22:05:57.580153"
       }
     },
     "Data Ingestion": {
-      "Module Import": {
-        "status": "FAIL",
-        "details": "No module named 'main.data_pipeline.ingestion.clients.polygon_client'",
-        "timestamp": "2025-08-08T19:04:06.757861"
+      "Polygon Client Init": {
+        "status": "PASS",
+        "details": "Client initialized",
+        "timestamp": "2025-08-08T22:05:57.620043"
+      },
+      "Polygon API Test": {
+        "status": "WARN",
+        "details": "Needs live test",
+        "timestamp": "2025-08-08T22:05:57.620055"
+      },
+      "Validation Module": {
+        "status": "WARN",
+        "details": "Module not found",
+        "timestamp": "2025-08-08T22:05:57.637032"
       }
     },
     "Features": {
-      "Module Import": {
+      "Orchestrator Init": {
         "status": "FAIL",
-        "details": "Configuration file not found: /Users/zachwade/StockMonitoring/ai_trader/src/main/config/yaml/unified_config.yaml",
-        "timestamp": "2025-08-08T19:04:09.287250"
+        "details": "FeatureStoreV2.__init__() missing 1 required positional argument: 'base_path'",
+        "timestamp": "2025-08-08T22:05:58.943666"
       }
     },
     "Models": {
       "Directory Structure": {
         "status": "PASS",
         "details": "Found subdirectories: strategies, training, event_driven, utils, __pycache__, specialists, hft, inference, monitoring, outcome_classifier_helpers",
-        "timestamp": "2025-08-08T19:04:09.288589"
+        "timestamp": "2025-08-08T22:05:58.943919"
       },
       "Strategy Import": {
         "status": "PASS",
         "details": "BaseStrategy imported",
-        "timestamp": "2025-08-08T19:04:09.647364"
+        "timestamp": "2025-08-08T22:05:59.266204"
       },
       "Saved Models": {
         "status": "PASS",
         "details": "Found 501 saved model files",
-        "timestamp": "2025-08-08T19:04:38.170124"
+        "timestamp": "2025-08-08T22:06:27.479832"
       }
     },
     "Risk": {
-      "Module Import": {
+      "Pre-Trade Manager": {
         "status": "FAIL",
-        "details": "cannot import name 'ExposureLimitChecker' from 'main.risk_management.pre_trade' (/Users/zachwade/StockMonitoring/ai_trader/src/main/risk_management/pre_trade/__init__.py)",
-        "timestamp": "2025-08-08T19:04:38.185791"
+        "details": "Can't instantiate abstract class PositionSizeChecker without an implementation for abstract methods 'calculate_current_value', 'supports_limit_type'",
+        "timestamp": "2025-08-08T22:06:27.645131"
+      },
+      "Real-Time Monitor": {
+        "status": "FAIL",
+        "details": "Can't instantiate abstract class PositionSizeChecker without an implementation for abstract methods 'calculate_current_value', 'supports_limit_type'",
+        "timestamp": "2025-08-08T22:06:27.645183"
+      },
+      "Circuit Breaker": {
+        "status": "PASS",
+        "details": "Circuit breaker found",
+        "timestamp": "2025-08-08T22:06:27.645189"
       }
     },
     "Trading": {
-      "Module Import": {
-        "status": "FAIL",
-        "details": "cannot import name 'OrderError' from 'main.utils.exceptions' (/Users/zachwade/StockMonitoring/ai_trader/src/main/utils/exceptions.py)",
-        "timestamp": "2025-08-08T19:04:38.273522"
+      "Execution Engine": {
+        "status": "PASS",
+        "details": "Engine initialized",
+        "timestamp": "2025-08-08T22:06:27.672835"
+      },
+      "Alpaca Broker": {
+        "status": "PASS",
+        "details": "Broker module found",
+        "timestamp": "2025-08-08T22:06:27.672847"
+      },
+      "Execution Algorithms": {
+        "status": "PASS",
+        "details": "TWAP and VWAP found",
+        "timestamp": "2025-08-08T22:06:27.672852"
       }
     },
     "Scanners": {
       "Module Import": {
-        "status": "FAIL",
-        "details": "cannot import name 'get_scanner_registry' from 'main.scanners' (/Users/zachwade/StockMonitoring/ai_trader/src/main/scanners/__init__.py)",
-        "timestamp": "2025-08-08T19:04:38.274294"
+        "status": "PASS",
+        "details": "Scanners module found",
+        "timestamp": "2025-08-08T22:06:27.674676"
+      },
+      "Scanner Files": {
+        "status": "PASS",
+        "details": "Found 26 scanner implementations",
+        "timestamp": "2025-08-08T22:06:27.675650"
+      },
+      "CLI Integration": {
+        "status": "PASS",
+        "details": "Scanner commands found in CLI",
+        "timestamp": "2025-08-08T22:06:27.676486"
       }
     },
     "Monitoring": {
-      "Module Import": {
+      "Dashboard Modules": {
+        "status": "PASS",
+        "details": "System and Trading dashboards found",
+        "timestamp": "2025-08-08T22:06:27.676507"
+      },
+      "Health Metrics": {
         "status": "FAIL",
-        "details": "cannot import name 'SystemDashboard' from 'main.monitoring.dashboards' (unknown location)",
-        "timestamp": "2025-08-08T19:04:38.274349"
+        "details": "Module not found",
+        "timestamp": "2025-08-08T22:06:27.676618"
       }
     },
     "Jobs": {
-      "Module Import": {
-        "status": "FAIL",
-        "details": "cannot import name 'OrderError' from 'main.utils.exceptions' (/Users/zachwade/StockMonitoring/ai_trader/src/main/utils/exceptions.py)",
-        "timestamp": "2025-08-08T19:04:38.298367"
+      "Scheduler Module": {
+        "status": "PASS",
+        "details": "Scheduler found",
+        "timestamp": "2025-08-08T22:06:27.681443"
+      },
+      "Job Definitions": {
+        "status": "WARN",
+        "details": "Only 1 job files",
+        "timestamp": "2025-08-08T22:06:27.681938"
       }
     }
   },
   "issues_found": [
     {
       "component": "Configuration",
-      "test": "Load unified_config",
-      "issue": "Cannot load configuration",
-      "timestamp": "2025-08-08T19:04:06.733395"
-    },
-    {
-      "component": "Database",
-      "test": "Module Import",
-      "issue": "Database module broken",
-      "timestamp": "2025-08-08T19:04:06.741357"
+      "test": "Environment DATABASE_URL",
+      "issue": "Missing DATABASE_URL",
+      "timestamp": "2025-08-08T22:05:57.462988"
     },
     {
       "component": "Data Ingestion",
-      "test": "Module Import",
-      "issue": "Ingestion module broken",
-      "timestamp": "2025-08-08T19:04:06.757867"
+      "test": "Polygon API Test",
+      "issue": "Manual verification needed",
+      "timestamp": "2025-08-08T22:05:57.620056"
+    },
+    {
+      "component": "Data Ingestion",
+      "test": "Validation Module",
+      "issue": "Validation may be missing",
+      "timestamp": "2025-08-08T22:05:57.637038"
     },
     {
       "component": "Features",
-      "test": "Module Import",
-      "issue": "Feature module broken",
-      "timestamp": "2025-08-08T19:04:09.287261"
+      "test": "Orchestrator Init",
+      "issue": "Orchestrator initialization failed",
+      "timestamp": "2025-08-08T22:05:58.943676"
     },
     {
       "component": "Risk",
-      "test": "Module Import",
-      "issue": "Risk management broken",
-      "timestamp": "2025-08-08T19:04:38.185797"
+      "test": "Pre-Trade Manager",
+      "issue": "Pre-trade risk broken",
+      "timestamp": "2025-08-08T22:06:27.645140"
     },
     {
-      "component": "Trading",
-      "test": "Module Import",
-      "issue": "Trading engine broken",
-      "timestamp": "2025-08-08T19:04:38.273531"
-    },
-    {
-      "component": "Scanners",
-      "test": "Module Import",
-      "issue": "Scanner module broken",
-      "timestamp": "2025-08-08T19:04:38.274297"
+      "component": "Risk",
+      "test": "Real-Time Monitor",
+      "issue": "Real-time risk broken",
+      "timestamp": "2025-08-08T22:06:27.645184"
     },
     {
       "component": "Monitoring",
-      "test": "Module Import",
-      "issue": "Monitoring module broken",
-      "timestamp": "2025-08-08T19:04:38.274351"
+      "test": "Health Metrics",
+      "issue": "ISSUE-005: System health not implemented",
+      "timestamp": "2025-08-08T22:06:27.676620"
     },
     {
       "component": "Jobs",
-      "test": "Module Import",
-      "issue": "Jobs module broken",
-      "timestamp": "2025-08-08T19:04:38.298374"
+      "test": "Job Definitions",
+      "issue": "Jobs may be missing",
+      "timestamp": "2025-08-08T22:06:27.681941"
     }
   ],
   "performance_metrics": {},
-  "overall_status": "FAIL"
+  "overall_status": "PARTIAL"
 }

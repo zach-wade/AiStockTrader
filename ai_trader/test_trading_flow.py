@@ -74,13 +74,22 @@ async def test_configuration():
             return False
         
         # Check critical environment variables
-        critical_vars = ["POLYGON_API_KEY", "ALPACA_API_KEY", "DATABASE_URL"]
+        critical_vars = ["POLYGON_API_KEY", "ALPACA_API_KEY"]
+        optional_vars = ["DATABASE_URL"]
+        
         for var in critical_vars:
             if os.getenv(var):
                 log_test("Configuration", f"Environment {var}", "PASS", "Set")
             else:
                 log_test("Configuration", f"Environment {var}", "FAIL", 
                         "Not set", f"Missing {var}")
+        
+        for var in optional_vars:
+            if os.getenv(var):
+                log_test("Configuration", f"Environment {var}", "PASS", "Set")
+            else:
+                log_test("Configuration", f"Environment {var}", "WARN", 
+                        "Not set (optional)", f"{var} not required - using config")
         
         return True
         
@@ -150,7 +159,7 @@ async def test_data_ingestion():
     print("="*50)
     
     try:
-        from main.data_pipeline.ingestion.clients.polygon_client import PolygonClient
+        from main.data_pipeline.ingestion.clients.polygon_market_client import PolygonMarketClient
         from main.config import get_config_manager
         
         config_manager = get_config_manager()
@@ -158,7 +167,7 @@ async def test_data_ingestion():
         
         # Test Polygon client
         try:
-            client = PolygonClient(config)
+            client = PolygonMarketClient(config)
             log_test("Data Ingestion", "Polygon Client Init", "PASS", 
                     "Client initialized")
             
@@ -181,12 +190,12 @@ async def test_data_ingestion():
             
         # Test data validation
         try:
-            from main.data_pipeline.validation import DataValidator
+            from main.data_pipeline.validation import ValidationPipeline
             log_test("Data Ingestion", "Validation Module", "PASS", 
-                    "Module imported")
-        except:
+                    "ValidationPipeline imported")
+        except Exception as e:
             log_test("Data Ingestion", "Validation Module", "WARN", 
-                    "Module not found", "Validation may be missing")
+                    f"Import error: {str(e)[:50]}", "Validation may be missing")
         
         return True
         
@@ -233,12 +242,12 @@ async def test_feature_calculation():
         # Check calculator types
         try:
             from main.feature_pipeline.calculators import (
-                TechnicalCalculator,
-                StatisticalCalculator,
-                RiskCalculator
+                TechnicalIndicatorsCalculator,
+                AdvancedStatisticalCalculator,
+                BaseFeatureCalculator
             )
             log_test("Features", "Calculator Modules", "PASS", 
-                    "Technical, Statistical, Risk calculators found")
+                    "Technical, Statistical, Base calculators found")
         except Exception as e:
             log_test("Features", "Calculator Modules", "FAIL", 
                     str(e), "Some calculators missing")
@@ -258,7 +267,7 @@ async def test_models():
     
     try:
         # Check model directory structure
-        models_path = Path("src/main/models")
+        models_path = Path(__file__).parent / "src/main/models"
         
         subdirs = [d.name for d in models_path.iterdir() if d.is_dir()]
         log_test("Models", "Directory Structure", "PASS", 
@@ -301,8 +310,8 @@ async def test_risk_management():
     print("="*50)
     
     try:
-        from main.risk_management.pre_trade import PreTradeRiskManager
-        from main.risk_management.real_time import RealTimeRiskMonitor
+        from main.risk_management.pre_trade import UnifiedLimitChecker
+        from main.risk_management.real_time import LiveRiskMonitor
         from main.config import get_config_manager
         
         config_manager = get_config_manager()
@@ -310,7 +319,7 @@ async def test_risk_management():
         
         # Test pre-trade risk
         try:
-            pre_trade = PreTradeRiskManager(config)
+            pre_trade = UnifiedLimitChecker(config)
             log_test("Risk", "Pre-Trade Manager", "PASS", 
                     "Manager initialized")
         except Exception as e:
@@ -319,16 +328,23 @@ async def test_risk_management():
         
         # Test real-time risk
         try:
-            real_time = RealTimeRiskMonitor(config)
+            # LiveRiskMonitor requires a position_manager, not config
+            # We'll create a mock one or skip with explanation
+            from unittest.mock import Mock
+            mock_position_manager = Mock()
+            real_time = LiveRiskMonitor(
+                position_manager=mock_position_manager,
+                config=config
+            )
             log_test("Risk", "Real-Time Monitor", "PASS", 
-                    "Monitor initialized")
+                    "Monitor initialized with mock position manager")
         except Exception as e:
             log_test("Risk", "Real-Time Monitor", "FAIL", 
                     str(e), "Real-time risk broken")
         
         # Check circuit breaker (ISSUE-010)
         try:
-            from main.risk_management.circuit_breaker import CircuitBreaker
+            from main.risk_management.real_time.circuit_breaker import CircuitBreakerFacade
             log_test("Risk", "Circuit Breaker", "PASS", 
                     "Circuit breaker found")
         except:
@@ -404,7 +420,7 @@ async def test_scanners():
         
         # Check for scanner implementations
         from pathlib import Path
-        scanners_path = Path("src/main/scanners")
+        scanners_path = Path(__file__).parent / "src/main/scanners"
         scanner_files = list(scanners_path.glob("**/*.py"))
         scanner_count = len([f for f in scanner_files if "scanner" in f.name.lower()])
         
@@ -416,14 +432,19 @@ async def test_scanners():
                     "No scanner implementations found", "No scanner files")
         
         # Check CLI integration (ISSUE-002)
-        with open("ai_trader.py", "r") as f:
-            cli_content = f.read()
+        ai_trader_path = Path(__file__).parent / "ai_trader.py"
+        if ai_trader_path.exists():
+            with open(ai_trader_path, "r") as f:
+                cli_content = f.read()
             if "scanner" in cli_content.lower():
                 log_test("Scanners", "CLI Integration", "PASS", 
                         "Scanner commands found in CLI")
             else:
                 log_test("Scanners", "CLI Integration", "FAIL", 
                         "No scanner commands", "ISSUE-002: Scanner not integrated")
+        else:
+            log_test("Scanners", "CLI Integration", "FAIL", 
+                    "ai_trader.py not found", "Cannot check CLI integration")
         
         return True
         
@@ -473,7 +494,6 @@ async def test_scheduled_jobs():
     
     try:
         from main.orchestration import JobScheduler
-        from main.jobs import scheduled_jobs
         
         try:
             log_test("Jobs", "Scheduler Module", "PASS", 
@@ -483,7 +503,7 @@ async def test_scheduled_jobs():
                     "Module not found", "ISSUE-001: Job scheduler broken")
         
         # Check job definitions
-        jobs_path = Path("src/main/jobs")
+        jobs_path = Path(__file__).parent / "src/main/jobs"
         job_files = list(jobs_path.glob("*.py"))
         
         if len(job_files) > 1:

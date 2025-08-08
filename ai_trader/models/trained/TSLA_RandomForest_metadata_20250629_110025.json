@@ -1,0 +1,8 @@
+{
+  "symbol": "TSLA",
+  "model_type": "RandomForest",
+  "accuracy": 0.553763440860215,
+  "auc": 0.5445590994371483,
+  "trained_at": "20250629_110025",
+  "model_path": "models/trained/TSLA_RandomForest_20250629_110025.pkl"
+}

@@ -1,0 +1,14 @@
+{
+  "model_type": "GradientBoosting",
+  "accuracy": 1.0,
+  "trained_at": "20250629_111018",
+  "feature_count": 62,
+  "training_samples": 19108,
+  "symbols": [
+    "AAPL",
+    "GOOGL",
+    "MSFT",
+    "TSLA",
+    "AMZN"
+  ]
+}

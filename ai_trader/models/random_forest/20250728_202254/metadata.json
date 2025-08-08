@@ -1,0 +1,44 @@
+{
+  "model_type": "random_forest",
+  "training_timestamp": "20250728_202254",
+  "symbols": [
+    "AAPL",
+    "MSFT"
+  ],
+  "metrics": {
+    "accuracy": 0.7494356659142212,
+    "precision": 0.2777777777777778,
+    "recall": 0.1724137931034483,
+    "f1_score": 0.2127659574468085,
+    "roc_auc": 0.46096474234792717
+  },
+  "feature_columns": [
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "vwap",
+    "transactions",
+    "otc",
+    "returns",
+    "sma_20",
+    "volatility_20d",
+    "day_of_week",
+    "month",
+    "trade_count",
+    "Dividends",
+    "Stock Splits",
+    "Adj Close"
+  ],
+  "training_metadata": {
+    "train_samples": 1769,
+    "test_samples": 443,
+    "hyperparameters_used": {}
+  },
+  "config": {
+    "lookback_days": 365,
+    "test_size": 0.8,
+    "model_config": {}
+  }
+}

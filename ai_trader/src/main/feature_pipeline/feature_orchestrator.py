@@ -26,11 +26,14 @@ from main.data_pipeline.storage.archive_initializer import get_archive
 from main.data_pipeline.storage.repositories import get_repository_factory
 from main.interfaces.repositories import IMarketDataRepository
 from main.utils.resilience import ErrorRecoveryManager
+from main.utils.resilience.strategies import ResilienceStrategies
 from main.feature_pipeline.feature_store import FeatureStoreV2
 from main.feature_pipeline.feature_store import FeatureStoreV2 as FeatureStoreRepository
+from main.utils.cache import get_global_cache
 from main.interfaces.events import IEventBus, EventType
 from main.events.types import ScannerAlertEvent, FeatureRequestEvent
-from main.data_pipeline.validation.core.validation_pipeline import ValidationPipeline, ValidationStage
+from main.data_pipeline.validation.core.validation_factory import ValidationFactory
+from main.data_pipeline.validation.core.validation_pipeline import ValidationStage
 from main.utils.data import (
     DataFrameStreamer, StreamingConfig, stream_process_dataframe, 
     streaming_context, optimize_feature_calculation
@@ -72,15 +75,17 @@ class FeatureOrchestrator:
         self.data_archive = get_archive()
         repo_factory = get_repository_factory()
         self.market_data_repo = repo_factory.create_market_data_repository(self.db_adapter)
-        self.feature_store_repo = FeatureStoreRepository(self.db_adapter)
+        self.feature_store_repo = repo_factory.create_feature_repository(self.db_adapter)
         self.resilience = ResilienceStrategies(self.config)
         
         # Initialize FeatureStoreV2 for versioned HDF5 storage
-        self.feature_store = FeatureStoreV2(config=self.config)
+        # Get base path from config or use default
+        feature_store_base_path = self.config.get('feature_store.base_path', 'data/feature_store')
+        self.feature_store = FeatureStoreV2(base_path=feature_store_base_path, config=self.config)
         
         # Create DataFetchService with required dependencies
-        from main.data_pipeline.processing.standardizer import DataStandardizer
-        standardizer = DataStandardizer(self.config)
+        from main.data_pipeline.processing.standardizers import DataStandardizer
+        standardizer = DataStandardizer()
         
         # DataFetchService will be initialized when clients are set
         self.data_fetch_service = None
@@ -131,8 +136,9 @@ class FeatureOrchestrator:
         self._batch_queue = asyncio.Queue()
         self._batch_processing_task = None
         
-        # Initialize validation pipeline
-        self.validation_pipeline = ValidationPipeline()
+        # Initialize validation pipeline using factory
+        validation_factory = ValidationFactory(use_config_manager=True)
+        self.validation_pipeline = validation_factory.create_pipeline()
         
         # Initialize streaming processing capabilities
         streaming_chunk_size = self.config.get('orchestrator.features.streaming.chunk_size', 10000)
@@ -141,9 +147,7 @@ class FeatureOrchestrator:
         self.streaming_config = StreamingConfig(
             chunk_size=streaming_chunk_size,
             max_memory_mb=streaming_memory_limit,
-            parallel_workers=max_workers,
-            enable_gc_per_chunk=True,
-            log_progress_every=5
+            parallel_workers=max_workers
         )
         
         # Memory monitoring

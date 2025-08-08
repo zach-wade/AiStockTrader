@@ -159,6 +159,11 @@ pydantic>=2.0.0        # Data validation
   - Brokers: `brokers/`
   - Algorithms: `algorithms/`
 
+- **Orchestration**: `src/main/orchestration/`
+  - ML Orchestrator: `ml_orchestrator.py`
+  - Job Scheduler: `job_scheduler.py` (relocated from /scripts/scheduler/)
+  - Scripts: `/scripts/scheduler/master_scheduler.py` (CLI wrapper only)
+
 #### Database Schema Locations
 - **Main Schemas**: `docs/database/schema/`
   - `companies_table.sql`
@@ -497,5 +502,6 @@ cache:market_data:AAPL:1h:20240101
 
 ---
 
-*Last Updated: 2025-08-08*
-*Version: 1.0*
+*Last Updated: 2025-08-08 22:30 (Phase 3.0 - All systems operational)*  
+*System Status: FULLY FUNCTIONAL (10/10 components passing)*
+*Version: 1.2*

@@ -91,3 +91,31 @@ class PositionSizeChecker(LimitChecker):
     def supported_limit_types(self) -> List[LimitType]:
         """Return supported limit types."""
         return [LimitType.POSITION_SIZE]
+    
+    def supports_limit_type(self, limit_type: LimitType) -> bool:
+        """Check if this checker supports the given limit type."""
+        return limit_type == LimitType.POSITION_SIZE
+    
+    def calculate_current_value(self, limit: LimitDefinition, context: Dict[str, Any]) -> float:
+        """
+        Calculate the current position value from context.
+        
+        Args:
+            limit: The limit definition
+            context: Context containing position and portfolio information
+            
+        Returns:
+            Current position value
+        """
+        # Get position value from context
+        position_value = context.get('position_value', 0.0)
+        
+        # If relative limit, calculate as percentage of portfolio
+        if limit.scope_filter.get('relative', False):
+            portfolio_value = context.get('portfolio_value', 1.0)
+            if portfolio_value > 0:
+                return (position_value / portfolio_value) * 100
+            return 0.0
+        
+        # Return absolute position value
+        return position_value

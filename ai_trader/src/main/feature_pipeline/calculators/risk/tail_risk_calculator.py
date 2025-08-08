@@ -40,6 +40,10 @@ class TailRiskCalculator(BaseRiskCalculator):
         
         logger.debug(f"Initialized TailRiskCalculator with {self.threshold:.1%} threshold")
     
+    def get_required_columns(self) -> List[str]:
+        """Get list of required input columns."""
+        return ['close']
+    
     def get_feature_names(self) -> List[str]:
         """Return list of tail risk feature names."""
         feature_names = [

@@ -84,7 +84,7 @@ class BaseIngestionClient(ABC, Generic[T]):
         # Initialize circuit breaker
         self.circuit_breaker = AsyncCircuitBreaker(
             failure_threshold=config.circuit_breaker_failures,
-            timeout_duration=config.circuit_breaker_timeout,
+            recovery_timeout=config.circuit_breaker_timeout,
             expected_exception=aiohttp.ClientError
         )
         

@@ -87,6 +87,16 @@ class VaRCalculator(BaseRiskCalculator):
         
         logger.debug(f"Initialized VaRCalculator with {len(self.confidence_levels)} confidence levels")
     
+    def get_required_columns(self) -> List[str]:
+        """
+        Get list of required input columns for VaR calculations.
+        
+        Returns:
+            List of required column names
+        """
+        # VaR calculations typically need price or returns data
+        return ['close']
+    
     def get_feature_names(self) -> List[str]:
         """Return list of VaR feature names."""
         feature_names = []

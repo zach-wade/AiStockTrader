@@ -39,6 +39,10 @@ class DrawdownCalculator(BaseRiskCalculator):
         
         logger.debug(f"Initialized DrawdownCalculator with {self.lookback_window}d lookback")
     
+    def get_required_columns(self) -> List[str]:
+        """Get list of required input columns."""
+        return ['close']
+    
     def get_feature_names(self) -> List[str]:
         """Return list of drawdown feature names."""
         feature_names = [

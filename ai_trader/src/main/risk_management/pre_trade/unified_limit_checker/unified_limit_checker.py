@@ -5,16 +5,17 @@ This module provides the main UnifiedLimitChecker class that orchestrates
 all limit checking functionality using the modular components.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Callable
 
 from .config import LimitConfig, get_default_config
-from .registry import CheckerRegistry, create_default_registry
+from .registry import CheckerRegistry, create_default_registry, SimpleThresholdChecker
 from .events import EventManager, create_event_manager_with_defaults
 from .types import LimitType
 from .models import LimitDefinition, LimitViolation, LimitCheckResult
-from .checkers import SimpleThresholdChecker, PositionSizeChecker, DrawdownChecker
+from .checkers import PositionSizeChecker, DrawdownChecker
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +59,18 @@ class UnifiedLimitChecker:
     
     def _create_default_registry(self) -> CheckerRegistry:
         """Create default registry with standard checkers."""
-        registry = create_default_registry()
+        registry = create_default_registry(self.config)
         
-        # Register specialized checkers
-        registry.register_checker(LimitType.POSITION_SIZE, PositionSizeChecker())
-        registry.register_checker(LimitType.DRAWDOWN, DrawdownChecker())
+        # Register specialized checkers using async tasks
+        asyncio.create_task(registry.register_checker(
+            PositionSizeChecker(checker_id="position_size", config=self.config)))
+        asyncio.create_task(registry.register_checker(
+            DrawdownChecker(checker_id="drawdown", config=self.config)))
         
-        # Register default checker for other types
-        registry.register_default_checker(SimpleThresholdChecker())
+        # Note: registry.register_default_checker might not exist
+        # We should just register it as a normal checker
+        asyncio.create_task(registry.register_checker(
+            SimpleThresholdChecker(self.config)))
         
         return registry
     

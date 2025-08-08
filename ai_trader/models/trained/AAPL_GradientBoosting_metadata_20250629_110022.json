@@ -1,0 +1,8 @@
+{
+  "symbol": "AAPL",
+  "model_type": "GradientBoosting",
+  "accuracy": 0.49732620320855614,
+  "auc": 0.4250574712643679,
+  "trained_at": "20250629_110022",
+  "model_path": "models/trained/AAPL_GradientBoosting_20250629_110022.pkl"
+}

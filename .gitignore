@@ -20,7 +20,6 @@ archive/
 # ============================================
 # MODELS & TRAINING ARTIFACTS (CRITICAL)
 # ============================================
-models/
 *.pkl
 *.joblib
 *.h5

@@ -108,6 +108,16 @@ class RiskMetricsFacade(BaseRiskCalculator):
         
         return features
     
+    def get_required_columns(self) -> List[str]:
+        """
+        Get list of required input columns for risk calculations.
+        
+        Returns:
+            List of required column names
+        """
+        # Risk calculations typically need OHLCV data
+        return ['open', 'high', 'low', 'close', 'volume']
+    
     def calculate(self, data: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate all risk metrics using parallel processing.

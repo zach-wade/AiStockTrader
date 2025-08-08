@@ -104,6 +104,10 @@ class StressTestCalculator(BaseRiskCalculator):
         
         logger.info("Initialized StressTestCalculator")
     
+    def get_required_columns(self) -> List[str]:
+        """Get list of required input columns."""
+        return ['close']
+    
     def get_feature_names(self) -> List[str]:
         """Get list of stress test feature names."""
         features = []

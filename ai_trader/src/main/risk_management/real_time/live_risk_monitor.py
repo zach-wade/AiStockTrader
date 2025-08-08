@@ -193,8 +193,8 @@ class LiveRiskMonitor:
         self.config = config or {}
         
         # Initialize risk management components
-        self.limit_checker = UnifiedLimitChecker()
-        self.risk_metrics = RiskMetricsFacade()
+        self.limit_checker = UnifiedLimitChecker(config or {})
+        self.risk_metrics = RiskMetricsFacade(config or {})
         self.circuit_breaker = CircuitBreakerFacade(self._get_circuit_breaker_config())
         
         # Risk profile-specific limits
