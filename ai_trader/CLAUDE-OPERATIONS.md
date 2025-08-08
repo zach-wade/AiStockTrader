@@ -264,6 +264,46 @@ CRITICAL [2024-01-01 09:30:15] Trading engine crashed: insufficient funds
 
 ---
 
+## 📊 Code Review & Audit
+
+### Audit Documentation (August 2025)
+The project is undergoing a comprehensive audit. Reference these documents:
+
+- **[PROJECT_AUDIT.md](PROJECT_AUDIT.md)** - Audit methodology and current findings
+- **[ISSUE_REGISTRY.md](ISSUE_REGISTRY.md)** - All known issues with P0-P3 priorities
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Complete code structure analysis
+- **[review_progress.json](review_progress.json)** - Track review progress by module
+
+### Checking Review Status
+```bash
+# View current review progress
+cat review_progress.json | jq '.statistics'
+
+# Check module-specific status
+cat review_progress.json | jq '.modules.trading_engine'
+
+# Count remaining files to review
+cat review_progress.json | jq '.statistics.files_reviewed, .statistics.total_files'
+
+# Run code inventory analysis
+./code_inventory_v2.sh
+```
+
+### Updating Audit Documents
+When fixing issues or reviewing code:
+1. Update `review_progress.json` with files reviewed
+2. Mark issues as resolved in `ISSUE_REGISTRY.md`
+3. Update statistics in `PROJECT_AUDIT.md`
+4. Document any new issues found
+
+### Priority Issue Categories
+- **P0 (Critical)**: System breaking, must fix immediately
+- **P1 (High)**: Major functionality broken
+- **P2 (Medium)**: Performance/quality issues
+- **P3 (Low)**: Code quality/maintenance
+
+---
+
 ## 🔍 Monitoring & Metrics
 
 ### Accessing Dashboards
@@ -333,6 +373,8 @@ groups:
 ---
 
 ## 🛠️ Troubleshooting Guide
+
+**📝 Note**: Check [ISSUE_REGISTRY.md](ISSUE_REGISTRY.md) for complete list of 50+ known issues with priorities and status.
 
 ### Common Issues & Solutions
 

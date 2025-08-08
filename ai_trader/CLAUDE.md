@@ -66,6 +66,31 @@ When updating CLAUDE documentation, the AI assistant MUST:
 - Graceful shutdown improvements needed
 - Database execute operations audit findings need addressing (see docs/reports/database_execute_audit.md)
 
+## 📊 Project Audit & Review (August 2025)
+
+### Comprehensive Review Initiative
+A systematic audit of the entire codebase is underway to ensure code quality, identify issues, and plan improvements.
+
+### Key Audit Documents
+- **[PROJECT_AUDIT.md](PROJECT_AUDIT.md)** - Complete audit methodology and findings
+- **[ISSUE_REGISTRY.md](ISSUE_REGISTRY.md)** - 50+ categorized issues with priorities (P0-P3)
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Detailed code metrics and structure analysis
+- **[review_progress.json](review_progress.json)** - Real-time tracking of review progress
+
+### Current Audit Status
+- **Code to Review**: 785 Python files, 231,721 lines
+- **Test Coverage**: 156 test files, 23% test-to-code ratio
+- **Issues Documented**: 50+ (5 Critical, 12 High, 18 Medium, 15+ Low)
+- **Modules**: 20 total (3 empty, 3 oversized)
+- **Progress**: Phase 1 Discovery completed, Phase 2 Critical Path Analysis pending
+
+### Priority Issues (P0 - Must Fix)
+1. Scheduled jobs broken (ISSUE-001)
+2. Scanner execution not integrated (ISSUE-002)
+3. Graceful shutdown broken (ISSUE-003)
+4. Database execute audit findings (ISSUE-004)
+5. System health dashboard empty (ISSUE-005)
+
 ---
 
 ## 📊 Project Overview
@@ -848,10 +873,19 @@ order_repo = factory.create_order_repository(db)  # Type: IOrderRepository
 ## 📚 Additional Resources
 
 ### Internal Documentation
+
+#### Core Documentation
 - `README.md` - Project overview and quick start
 - `PRODUCTION_USAGE_GUIDE.md` - Production deployment guide
 - `config/docs/CONFIG_ARCHITECTURE.md` - Configuration system details
 - `monitoring/README.md` - Monitoring setup guide
+
+#### Audit & Review Documents (August 2025)
+- `PROJECT_AUDIT.md` - Comprehensive project audit and methodology
+- `ISSUE_REGISTRY.md` - Complete issue tracking with priorities
+- `PROJECT_STRUCTURE.md` - Detailed code structure and metrics
+- `review_progress.json` - Live review progress tracking
+- `code_inventory_v2.sh` - Automated code analysis script
 
 ### Key Integration Points
 - Alpaca API: https://alpaca.markets/docs/

@@ -37,6 +37,40 @@ pydantic>=2.0.0        # Data validation
 
 ---
 
+## 📊 Project Statistics (August 2025 Audit)
+
+**Source**: See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete analysis
+
+### Code Distribution
+| Category | Files | Lines | Notes |
+|----------|-------|-------|-------|
+| Main Code (src/main/) | 785 | 231,721 | Core application |
+| Test Suite (tests/) | 156 | 53,957 | 23% test-to-code ratio |
+| Scripts | 37 | 9,118 | Utility scripts |
+| Examples | 11 | 2,940 | Example implementations |
+| **Total Python** | **989** | **297,736** | Entire codebase |
+
+### Module Size Analysis
+#### Top 5 Largest Modules (Need Refactoring)
+1. **feature_pipeline**: 44,393 lines (19.2% of codebase) 🔴
+2. **data_pipeline**: 40,305 lines (17.4% of codebase) 🔴
+3. **utils**: 36,628 lines (15.8% of codebase) 🔴
+4. **models**: 24,406 lines (10.5% of codebase)
+5. **risk_management**: 16,554 lines (7.1% of codebase)
+
+#### Empty Modules (Need Investigation)
+- **core/**: 0 files ❓
+- **services/**: 0 files ❓
+- **migrations/**: 0 files ❓
+
+### Known Technical Debt
+- **50+ documented issues** - See [ISSUE_REGISTRY.md](ISSUE_REGISTRY.md)
+- **10+ files over 500 lines** - Refactoring candidates
+- **Circular import patterns** - Detected in 5+ files
+- **Module size imbalance** - Top 3 modules contain 52% of code
+
+---
+
 ## 📁 Detailed Directory Structure
 
 ### Project Root Structure

@@ -294,6 +294,39 @@ env_file:
 
 ---
 
+## 🔍 Project Health Check
+
+### Current Project Status (August 2025)
+Before starting development, review the current state of the project:
+
+- **[PROJECT_AUDIT.md](PROJECT_AUDIT.md)** - Comprehensive audit findings
+- **[ISSUE_REGISTRY.md](ISSUE_REGISTRY.md)** - 50+ known issues to be aware of
+- **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Complete codebase structure
+- **[review_progress.json](review_progress.json)** - Module review status
+
+### Quick Health Metrics
+```bash
+# Check project statistics
+./code_inventory_v2.sh
+
+# View known critical issues
+grep "P0 -" ISSUE_REGISTRY.md
+
+# Check test coverage
+pytest --cov=src/main --cov-report=term-missing
+
+# Verify all dependencies
+pip check
+```
+
+### Known Setup Issues
+- **Scheduled jobs broken** (ISSUE-001) - Manual execution required
+- **Scanner integration missing** (ISSUE-002) - Use direct imports
+- **Graceful shutdown issues** (ISSUE-003) - Use Ctrl+C twice
+- **Empty modules** - core/, services/, migrations/ have no implementation
+
+---
+
 ## 🛠️ Development Tools Setup
 
 ### IDE Configuration
