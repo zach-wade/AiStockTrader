@@ -26,36 +26,62 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 ### Codebase Metrics
 | Metric | Value | Status |
 |--------|-------|--------|
-| Python Files | 786 | 🔍 To Review |
-| Lines of Code | 231,764 | 🔍 To Analyze |
+| Python Files (Main) | 785 | 🔍 To Review |
+| Python Files (Tests) | 156 | ✅ Tests exist! |
+| Lines of Code (Main) | 231,721 | 🔍 To Analyze |
+| Lines of Code (Tests) | 53,957 | 🟡 23% test-to-code ratio |
 | Main Modules | 20 | 🔍 To Audit |
-| Known Issues | 19+ | 🔴 To Fix |
-| Test Coverage | TBD | 📊 To Measure |
-| Documentation | Partial | 🟡 To Complete |
+| Known Issues | 50+ | 🔴 To Fix |
+| Test Coverage | ~23% ratio | 🟡 Needs improvement |
+| Documentation | 88 MD files | 🟡 To Complete |
 
 ### Module Overview
 | Module | Files | Lines | Status | Priority | Notes |
 |--------|-------|-------|--------|----------|-------|
-| app/ | TBD | TBD | 🔍 Pending | High | Entry points, CLI |
-| backtesting/ | TBD | TBD | 🔍 Pending | Medium | Historical validation |
-| config/ | TBD | TBD | 🔍 Pending | High | Configuration management |
-| data_pipeline/ | TBD | TBD | 🔍 Pending | Critical | Data ingestion & storage |
-| events/ | TBD | TBD | 🔍 Pending | Low | Likely deprecated |
-| feature_pipeline/ | TBD | TBD | 🔍 Pending | High | Feature calculation |
-| interfaces/ | TBD | TBD | 🔍 Pending | Critical | Contracts & protocols |
-| models/ | TBD | TBD | 🔍 Pending | Critical | ML models & strategies |
-| monitoring/ | TBD | TBD | 🔍 Pending | High | System observability |
-| risk_management/ | TBD | TBD | 🔍 Pending | Critical | Safety mechanisms |
-| scanners/ | TBD | TBD | 🔍 Pending | High | Symbol selection |
-| trading_engine/ | TBD | TBD | 🔍 Pending | Critical | Order execution |
-| universe/ | TBD | TBD | 🔍 Pending | Medium | Symbol management |
-| utils/ | TBD | TBD | 🔍 Pending | Low | Shared utilities |
-| orchestration/ | TBD | TBD | 🔍 Pending | Medium | Job scheduling |
-| services/ | TBD | TBD | 🔍 Pending | Medium | External services |
-| migrations/ | TBD | TBD | 🔍 Pending | Low | Database migrations |
-| jobs/ | TBD | TBD | 🔍 Pending | Medium | Scheduled tasks |
-| features/ | TBD | TBD | 🔍 Pending | Medium | Feature definitions |
-| core/ | TBD | TBD | 🔍 Pending | Low | Core utilities |
+| app/ | 13 | 5,478 | 🔍 Pending | High | Entry points, CLI, ai_trader.py too large |
+| backtesting/ | 16 | 4,467 | 🔍 Pending | Medium | Historical validation, possible dead code |
+| config/ | 12 | 2,643 | 🔍 Pending | High | Configuration management |
+| data_pipeline/ | 170 | 40,305 | 🔍 Pending | Critical | Largest module, hot/cold routing issues |
+| events/ | 34 | 6,707 | 🔍 Pending | Low | Likely deprecated, needs removal |
+| feature_pipeline/ | 90 | 44,393 | 🔍 Pending | High | 2nd largest, performance issues |
+| interfaces/ | 42 | 10,322 | 🔍 Pending | Critical | Contracts & protocols |
+| models/ | 101 | 24,406 | 🔍 Pending | Critical | ML models, organization issues |
+| monitoring/ | 36 | 10,349 | 🔍 Pending | High | Dashboard issues, health tab empty |
+| risk_management/ | 51 | 16,554 | 🔍 Pending | Critical | Circuit breakers over-triggering |
+| scanners/ | 34 | 13,867 | 🔍 Pending | High | Not working, not integrated |
+| trading_engine/ | 33 | 13,543 | 🔍 Pending | Critical | Core execution logic |
+| universe/ | 3 | 578 | 🔍 Pending | Medium | Symbol management |
+| utils/ | 145 | 36,628 | 🔍 Pending | Low | 3rd largest, needs consolidation |
+| orchestration/ | 2 | 439 | 🔍 Pending | Medium | Job scheduling broken |
+| services/ | 0 | 0 | ❓ Empty | Medium | No implementation found |
+| migrations/ | 0 | 0 | ❓ Empty | Low | No migrations present |
+| jobs/ | 1 | 304 | 🔍 Pending | Medium | Scheduled tasks broken |
+| features/ | 2 | 738 | 🔍 Pending | Medium | Minimal implementation |
+| core/ | 0 | 0 | ❓ Empty | Low | Purpose unclear, empty |
+
+---
+
+## 🚨 Critical Findings
+
+### Test Coverage Status - CORRECTED
+- **156 test files found** in tests/ directory
+- Test suite categories: fixtures (12), integration (54), monitoring (1), performance (4), unit (68), root tests (17)
+- 53,957 lines of test code vs 231,721 lines of main code
+- **23% test-to-code line ratio** (needs improvement to reach 80%+ industry standard)
+- Test organization appears good with unit/integration/performance separation
+
+### Major Code Smells
+1. **Three empty modules**: core/, services/, migrations/
+2. **Massive modules**: data_pipeline (40K lines), feature_pipeline (44K lines), utils (36K lines)
+3. **10+ files over 500 lines** need refactoring
+4. **Circular import patterns** detected in 5+ files
+5. **No docstrings** in many files
+
+### Architectural Issues
+1. **events/** module likely deprecated (6,707 lines of dead code?)
+2. **Duplicate functionality** suspected between modules
+3. **No clear separation** between models/, features/, and feature_pipeline/
+4. **Factory pattern inconsistency** across modules
 
 ---
 
