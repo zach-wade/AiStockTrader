@@ -1,8 +1,9 @@
 # AI Trading System - Issue Registry
 
 **Created**: 2025-08-08  
-**Source**: current_issues.txt + system analysis  
-**Total Issues**: 50+ (19 primary, 31+ sub-issues)  
+**Updated**: 2025-08-08 (Phase 2 Testing)  
+**Source**: current_issues.txt + system analysis + Phase 2 testing  
+**Total Issues**: 53+ (22 primary, 31+ sub-issues)  
 
 ---
 
@@ -10,16 +11,52 @@
 
 | Priority | Count | Status |
 |----------|-------|--------|
-| P0 - Critical | 5 | 🔴 Blocking |
+| P0 - Critical | 8 | 🔴 Blocking (3 NEW from testing) |
 | P1 - High | 12 | 🟡 Major Impact |
 | P2 - Medium | 18 | 🟡 Performance |
 | P3 - Low | 15+ | 🔵 Maintenance |
+
+## 🔴 SYSTEM STATUS: NON-FUNCTIONAL
+Phase 2 testing on 2025-08-08 revealed the system is completely non-operational.
+9 out of 10 major components failed basic initialization tests.
 
 ---
 
 ## P0 - Critical Issues (System Breaking)
 
-### ISSUE-001: Scheduled Jobs Broken
+### 🆕 ISSUE-NEW-001: Configuration System Broken (BLOCKER)
+- **Component**: config/
+- **Impact**: Blocks entire system - nothing can initialize
+- **Status**: 🔴 Open
+- **Discovered**: Phase 2 Testing (2025-08-08)
+- **Description**: System expects `unified_config.yaml` which doesn't exist
+- **Actual Files**: app_context_config.yaml, layer_definitions.yaml, event_config.yaml, etc.
+- **Required Action**: 
+  1. Fix config loader to use correct filenames
+  2. OR create unified_config.yaml
+  3. This MUST be fixed first
+
+### 🆕 ISSUE-NEW-002: Missing OrderError Exception
+- **Component**: utils/exceptions.py
+- **Impact**: Blocks trading_engine and jobs modules
+- **Status**: 🔴 Open
+- **Discovered**: Phase 2 Testing (2025-08-08)
+- **Error**: `cannot import name 'OrderError' from 'main.utils.exceptions'`
+- **Required Action**: Add OrderError class to exceptions.py
+
+### 🆕 ISSUE-NEW-003: System-Wide Import Failures
+- **Component**: Multiple
+- **Impact**: 9/10 components cannot initialize
+- **Status**: 🔴 Open
+- **Discovered**: Phase 2 Testing (2025-08-08)
+- **Missing Classes/Functions**:
+  - ExposureLimitChecker (risk_management)
+  - SystemDashboard (monitoring)
+  - get_scanner_registry (scanners)
+  - polygon_client module path incorrect
+- **Required Action**: Fix all missing imports
+
+### ISSUE-001: Scheduled Jobs Broken ✅ CONFIRMED
 - **Component**: orchestration/jobs
 - **Impact**: No automation, manual intervention required
 - **Status**: 🔴 Open
@@ -30,10 +67,11 @@
   3. Test all job types
   4. Implement monitoring
 
-### ISSUE-002: Scanner Execution Not Integrated
+### ISSUE-002: Scanner Execution Not Integrated ✅ CONFIRMED
 - **Component**: scanners/, app/ai_trader.py
 - **Impact**: Cannot run scanners from main entry point
 - **Status**: 🔴 Open
+- **Confirmed**: Phase 2 Testing - get_scanner_registry missing
 - **Description**: New scanner pipeline not accessible via CLI
 - **Required Action**:
   1. Add scanner commands to ai_trader.py
@@ -63,10 +101,11 @@
   3. Add proper error handling
   4. Update documentation
 
-### ISSUE-005: System Health Dashboard Empty
+### ISSUE-005: System Health Dashboard Empty ✅ CONFIRMED
 - **Component**: monitoring/dashboards
 - **Impact**: No system visibility
 - **Status**: 🔴 Open
+- **Confirmed**: Phase 2 Testing - SystemDashboard class doesn't exist
 - **Description**: System health tab shows no data
 - **Required Action**:
   1. Connect health metrics
