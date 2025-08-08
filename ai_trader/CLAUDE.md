@@ -10,6 +10,34 @@ This is the main reference document. For detailed information, see:
 - **[CLAUDE-OPERATIONS.md](CLAUDE-OPERATIONS.md)** - Operational procedures, troubleshooting, monitoring
 - **[CLAUDE-SETUP.md](CLAUDE-SETUP.md)** - Initial setup, configuration, development environment
 
+### 📝 Documentation Update Protocol (`/update-claude-doc` command)
+
+When updating CLAUDE documentation, the AI assistant MUST:
+
+1. **Update ALL CLAUDE files**:
+   - CLAUDE.md (main reference)
+   - CLAUDE-TECHNICAL.md (if technical changes)
+   - CLAUDE-OPERATIONS.md (if operational changes)
+   - CLAUDE-SETUP.md (if setup/repository changes)
+
+2. **Check for placeholders** in all files:
+   - Repository URLs (replace `[username]` with actual username)
+   - File paths (update to actual paths)
+   - Version numbers and dates
+   - Any TODO or PLACEHOLDER markers
+
+3. **Synchronize information** across files:
+   - Repository information must match
+   - Version numbers should be consistent
+   - Cross-references should be valid
+
+4. **Update these sections** when relevant:
+   - Current project status
+   - Known issues and priorities
+   - Recent changes and commits
+   - Configuration examples with actual values
+   - Setup instructions with real repository URLs
+
 ## 🚀 Repository Information
 
 - **GitHub Repository**: [https://github.com/zach-wade/AiStockTrader](https://github.com/zach-wade/AiStockTrader)
@@ -426,6 +454,19 @@ ENVIRONMENT             # development, paper, production
 - Scanner cycle: <5 seconds
 
 ---
+
+## 🔴 MANDATORY `/update-claude-doc` Checklist
+
+When the user runs `/update-claude-doc`, you MUST:
+
+- [ ] Check ALL CLAUDE*.md files exist (CLAUDE.md, CLAUDE-TECHNICAL.md, CLAUDE-OPERATIONS.md, CLAUDE-SETUP.md)
+- [ ] Update repository URLs in all files (especially CLAUDE-SETUP.md)
+- [ ] Update version numbers and dates consistently across all files
+- [ ] Replace ALL placeholders like `[username]`, `[path]`, `TODO`, etc.
+- [ ] Update current project status section with recent changes
+- [ ] Verify all cross-references between files are valid
+- [ ] Commit all updated files together with descriptive message
+- [ ] Report which files were updated and what changed
 
 ## 🔴 MANDATORY Code Review Checklist (2025-08-08)
 
