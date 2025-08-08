@@ -1,0 +1,105 @@
+"""
+Event Configuration
+
+Defines event-driven processing settings including backfill triggers,
+gap detection, and event handling parameters.
+"""
+
+# Automatic backfill configuration
+backfill:
+  auto_enabled: true                    # Enable automatic backfill on symbol qualification
+  delay_minutes: 5                      # Delay before backfill starts (rate limiting)
+  max_concurrent: 3                     # Maximum concurrent backfills
+  priority_by_trigger:                  # Priority based on trigger type
+    symbol_qualification: normal
+    symbol_promotion: high
+    data_gap_detected: normal
+    manual_request: high
+
+# Gap detection configuration  
+gap_detection:
+  enabled: true
+  check_interval_minutes: 60            # How often to check for gaps
+  min_gap_size_hours: 4                 # Minimum gap size to trigger backfill
+  lookback_days: 7                      # How far back to look for gaps
+
+# Event processing settings
+event_processing:
+  dead_letter_queue_enabled: true       # Enable DLQ for failed events
+  max_retries: 3                        # Max retries for failed events
+  retry_delay_seconds: 5                # Delay between retries
+  event_ttl_hours: 24                   # How long to keep events in history
+
+# Event type configuration
+event_types:
+  symbol_qualified:
+    enabled: true
+    triggers_backfill: true
+    propagate_to_scanner: true
+  
+  symbol_promoted:
+    enabled: true
+    triggers_backfill: true
+    propagate_to_scanner: true
+    
+  data_gap_detected:
+    enabled: true
+    triggers_backfill: true
+    propagate_to_scanner: false
+    
+  backfill_completed:
+    enabled: true
+    triggers_backfill: false
+    propagate_to_scanner: true
+
+# Backfill event handler configuration
+backfill_handler:
+  enabled: true                         # Enable the backfill event handler
+  max_concurrent_backfills: 3           # Maximum concurrent backfill executions
+  retry_attempts: 3                      # Number of retry attempts for failed backfills
+  retry_delay_seconds: 60               # Delay between retry attempts
+  deduplication_window_minutes: 60     # Window for deduplicating identical requests
+  circuit_breaker_threshold: 5          # Failures before circuit breaker opens
+  circuit_breaker_timeout: 300          # Seconds before circuit breaker resets
+
+# Monitoring and alerts
+monitoring:
+  alert_on_failure: true
+  failure_threshold: 10                 # Alert after N failures
+  failure_window_minutes: 60            # Within this time window
+  metrics_enabled: true
+  metrics_interval_seconds: 60
+
+# Priority Configuration (merged from events/priority_boosts.yaml)
+# Defines how different alert types and conditions affect priority
+priority_boosts:
+  BREAKOUT: 10
+  UNUSUAL_VOLUME: 15
+  INSIDER_ACTIVITY: 20
+  EARNINGS_SURPRISE: 25
+  TECHNICAL_SIGNAL: 5
+  NEWS_SENTIMENT: 10
+  OPTIONS_FLOW: 15
+  SECTOR_ROTATION: 8
+  INTERMARKET_DIVERGENCE: 12
+  SOCIAL_MOMENTUM: 7
+
+# Priority configuration
+priority_config:
+  min_priority: 1
+  max_priority: 10
+  base_multiplier: 10
+
+# Multipliers for different conditions
+condition_multipliers:
+  high_volume_ratio: 1.5      # When volume > 3x average
+  extreme_price_move: 2.0     # When price move > 5%
+  multiple_signals: 1.3       # When multiple scanners trigger
+  institutional_interest: 1.4 # When institutional activity detected
+  
+# Time-based adjustments
+time_adjustments:
+  pre_market: 1.2
+  after_hours: 0.8
+  first_hour: 1.5
+  last_hour: 1.3

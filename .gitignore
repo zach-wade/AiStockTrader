@@ -1,0 +1,234 @@
+# AI Trader - Comprehensive .gitignore
+# Prevents repository pollution from data files, models, logs, and sensitive files
+
+# ============================================
+# DATA LAKE & MARKET DATA (CRITICAL - 38GB+)
+# ============================================
+data_lake/
+*.parquet
+*.feather
+*.h5
+*.hdf5
+data/
+raw_data/
+processed_data/
+market_data/
+historical_data/
+backups/
+archive/
+
+# ============================================
+# MODELS & TRAINING ARTIFACTS (CRITICAL)
+# ============================================
+models/
+*.pkl
+*.joblib
+*.h5
+*.pb
+*.onnx
+*.pt
+*.pth
+checkpoints/
+saved_models/
+model_artifacts/
+training_outputs/
+hyperopt_results/
+results/
+
+# ============================================
+# ENVIRONMENT & CREDENTIALS (SECURITY)
+# ============================================
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+credentials/
+secrets/
+config/secrets/
+api_keys/
+
+# ============================================
+# LOGS & TEMPORARY FILES
+# ============================================
+logs/
+*.log
+*.log.*
+log_*
+deployment/logs/
+
+# ============================================
+# PYTHON
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================
+# VIRTUAL ENVIRONMENTS
+# ============================================
+venv/
+env/
+ENV/
+.venv/
+.env/
+.virtualenv/
+
+# ============================================
+# TESTING & COVERAGE
+# ============================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# ============================================
+# JUPYTER NOTEBOOKS
+# ============================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ============================================
+# IDE & EDITORS
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+.ropeproject
+
+# ============================================
+# DATABASE FILES
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ============================================
+# CACHING
+# ============================================
+.cache/
+cache/
+*.cache
+__pycache__/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+data_pipeline/storage/cache/
+data_pipeline/storage/feature_cache/
+
+# ============================================
+# SYSTEM FILES
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================
+# PROFILING
+# ============================================
+.prof
+*.profile
+
+# ============================================
+# DOCUMENTATION BUILDS
+# ============================================
+docs/_build/
+site/
+
+# ============================================
+# MONITORING & METRICS
+# ============================================
+monitoring_data/
+metrics/
+alerts/
+health_checks/
+system_health_report.json
+
+# ============================================
+# CONFIGURATION OVERRIDES
+# ============================================
+config_local.yaml
+config_override.yaml
+local_config/
+
+# ============================================
+# TEMPORARY & SCRATCH FILES
+# ============================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*~
+*.backup
+scratch/
+work/
+.scratch/
+
+# ============================================
+# COMPRESSED FILES (unless explicitly needed)
+# ============================================
+*.zip
+*.tar.gz
+*.rar
+
+# ============================================
+# SPECIFIC TO AI TRADER PROJECT
+# ============================================
+# Data processing outputs
+feature_cache/
+processed_features/
+pipeline_outputs/
+
+# Trading outputs
+trade_history/
+portfolio_snapshots/
+execution_reports/
+
+# Research outputs
+research_outputs/
+backtesting_results/
+analysis_results/
+reports/*.json
+*_analysis.json
+*_report.json
+
+# System state
+system_state/
+runtime_data/
+session_data/

@@ -1,0 +1,207 @@
+# File: config/model_config_clean.yaml
+# Configuration for ML models and training
+# Separated from main config for modularity
+
+model_config:
+  # Training settings
+  training:
+    # Data settings
+    feature_lookback_days: 730  # 2 years
+    train_test_split: 0.8
+    validation_months: 3
+    walk_forward_windows: 12
+    
+    # Symbol selection for training
+    top_n_symbols_for_training: 500
+    ensure_sector_diversity: true
+    min_symbols_per_sector: 2
+    max_symbols_per_sector: 50
+    
+    # Model selection
+    models:
+      xgboost:
+        enabled: true
+        n_estimators: 1000
+        max_depth: 6
+        learning_rate: 0.01
+        subsample: 0.8
+        colsample_bytree: 0.8
+        early_stopping_rounds: 50
+        
+      lightgbm:
+        enabled: true
+        n_estimators: 1000
+        num_leaves: 31
+        learning_rate: 0.01
+        feature_fraction: 0.8
+        bagging_fraction: 0.8
+        bagging_freq: 5
+        
+      random_forest:
+        enabled: true
+        n_estimators: 500
+        max_depth: 10
+        min_samples_split: 20
+        min_samples_leaf: 10
+        
+      ensemble:
+        enabled: true
+        voting: soft
+        weights: [0.4, 0.4, 0.2]  # XGB, LGBM, RF
+        
+    # Hyperparameter optimization
+    hyperopt:
+      enabled: true
+      n_trials: 100
+      n_jobs: -1
+      timeout_hours: 6
+      cv_splits: 5
+      scoring: sharpe_ratio
+      
+    # Training criteria
+    criteria:
+      min_sharpe_ratio: 0.5
+      min_win_rate: 0.45
+      max_drawdown: 0.15
+      min_trades: 100
+      
+  # Feature engineering
+  features:
+    # Technical indicators
+    technical:
+      enabled: true
+      indicators:
+        # Price-based
+        - rsi
+        - macd
+        - bollinger_bands
+        - atr
+        - sma
+        - ema
+        
+        # Volume-based
+        - volume_profile
+        - vwap
+        - obv
+        
+        # Advanced
+        - fibonacci_levels
+        - ichimoku
+        
+      # Indicator parameters
+      rsi_period: 14
+      macd_fast: 12
+      macd_slow: 26
+      macd_signal: 9
+      bb_period: 20
+      bb_std: 2
+        
+    # Market microstructure
+    microstructure:
+      enabled: true
+      features:
+        - bid_ask_spread
+        - order_imbalance
+        - trade_intensity
+        - price_impact
+        - volume_at_price
+        
+    # Alternative data features
+    alternative:
+      enabled: true
+      sources:
+        news_sentiment: true
+        social_sentiment: true
+        options_flow: true
+        analyst_ratings: false  # Not implemented
+        insider_trading: false  # Not implemented
+        
+    # Cross-sectional features
+    cross_sectional:
+      enabled: true
+      features:
+        - sector_relative_strength
+        - market_cap_rank
+        - volume_rank
+        - momentum_rank
+        - volatility_rank
+        
+    # Market regime features
+    market_regime:
+      enabled: true
+      lookback_periods: [20, 60, 252]  # days
+      regime_types:
+        - trend_strength
+        - volatility_regime
+        - correlation_regime
+        
+  # Model registry
+  registry:
+    # Version control
+    versioning:
+      enabled: true
+      max_versions: 10
+      auto_archive: true
+      
+    # A/B testing
+    ab_testing:
+      enabled: true
+      traffic_allocation:
+        champion: 0.7
+        challenger: 0.3
+      min_sample_size: 1000
+      
+    # Performance tracking
+    tracking:
+      metrics:
+        - sharpe_ratio
+        - win_rate
+        - profit_factor
+        - max_drawdown
+        - average_trade
+        - trades_per_day
+      update_frequency: daily
+      
+    # Model deployment
+    deployment:
+      auto_deploy: false
+      performance_threshold: 1.5  # Min Sharpe
+      observation_period: 30      # Days
+      rollback_on_failure: true
+      
+  # Backtesting
+  backtesting:
+    # Walk-forward analysis
+    walk_forward:
+      enabled: true
+      training_months: 12
+      testing_months: 3
+      step_months: 1
+      
+    # Monte Carlo simulation
+    monte_carlo:
+      enabled: true
+      n_simulations: 1000
+      confidence_intervals: [0.05, 0.95]
+      randomize:
+        - trade_timing
+        - position_sizing
+        - entry_price
+        
+    # Market regime analysis
+    regime_analysis:
+      enabled: true
+      regimes:
+        - bull_market
+        - bear_market
+        - high_volatility
+        - low_volatility
+        - trending
+        - ranging
+        
+    # Transaction costs
+    costs:
+      commission: 0.0        # Alpaca has no commissions
+      slippage_bps: 5
+      market_impact_model: linear
+      borrowing_cost_bps: 50  # For shorts

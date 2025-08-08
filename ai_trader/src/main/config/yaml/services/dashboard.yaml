@@ -1,0 +1,42 @@
+# Dashboard Configuration
+monitoring:
+  dashboards:
+    enabled: true
+    auto_open_browser: true  # Automatically open main dashboard in browser
+    
+    # Trading Dashboard - combines live trading, positions, and risk management
+    trading_dashboard:
+      enabled: true
+      port: 8080
+      update_interval: 2000  # milliseconds
+      features:
+        - live_positions
+        - pnl_tracking
+        - trading_signals
+        - risk_metrics
+        - circuit_breakers
+        - trade_history
+        - data_flow
+        - signal_management
+      
+    # System Dashboard - infrastructure and performance monitoring  
+    system_dashboard:
+      enabled: true
+      port: 8052
+      update_interval: 5000  # milliseconds
+      features:
+        - system_health
+        - cpu_memory_usage
+        - component_status
+        - performance_metrics
+        - error_logs
+        - data_feed_status
+    
+    # Deprecated dashboards - functionality merged into trading_dashboard
+    live_dashboard:
+      enabled: false
+      port: 8080
+      
+    risk_dashboard:
+      enabled: false
+      port: 8051

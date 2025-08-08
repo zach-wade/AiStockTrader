@@ -1,0 +1,98 @@
+{
+  "custom_commands": [
+    {
+      "name": "update-claude-docs",
+      "description": "Update all CLAUDE documentation based on recent code changes",
+      "aliases": ["update-docs", "sync-docs", "refresh-docs"],
+      "prompt": "Please perform a comprehensive documentation update:\n\n1. First, analyze recent changes:\n   - Check the last 10 git commits for code changes\n   - Identify modified files and their types\n   - Note any new features, commands, or configurations\n\n2. Update the appropriate CLAUDE documentation:\n   - CLAUDE.md: Update architecture, commands, and guidelines if core functionality changed\n   - CLAUDE-TECHNICAL.md: Update if dependencies, Docker, or technical specs changed\n   - CLAUDE-OPERATIONS.md: Update if operational procedures or troubleshooting changed\n   - CLAUDE-SETUP.md: Update if setup steps, environment variables, or prerequisites changed\n\n3. For each update:\n   - Maintain existing formatting and style\n   - Update examples to match current code\n   - Fix any broken file paths or references\n   - Update version numbers and dates\n\n4. Validate all changes:\n   - Ensure cross-references between docs work\n   - Verify command syntax is correct\n   - Check that file paths exist\n   - Confirm configuration examples are accurate\n\nPlease show me what changes you're making and why.",
+      "parameters": {
+        "quick": {
+          "description": "Only update changed sections",
+          "prompt_modifier": "Focus only on sections directly affected by recent changes."
+        },
+        "full": {
+          "description": "Complete documentation review",
+          "prompt_modifier": "Perform a complete review of all documentation, checking for any outdated information."
+        },
+        "validate": {
+          "description": "Just check for inconsistencies",
+          "prompt_modifier": "Don't make changes yet, just report what needs updating."
+        },
+        "focus": {
+          "description": "Focus on specific area",
+          "requires_value": true,
+          "prompt_modifier": "Focus specifically on {value} related documentation."
+        }
+      }
+    },
+    {
+      "name": "check-code-quality",
+      "description": "Run the comprehensive code review checklist",
+      "aliases": ["review-code", "code-check"],
+      "prompt": "Please run the comprehensive code review checklist from CLAUDE.md on the recent changes. Check all 6 levels and provide the review output in the specified format."
+    },
+    {
+      "name": "explain-architecture",
+      "description": "Explain a specific part of the system architecture",
+      "aliases": ["explain", "architecture"],
+      "prompt": "Please explain the architecture and implementation details of the specified component, referencing the CLAUDE documentation for context.",
+      "parameters": {
+        "component": {
+          "description": "Component to explain",
+          "requires_value": true,
+          "prompt_modifier": "Explain the {value} component in detail."
+        }
+      }
+    },
+    {
+      "name": "troubleshoot",
+      "description": "Help troubleshoot an issue using CLAUDE-OPERATIONS.md",
+      "aliases": ["debug", "fix"],
+      "prompt": "Please help troubleshoot this issue using the procedures in CLAUDE-OPERATIONS.md. Provide step-by-step debugging instructions.",
+      "parameters": {
+        "issue": {
+          "description": "Issue to troubleshoot",
+          "requires_value": true,
+          "prompt_modifier": "The issue is: {value}"
+        }
+      }
+    },
+    {
+      "name": "setup-help",
+      "description": "Get setup assistance from CLAUDE-SETUP.md",
+      "aliases": ["setup", "install"],
+      "prompt": "Please provide setup assistance using CLAUDE-SETUP.md as reference. Guide me through the required steps.",
+      "parameters": {
+        "step": {
+          "description": "Specific setup step",
+          "requires_value": true,
+          "prompt_modifier": "Help specifically with: {value}"
+        }
+      }
+    }
+  ],
+  "documentation": {
+    "primary": "CLAUDE.md",
+    "supporting": [
+      "CLAUDE-TECHNICAL.md",
+      "CLAUDE-OPERATIONS.md",
+      "CLAUDE-SETUP.md"
+    ],
+    "auto_update": {
+      "enabled": true,
+      "triggers": [
+        "after_major_refactoring",
+        "new_feature_added",
+        "configuration_changed",
+        "weekly_review"
+      ]
+    }
+  },
+  "preferences": {
+    "always_validate_examples": true,
+    "update_timestamps": true,
+    "maintain_cross_references": true,
+    "preserve_formatting": true,
+    "commit_docs_separately": true
+  }
+}

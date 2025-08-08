@@ -1,0 +1,96 @@
+# Layer Definitions Configuration
+# Single source of truth for all layer definitions across scanner, backfill, and storage
+# Replaces scattered tier/layer references throughout the codebase
+
+layers:
+  layer_0:
+    name: "Universe"
+    description: "All tradable symbols (~9,800)"
+    criteria:
+      # From scanner_pipeline.yaml
+      exchanges: ["NYSE", "NASDAQ", "AMEX"]
+      exclude: ["OTCBB", "OTHER_OTC", "PINK", "GREY"]
+      min_market_cap: 100_000_000
+      min_price: 1.0
+    
+    retention:
+      hot_storage_days: 30
+      data_types: ["1hour", "1day"]
+    backfill:
+      lookback_days: 365
+      priority: 4
+      
+      
+  layer_1:
+    name: "Liquid"
+    description: "High liquidity symbols (~2,000)"
+    criteria:
+      # From scanner_pipeline.yaml layer1
+      min_avg_dollar_volume: 5_000_000
+      min_price: 1.0
+      max_price: 10_000.0
+      lookback_days: 20
+        
+    retention:
+      hot_storage_days: 60
+      data_types: ["15minute", "1hour", "1day"]
+    backfill:
+      lookback_days: 730  # 2 years
+      priority: 3
+      
+      
+  layer_2:
+    name: "Catalyst"
+    description: "Active catalyst symbols (~200)"
+    criteria:
+      # From scanner_pipeline.yaml layer2
+      min_catalyst_score: 3.0
+      require_layer1: true
+        
+    retention:
+      hot_storage_days: 90
+      data_types: ["1minute", "5minute", "15minute", "1hour", "1day"]
+    backfill:
+      lookback_days: 1095  # 3 years
+      priority: 2
+      
+      
+  layer_3:
+    name: "RealTime"
+    description: "Real-time monitoring symbols (~50)"
+    criteria:
+      # From scanner_pipeline.yaml layer3
+      min_rvol: 2.0
+      min_price_change: 0.02
+      require_layer2: true
+      
+    retention:
+      hot_storage_days: 90
+      data_types: ["1minute", "5minute", "15minute", "1hour", "1day"]
+    backfill:
+      lookback_days: 1095  # 3 years
+      priority: 1
+      
+
+# Global layer settings
+global:
+  # Promotion rules
+  promotion:
+    evaluation_interval_hours: 24
+    min_stability_days: 7
+    require_continuous_qualification: true
+    
+  # Demotion rules
+  demotion:
+    evaluation_interval_hours: 24
+    grace_period_days: 3
+    require_continuous_disqualification: true
+    
+  # Resource allocation
+  resources:
+    total_api_rate_limit: 1000  # requests per minute
+    layer_weights:  # For proportional allocation
+      layer_0: 0.1
+      layer_1: 0.2
+      layer_2: 0.3
+      layer_3: 0.4

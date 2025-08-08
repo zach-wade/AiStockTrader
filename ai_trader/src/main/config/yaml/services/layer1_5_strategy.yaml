@@ -1,0 +1,116 @@
+# Layer 1.5 Strategy Affinity Configuration
+# Configuration for the strategy affinity filter that bridges Layer 1 and Layer 2
+
+layer1_5:
+  # Filtering thresholds
+  min_affinity_score: 0.5          # Minimum strategy affinity score (0.0-1.0)
+  max_output_symbols: 500          # Maximum symbols to pass to Layer 2
+  enable_regime_filtering: true    # Whether to use market regime filtering
+  
+  # Strategy-regime preference matrix
+  # Defines which strategies work best in different market regimes
+  regime_strategy_preferences:
+    bull:
+      - momentum
+      - breakout
+    bear:
+      - mean_reversion
+      - sentiment
+    sideways:
+      - mean_reversion
+      - sentiment
+    volatile:
+      - breakout
+      - momentum
+    unknown:
+      - momentum
+      - mean_reversion
+      - breakout
+      - sentiment
+  
+  # Fallback strategy when no preferred strategies have good scores
+  fallback_strategy: momentum
+  
+  # Output configuration
+  output_dir: data/universe/layer1_5
+  save_timestamped_files: true
+  save_detailed_analysis: true
+
+# Strategy Affinity Calculator Configuration
+strategy_affinity:
+  # Data lookback period
+  lookback_days: 90               # Days of historical data to analyze
+  min_data_points: 50             # Minimum data points required for analysis
+  
+  # Strategy-specific parameters
+  momentum_period: 20             # Period for momentum calculations
+  mean_reversion_period: 14       # Period for mean reversion calculations (RSI)
+  breakout_period: 30             # Period for breakout pattern analysis
+  
+  # Calculation weights and thresholds
+  momentum_weights:
+    trend_consistency: 0.35       # Weight for price trend consistency
+    ma_alignment: 0.25            # Weight for moving average alignment
+    macd_strength: 0.25           # Weight for MACD momentum signals
+    volume_confirmation: 0.15     # Weight for volume confirmation
+  
+  mean_reversion_weights:
+    rsi_extremes: 0.30           # Weight for RSI overbought/oversold signals
+    bb_extremes: 0.25            # Weight for Bollinger Band extremes
+    price_reversals: 0.25        # Weight for price reversal patterns
+    sideways_bias: 0.20          # Weight for sideways market preference
+  
+  breakout_weights:
+    volatility_expansion: 0.25   # Weight for volatility expansion patterns
+    range_breakouts: 0.35        # Weight for actual range breakouts
+    consolidation_patterns: 0.25 # Weight for consolidation before breakout
+    volume_spikes: 0.15          # Weight for volume spike patterns
+  
+  sentiment_weights:
+    gap_patterns: 0.30           # Weight for overnight gap patterns
+    volume_surprises: 0.25       # Weight for volume surprise moves
+    intraday_volatility: 0.25    # Weight for intraday range expansion
+    momentum_follow_through: 0.20 # Weight for post-spike momentum
+
+# Market Regime Configuration (for MarketRegimeAnalyticsCalculator)
+market_regime:
+  # Benchmark symbols for regime analysis
+  benchmark_symbols:
+    - SPY                        # S&P 500 ETF
+    - QQQ                        # NASDAQ 100 ETF
+    - IWM                        # Russell 2000 ETF
+  
+  # Analysis parameters
+  lookback_days: 60              # Days of historical data for regime analysis
+  cache_duration_hours: 1        # Hours to cache regime results
+  
+  # Regime classification thresholds
+  volatility_threshold: 1.5      # Multiplier for high volatility detection
+  trend_threshold_3m: 0.05       # 5% threshold for 3-month trend classification
+  trend_threshold_1m: 0.03       # 3% threshold for 1-month trend classification
+  high_vol_move_threshold: 0.1   # 10% threshold for high volatility moves
+  
+  # Regime preference order for tie-breaking
+  regime_priority:
+    - volatile                   # Highest priority in mixed conditions
+    - sideways                   # Neutral default
+    - bull                       # Bullish bias
+    - bear                       # Bearish bias
+
+# Layer Integration Settings
+integration:
+  # Event-driven updates
+  trigger_backfill_on_new_layer3: true    # Trigger priority backfill for new Layer 3 symbols
+  update_feature_store: true              # Update feature store with layer qualifications
+  
+  # Performance settings
+  batch_size: 50                          # Symbols to process per batch
+  max_concurrent_symbols: 10              # Maximum concurrent symbol processing
+  
+  # Monitoring and alerting
+  min_output_symbols_warning: 100         # Warn if output symbols < threshold
+  max_processing_time_minutes: 30         # Alert if processing takes longer
+  
+  # Quality assurance
+  validate_affinity_scores: true          # Validate calculated affinity scores
+  log_detailed_statistics: true           # Log detailed filtering statistics

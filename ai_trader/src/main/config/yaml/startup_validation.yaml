@@ -1,0 +1,525 @@
+# Startup Validation Configuration
+# Defines validation rules for application startup
+
+validation:
+  # Checks to perform on startup
+  startup_checks:
+    - credentials
+    - database_connectivity
+    - paths_and_permissions
+    - api_rate_limits
+    - memory_requirements
+    - dependencies
+    - configuration_files
+    
+  # Credential validation requirements
+  credential_requirements:
+    alpaca:
+      type: api_key
+      env_var: ALPACA_API_KEY
+      min_length: 20
+      required: true
+      validate_format: '^[A-Za-z0-9]{20,}$'
+      test_endpoint: 'https://api.alpaca.markets/v2/account'
+      
+    polygon:
+      type: api_key
+      env_var: POLYGON_API_KEY
+      min_length: 32
+      required: false  # Optional data source
+      validate_format: '^[A-Za-z0-9_]{32,}$'
+      test_endpoint: 'https://api.polygon.io/v2/reference/tickers?limit=1'
+      
+    benzinga:
+      type: api_key
+      env_var: BENZINGA_API_KEY
+      min_length: 30
+      required: false
+      
+    reddit:
+      type: oauth
+      client_id_var: REDDIT_CLIENT_ID
+      client_secret_var: REDDIT_CLIENT_SECRET
+      required: false
+      
+    database:
+      type: connection_string
+      env_var: DATABASE_URL
+      required: true
+      validate_format: '^postgresql://.*$'
+      
+    redis:
+      type: connection_string
+      env_var: REDIS_URL
+      required: false  # Optional cache backend
+      validate_format: '^redis://.*$'
+      
+  # Path validation requirements
+  path_requirements:
+    data_lake:
+      path: ${DATA_LAKE_ROOT:-./data_lake}
+      permissions: read_write
+      create_if_missing: true
+      min_free_space_gb: 50
+      
+    logs:
+      path: ./logs
+      permissions: write
+      create_if_missing: true
+      min_free_space_gb: 5
+      
+    temp:
+      path: ${TEMP_DIR:-/tmp/ai_trader}
+      permissions: read_write
+      create_if_missing: true
+      cleanup_on_start: true
+      
+    config:
+      path: ./src/main/config
+      permissions: read
+      create_if_missing: false
+      required_files:
+        - layer_definitions.yaml
+        - rate_limits.yaml
+        - storage_config.yaml
+        
+  # Memory and resource requirements
+  memory_requirements:
+    minimum_gb: 4
+    recommended_gb: 8
+    warning_threshold_gb: 6
+    
+    # Process-specific limits
+    max_heap_size_gb: 6
+    cache_size_mb: 512
+    buffer_pool_size_mb: 256
+    
+  # CPU requirements
+  cpu_requirements:
+    minimum_cores: 2
+    recommended_cores: 4
+    
+  # Disk space requirements
+  disk_requirements:
+    minimum_free_gb: 100
+    recommended_free_gb: 500
+    warning_threshold_gb: 200
+    
+    # Per-component space allocation
+    data_lake_reserved_gb: 300
+    logs_reserved_gb: 10
+    temp_reserved_gb: 50
+    
+  # Database connectivity checks
+  database_checks:
+    # Connection pool settings
+    min_connections: 5
+    max_connections: 50
+    connection_timeout: 30
+    
+    # Required tables
+    required_tables:
+      - companies
+      - market_data_1h
+      - market_data_1d
+      - news_data
+      - features
+      
+    # Required permissions
+    required_permissions:
+      - SELECT
+      - INSERT
+      - UPDATE
+      - DELETE
+      
+  # API connectivity checks
+  api_checks:
+    # Test each API with a simple request
+    test_apis:
+      - name: polygon
+        test_url: 'https://api.polygon.io/v1/meta/exchanges'
+        expected_status: 200
+        timeout: 10
+        
+      - name: alpaca
+        test_url: 'https://api.alpaca.markets/v2/clock'
+        expected_status: 200
+        timeout: 10
+        
+    # Verify rate limits are configured
+    verify_rate_limits: true
+    
+  # Dependency checks
+  dependency_checks:
+    # Python package versions
+    python_packages:
+      pandas: '>=1.3.0'
+      numpy: '>=1.21.0'
+      asyncpg: '>=0.24.0'
+      aiohttp: '>=3.8.0'
+      
+    # System commands
+    system_commands:
+      - git
+      - psql
+      
+  # Configuration file validation
+  config_validation:
+    # Schema validation
+    validate_schemas: true
+    
+    # Check for missing references
+    check_references: true
+    
+    # Verify no duplicate keys
+    check_duplicates: true
+    
+    # Ensure environment variables are set
+    check_env_vars: true
+    
+# Validation failure handling
+failure_handling:
+  # What to do on validation failure
+  on_critical_failure: exit  # exit, continue_with_warning
+  on_warning: log  # log, ignore
+  
+  # Grace periods
+  allow_degraded_mode: true
+  degraded_mode_features:
+    - disable_optional_apis
+    - reduce_cache_size
+    - limit_concurrent_operations
+    
+  # Retry configuration
+  retry_failed_checks: true
+  max_retry_attempts: 3
+  retry_delay_seconds: 30
+
+# Validation Rules Configuration (merged from validation/rules.yaml)
+# Centralized business rules for multi-stage validation system
+
+# Global validation settings
+rules_validation:
+  # Default profile to use if not specified
+  default_profile: STRICT
+  
+  # Enable/disable validation globally
+  enabled: true
+  
+  # Maximum number of validation errors before failing entire batch
+  max_errors_per_batch: 100
+
+# Validation profiles with different strictness levels
+profiles:
+  STRICT:
+    description: "Production profile with all checks enabled"
+    enabled_checks:
+      - required_fields
+      - data_types
+      - business_rules
+      - statistical_outliers
+      - cross_field_validation
+      - timestamp_consistency
+      - volume_spikes
+      - price_anomalies
+    thresholds:
+      outlier_std_devs: 3
+      volume_spike_multiplier: 10
+      price_change_max_pct: 20
+      
+  HISTORICAL:
+    description: "Relaxed profile for historical data imports"
+    enabled_checks:
+      - required_fields
+      - data_types
+      - business_rules
+      - cross_field_validation
+    thresholds:
+      outlier_std_devs: 5
+      volume_spike_multiplier: 50
+      price_change_max_pct: 50
+      
+  REALTIME:
+    description: "Optimized for speed with minimal checks"
+    enabled_checks:
+      - required_fields
+      - basic_business_rules
+      - critical_anomalies
+    thresholds:
+      outlier_std_devs: 10
+      volume_spike_multiplier: 100
+      price_change_max_pct: 100
+      
+  DEBUG:
+    description: "All checks with verbose logging"
+    enabled_checks:
+      - all
+    log_level: DEBUG
+    save_validation_reports: true
+
+# Market data validation rules
+market_data:
+  # Required fields for each data type
+  required_fields:
+    ohlcv:
+      - timestamp
+      - open
+      - high
+      - low
+      - close
+      - volume
+    quote:
+      - timestamp
+      - bid
+      - ask
+      - bid_size
+      - ask_size
+    trade:
+      - timestamp
+      - price
+      - size
+      
+  # Data type specifications
+  data_types:
+    timestamp:
+      type: datetime
+      timezone_aware: true
+      timezone: UTC
+    open:
+      type: float
+      min: 0.0
+      max: 1000000.0
+    high:
+      type: float
+      min: 0.0
+      max: 1000000.0
+    low:
+      type: float
+      min: 0.0
+      max: 1000000.0
+    close:
+      type: float
+      min: 0.0
+      max: 1000000.0
+    volume:
+      type: integer
+      min: 0
+      max: 10000000000
+    bid:
+      type: float
+      min: 0.0
+    ask:
+      type: float
+      min: 0.0
+    bid_size:
+      type: integer
+      min: 0
+    ask_size:
+      type: integer
+      min: 0
+      
+  # Business rules
+  business_rules:
+    - rule: "high_gte_low"
+      expression: "high >= low"
+      error_message: "High price must be >= low price"
+      severity: ERROR
+      
+    - rule: "high_gte_open"
+      expression: "high >= open"
+      error_message: "High price must be >= open price"
+      severity: ERROR
+      
+    - rule: "high_gte_close"
+      expression: "high >= close"
+      error_message: "High price must be >= close price"
+      severity: ERROR
+      
+    - rule: "low_lte_open"
+      expression: "low <= open"
+      error_message: "Low price must be <= open price"
+      severity: ERROR
+      
+    - rule: "low_lte_close"
+      expression: "low <= close"
+      error_message: "Low price must be <= close price"
+      severity: ERROR
+      
+    - rule: "positive_volume"
+      expression: "volume >= 0"
+      error_message: "Volume must be non-negative"
+      severity: ERROR
+      
+    - rule: "reasonable_spread"
+      expression: "(high - low) / low < 0.5"
+      error_message: "Price spread exceeds 50% of low price"
+      severity: WARNING
+      applies_to: ["STRICT", "REALTIME"]
+      
+    - rule: "bid_lte_ask"
+      expression: "bid <= ask"
+      error_message: "Bid must be <= ask"
+      severity: ERROR
+      data_type: quote
+
+# News data validation rules
+news_data:
+  required_fields:
+    - headline
+    - timestamp
+    - source
+    
+  optional_fields:
+    - summary
+    - body
+    - author
+    - url
+    - symbols
+    
+  business_rules:
+    - rule: "headline_not_empty"
+      expression: "len(headline) > 0"
+      error_message: "Headline cannot be empty"
+      severity: ERROR
+      
+    - rule: "valid_url"
+      expression: "url.startswith(('http://', 'https://'))"
+      error_message: "URL must be valid HTTP/HTTPS"
+      severity: WARNING
+      
+    - rule: "reasonable_headline_length"
+      expression: "len(headline) < 500"
+      error_message: "Headline exceeds 500 characters"
+      severity: WARNING
+
+# Validation stage configurations
+stages:
+  INGEST:
+    description: "Raw data validation at source"
+    checks:
+      - required_fields
+      - data_types
+      - basic_business_rules
+    failure_action: "DROP_ROW"
+    log_failures: true
+    
+  POST_ETL:
+    description: "Post-transformation validation"
+    checks:
+      - data_consistency
+      - aggregation_correctness
+      - business_rules
+      - cross_field_validation
+    failure_action: "SKIP_SYMBOL"
+    log_failures: true
+    alert_on_failure: true
+    
+  FEATURE_READY:  # Renamed from PRE_FEATURE
+    description: "Pre-feature engineering validation"
+    checks:
+      - data_completeness
+      - statistical_validity
+      - outlier_detection
+      - sufficient_history
+    failure_action: "USE_LAST_GOOD"
+    min_history_required: 20
+    log_failures: true
+
+# Statistical validation thresholds
+statistical:
+  outlier_detection:
+    method: "z_score"
+    threshold: 3.0
+    lookback_periods: 100
+    
+  volume_spike_detection:
+    method: "rolling_average"
+    lookback_periods: 20
+    spike_multiplier: 10.0
+    
+  price_movement_limits:
+    daily_pct_change: 20.0
+    intraday_pct_change: 10.0
+    tick_size_violations: true
+
+# Error handling decision tree
+error_handling:
+  decision_tree:
+    - stage: "INGEST"
+      severity: "ERROR"
+      action: "DROP_ROW"
+      log: true
+      alert: false
+      
+    - stage: "INGEST"
+      severity: "WARNING"
+      action: "FLAG_ROW"
+      log: true
+      alert: false
+      
+    - stage: "POST_ETL"
+      severity: "ERROR"
+      action: "SKIP_SYMBOL"
+      log: true
+      alert: true
+      
+    - stage: "POST_ETL"
+      severity: "WARNING"
+      action: "FLAG_AND_CONTINUE"
+      log: true
+      alert: false
+      
+    - stage: "FEATURE_READY"
+      severity: "ERROR"
+      action: "USE_LAST_GOOD"
+      log: true
+      alert: true
+      fallback_max_age_hours: 24
+      
+    - stage: "FEATURE_READY"
+      severity: "WARNING"
+      action: "CONTINUE_WITH_WARNING"
+      log: true
+      alert: false
+
+# Validation monitoring integration
+validation_monitoring:
+  metrics_prefix: "ai_trader.validation"
+  
+  metrics:
+    - name: "validation_success_rate"
+      type: "gauge"
+      labels: ["stage", "source", "data_type"]
+      
+    - name: "validation_errors_total"
+      type: "counter"
+      labels: ["stage", "source", "error_type"]
+      
+    - name: "validation_duration_seconds"
+      type: "histogram"
+      labels: ["stage", "source"]
+      
+    - name: "data_quality_score"
+      type: "gauge"
+      labels: ["symbol", "source"]
+  
+  # Prometheus pushgateway config
+  prometheus:
+    enabled: true
+    pushgateway_url: "http://localhost:9091"
+    job_name: "ai_trader_validation"
+    push_interval_seconds: 60
+    
+  # Grafana dashboard
+  grafana:
+    dashboard_uid: "ai-trader-validation"
+    alerts:
+      - name: "High Validation Failure Rate"
+        condition: "validation_success_rate < 0.95"
+        for: "5m"
+        severity: "warning"
+        
+      - name: "Critical Data Quality Issue"
+        condition: "validation_success_rate < 0.80"
+        for: "2m"
+        severity: "critical"

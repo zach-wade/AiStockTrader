@@ -1,0 +1,287 @@
+# Alert Feature Mappings Configuration
+# Maps scanner alert types to the feature sets required for computation
+
+# Default feature set for unmapped alert types
+alert_feature_mappings:
+  # Default features for any unknown alert type
+  default:
+    - price_features
+    - volume_features
+    - volatility_features
+  
+  # Volume-based alerts
+  volume_spike:
+    - volume_features
+    - price_features
+    - momentum_features
+    - market_microstructure
+  
+  unusual_activity:
+    - volume_features
+    - price_features
+    - volatility_features
+    - market_microstructure
+    - order_flow_features
+  
+  # Technical alerts
+  technical_breakout:
+    - price_features
+    - technical_indicators
+    - momentum_features
+    - support_resistance
+    - trend_features
+  
+  technical_signal:
+    - technical_indicators
+    - price_features
+    - momentum_features
+    - trend_features
+  
+  momentum:
+    - momentum_features
+    - price_features
+    - volume_features
+    - relative_strength
+  
+  momentum_shift:
+    - momentum_features
+    - price_features
+    - volatility_features
+    - trend_features
+  
+  trend_change:
+    - trend_features
+    - price_features
+    - momentum_features
+    - volatility_features
+  
+  # News and sentiment
+  news_catalyst:
+    - news_features
+    - sentiment_features
+    - price_features
+    - volume_features
+    - social_features
+  
+  sentiment_spike:
+    - sentiment_features
+    - news_features
+    - social_features
+    - price_features
+  
+  sentiment_surge:
+    - sentiment_features
+    - social_features
+    - volume_features
+    - price_features
+  
+  # Social media
+  social_buzz:
+    - social_features
+    - sentiment_features
+    - volume_features
+  
+  social_sentiment:
+    - social_features
+    - sentiment_features
+    - price_features
+  
+  social_volume:
+    - social_features
+    - volume_features
+    - sentiment_features
+  
+  social_viral:
+    - social_features
+    - sentiment_features
+    - volume_features
+    - price_features
+  
+  # Corporate actions
+  earnings_surprise:
+    - fundamental_features
+    - earnings_features
+    - price_features
+    - volume_features
+    - options_features
+  
+  earnings_announcement:
+    - fundamental_features
+    - earnings_features
+    - price_features
+    - volatility_features
+  
+  insider_activity:
+    - insider_features
+    - price_features
+    - volume_features
+    - fundamental_features
+  
+  insider_buying:
+    - insider_features
+    - price_features
+    - volume_features
+    - momentum_features
+  
+  # Options flow
+  options_flow:
+    - options_features
+    - price_features
+    - volume_features
+    - volatility_features
+  
+  unusual_options:
+    - options_features
+    - volume_features
+    - volatility_features
+    - price_features
+  
+  # Market structure
+  sector_rotation:
+    - sector_features
+    - relative_strength
+    - price_features
+    - correlation_features
+  
+  correlation_break:
+    - correlation_features
+    - price_features
+    - volatility_features
+    - market_regime
+  
+  correlation_anomaly:
+    - correlation_features
+    - price_features
+    - volatility_features
+    - intermarket_features
+  
+  intermarket_signal:
+    - intermarket_features
+    - correlation_features
+    - price_features
+    - market_regime
+  
+  divergence:
+    - price_features
+    - momentum_features
+    - correlation_features
+    - relative_strength
+  
+  regime_change:
+    - market_regime
+    - volatility_features
+    - correlation_features
+    - intermarket_features
+  
+  # Advanced analysis
+  coordinated_activity:
+    - social_features
+    - volume_features
+    - network_features
+    - sentiment_features
+    - order_flow_features
+  
+  # Price-based
+  price_breakout:
+    - price_features
+    - support_resistance
+    - volatility_features
+    - momentum_features
+  
+  price_reversal:
+    - price_features
+    - momentum_features
+    - support_resistance
+    - volume_features
+  
+  support_resistance:
+    - support_resistance
+    - price_features
+    - volume_features
+    - technical_indicators
+  
+  # Legacy alert types (backward compatibility)
+  earnings_beat:
+    - fundamental_features
+    - earnings_features
+    - price_features
+  
+  insider_buying_old:  # Map old name
+    - insider_features
+    - price_features
+  
+  social_momentum:
+    - social_features
+    - momentum_features
+    - sentiment_features
+  
+  options_activity:
+    - options_features
+    - volume_features
+
+# Comprehensive list of all available features
+all_features_list:
+  # Price-based features
+  - price_features
+  - returns_features
+  - log_returns
+  - price_ratios
+  - price_patterns
+  
+  # Volume features
+  - volume_features
+  - volume_patterns
+  - volume_profile
+  - volume_weighted_features
+  
+  # Technical indicators
+  - technical_indicators
+  - momentum_features
+  - trend_features
+  - volatility_features
+  - support_resistance
+  
+  # Market microstructure
+  - market_microstructure
+  - order_flow_features
+  - spread_features
+  - liquidity_features
+  
+  # Fundamental features
+  - fundamental_features
+  - earnings_features
+  - financial_ratios
+  - growth_metrics
+  
+  # Alternative data
+  - news_features
+  - sentiment_features
+  - social_features
+  - insider_features
+  - options_features
+  
+  # Cross-asset features
+  - correlation_features
+  - relative_strength
+  - sector_features
+  - intermarket_features
+  
+  # Market regime
+  - market_regime
+  - volatility_regime
+  - correlation_regime
+  
+  # Advanced features
+  - network_features
+  - clustering_features
+  - anomaly_scores
+  
+  # Time-based features
+  - time_features
+  - seasonality_features
+  - calendar_features
+  
+  # Statistical features
+  - statistical_moments
+  - distribution_features
+  - tail_risk_features
