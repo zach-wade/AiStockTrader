@@ -10,6 +10,34 @@ This is the main reference document. For detailed information, see:
 - **[CLAUDE-OPERATIONS.md](CLAUDE-OPERATIONS.md)** - Operational procedures, troubleshooting, monitoring
 - **[CLAUDE-SETUP.md](CLAUDE-SETUP.md)** - Initial setup, configuration, development environment
 
+## 🚀 Repository Information
+
+- **GitHub Repository**: [https://github.com/zach-wade/AiStockTrader](https://github.com/zach-wade/AiStockTrader)
+- **Local Path**: `/Users/zachwade/StockMonitoring`
+- **Main Branch**: `main`
+- **Last Updated**: 2025-08-08
+
+## 📋 Current Project Status (August 2025)
+
+### Recent Updates
+- **Git Repository**: Successfully initialized and pushed to GitHub
+- **Documentation**: Added comprehensive docs/ directory with architecture, implementation, and refactoring guides
+- **Configuration**: Added development tooling (pytest, tox, Docker, setup.cfg)
+- **CI/CD Ready**: Project now includes all necessary configuration files for automated testing
+
+### Active Development Areas
+1. **Scanner System**: Multiple scanners for layer-based symbol qualification
+2. **Event-Driven Architecture**: Transitioning from event bus to direct storage integration
+3. **ML Models**: XGBoost-based prediction models with ensemble strategies
+4. **Dashboard System**: Dual dashboard setup (system monitoring + trading interface)
+5. **Risk Management**: Circuit breakers, position limits, and real-time monitoring
+
+### Known Issues & Priorities
+- Scheduled jobs need configuration and activation
+- System health dashboard tab needs implementation
+- Graceful shutdown improvements needed
+- Database execute operations audit findings need addressing (see docs/reports/database_execute_audit.md)
+
 ---
 
 ## 📊 Project Overview
@@ -813,4 +841,5 @@ order_repo = factory.create_order_repository(db)  # Type: IOrderRepository
 ---
 
 *Last Updated: 2025-08-08*
-*Version: 2.0*
+*Version: 2.1*
+*GitHub: https://github.com/zach-wade/AiStockTrader*
