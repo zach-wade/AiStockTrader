@@ -205,6 +205,10 @@ class ConfigManager:
         Returns:
             Loaded and processed configuration
         """
+        # Special handling for unified_config (backward compatibility)
+        if config_name == "unified_config":
+            return self._load_unified_config(overrides, force_reload)
+        
         # Create proper cache key with hashing for overrides
         cache_key = self._create_cache_key(config_name, overrides)
         
@@ -236,6 +240,133 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Failed to load configuration: {e}")
             raise
+    
+    def _load_unified_config(self, 
+                             overrides: Optional[List[str]] = None, 
+                             force_reload: bool = False) -> DictConfig:
+        """
+        Load a unified configuration by merging multiple configs.
+        This provides backward compatibility for code expecting unified_config.
+        
+        Args:
+            overrides: List of override parameters
+            force_reload: Force reload even if cached
+            
+        Returns:
+            Merged configuration that emulates the old unified_config
+        """
+        import os
+        
+        # Create cache key for unified config
+        cache_key = self._create_cache_key("unified_config", overrides)
+        
+        # Check cache first
+        if not force_reload and self._cache:
+            cached_config = self._cache.get(cache_key)
+            if cached_config is not None:
+                logger.debug("Returning cached unified configuration")
+                return cached_config
+        
+        try:
+            # Load base configurations
+            configs = []
+            
+            # Load app context config as base
+            app_context_path = self.config_dir / "yaml" / "app_context_config.yaml"
+            if app_context_path.exists():
+                configs.append(self._load_yaml_config(app_context_path))
+            
+            # Load layer definitions
+            layer_def_path = self.config_dir / "yaml" / "layer_definitions.yaml"
+            if layer_def_path.exists():
+                configs.append(self._load_yaml_config(layer_def_path))
+            
+            # Merge all configs
+            if configs:
+                cfg = OmegaConf.merge(*configs)
+            else:
+                cfg = OmegaConf.create({})
+            
+            # Add essential runtime config from environment
+            cfg.database = OmegaConf.create({
+                "url": os.getenv("DATABASE_URL", ""),
+                "host": os.getenv("DB_HOST", "localhost"),
+                "port": int(os.getenv("DB_PORT", "5432")),
+                "name": os.getenv("DB_NAME", "ai_trader"),
+                "user": os.getenv("DB_USER", "postgres"),
+                "password": os.getenv("DB_PASSWORD", "")
+            })
+            
+            cfg.api_keys = OmegaConf.create({
+                "alpaca": {
+                    "key": os.getenv("ALPACA_API_KEY", ""),
+                    "secret": os.getenv("ALPACA_API_SECRET", "")
+                },
+                "polygon": {
+                    "key": os.getenv("POLYGON_API_KEY", "")
+                }
+            })
+            
+            # Add minimal defaults for compatibility
+            if "trading" not in cfg:
+                cfg.trading = OmegaConf.create({
+                    "symbols": [],
+                    "strategy": "default",
+                    "capital": 10000,
+                    "risk_management": {
+                        "max_risk_per_trade": 0.02,
+                        "max_positions": 10
+                    },
+                    "position_sizing": {
+                        "max_position_size": 1000
+                    },
+                    "starting_cash": 10000
+                })
+            
+            if "monitoring" not in cfg:
+                cfg.monitoring = OmegaConf.create({
+                    "dashboard": {
+                        "port": 8050
+                    }
+                })
+            
+            if "system" not in cfg:
+                cfg.system = OmegaConf.create({
+                    "environment": os.getenv("ENVIRONMENT", "development")
+                })
+            
+            if "broker" not in cfg:
+                cfg.broker = OmegaConf.create({
+                    "paper_trading": True
+                })
+            
+            # Apply overrides if provided
+            if overrides:
+                override_cfg = OmegaConf.from_dotlist(overrides)
+                cfg = OmegaConf.merge(cfg, override_cfg)
+            
+            # Cache the result
+            if self._cache:
+                self._cache.put(cache_key, cfg)
+                logger.debug("Cached unified configuration")
+            
+            logger.info("Loaded unified configuration (backward compatibility mode)")
+            return cfg
+            
+        except Exception as e:
+            logger.error(f"Failed to load unified configuration: {e}")
+            # Return minimal config to prevent total failure
+            return OmegaConf.create({
+                "database": {"url": os.getenv("DATABASE_URL", "")},
+                "api_keys": {
+                    "alpaca": {"key": "", "secret": ""},
+                    "polygon": {"key": ""}
+                },
+                "system": {"environment": "development"},
+                "broker": {"paper_trading": True},
+                "trading": {"symbols": [], "strategy": "default"},
+                "monitoring": {"dashboard": {"port": 8050}}
+            })
     
     def load_simple_config(self, config_file: str) -> DictConfig:
         """

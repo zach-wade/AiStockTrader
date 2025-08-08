@@ -19,9 +19,9 @@ from main.risk_management.types import (
 from main.risk_management.pre_trade import UnifiedLimitChecker
 from main.risk_management.real_time import (
     LiveRiskMonitor, CircuitBreakerFacade,
-    StopLossManager, DrawdownController
+    DynamicStopLossManager, DrawdownController
 )
-from main.risk_management.position_sizing import BasePositionSizer
+# from main.risk_management.position_sizing import BasePositionSizer  # TODO: Need to implement
 from main.utils.core import ErrorHandlingMixin
 from main.utils.monitoring import record_metric, timer
 
@@ -93,9 +93,9 @@ class TradingEngineRiskIntegration(ErrorHandlingMixin):
         self.limit_checker: Optional[UnifiedLimitChecker] = None
         self.risk_monitor: Optional[LiveRiskMonitor] = None
         self.circuit_breakers: Optional[CircuitBreakerFacade] = None
-        self.stop_loss_manager: Optional[StopLossManager] = None
+        self.stop_loss_manager: Optional[DynamicStopLossManager] = None
         self.drawdown_controller: Optional[DrawdownController] = None
-        self.position_sizer: Optional[BasePositionSizer] = None
+        self.position_sizer: Optional[Any] = None  # BasePositionSizer
         
         # State tracking
         self._is_initialized = False
@@ -118,8 +118,8 @@ class TradingEngineRiskIntegration(ErrorHandlingMixin):
                         limit_checker: UnifiedLimitChecker,
                         risk_monitor: LiveRiskMonitor,
                         circuit_breakers: CircuitBreakerFacade,
-                        stop_loss_manager: StopLossManager,
-                        position_sizer: BasePositionSizer):
+                        stop_loss_manager: DynamicStopLossManager,
+                        position_sizer: Any):  # BasePositionSizer
         """Initialize with risk management components."""
         with self._handle_error("initializing risk integration"):
             self.limit_checker = limit_checker

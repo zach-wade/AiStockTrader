@@ -22,6 +22,10 @@ class RiskLevel(Enum):
     EXTREME = "extreme"
 
 
+# Alias for backward compatibility
+RiskAlertLevel = RiskLevel
+
+
 class RiskEventType(Enum):
     """Types of risk events."""
     # Limit breaches

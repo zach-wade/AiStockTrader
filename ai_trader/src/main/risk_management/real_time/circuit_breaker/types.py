@@ -44,6 +44,14 @@ class BreakerStatus(Enum):
     MAINTENANCE = "maintenance"  # System maintenance mode
 
 
+class BreakerPriority(Enum):
+    """Priority levels for circuit breaker events."""
+    CRITICAL = "critical"  # Immediate action required
+    HIGH = "high"          # High priority
+    MEDIUM = "medium"      # Normal priority
+    LOW = "low"            # Low priority
+
+
 @dataclass
 class BreakerEvent:
     """Circuit breaker event record."""

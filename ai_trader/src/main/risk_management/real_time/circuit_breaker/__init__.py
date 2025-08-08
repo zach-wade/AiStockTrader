@@ -7,20 +7,20 @@ when certain risk conditions are met to prevent catastrophic losses.
 
 from .facade import (
     CircuitBreakerFacade,
-    CircuitBreakerSystem
+    SystemStatus
 )
 
 from .config import (
-    CircuitBreakerConfig,
-    BreakerThresholds,
-    BreakerAction
+    BreakerConfig
 )
 
 from .types import (
-    CircuitBreakerType,
+    BreakerType,
     BreakerStatus,
-    BreakerPriority,
-    TripReason
+    BreakerEvent,
+    MarketConditions,
+    BreakerMetrics,
+    BreakerPriority
 )
 
 from .events import (
@@ -31,13 +31,12 @@ from .events import (
 )
 
 from .registry import (
-    CircuitBreakerRegistry,
-    BreakerRegistration
+    BreakerRegistry,
+    BaseBreaker
 )
 
 # Import specific breaker implementations
 from .breakers import (
-    BaseCircuitBreaker,
     DrawdownBreaker,
     VolatilityBreaker,
     LossRateBreaker,
@@ -47,18 +46,18 @@ from .breakers import (
 __all__ = [
     # Main facade
     'CircuitBreakerFacade',
-    'CircuitBreakerSystem',
+    'SystemStatus',
     
     # Configuration
-    'CircuitBreakerConfig',
-    'BreakerThresholds',
-    'BreakerAction',
+    'BreakerConfig',
     
     # Types
-    'CircuitBreakerType',
+    'BreakerType',
     'BreakerStatus',
+    'BreakerEvent',
+    'MarketConditions',
+    'BreakerMetrics',
     'BreakerPriority',
-    'TripReason',
     
     # Events
     'CircuitBreakerEvent',
@@ -67,11 +66,10 @@ __all__ = [
     'BreakerWarningEvent',
     
     # Registry
-    'CircuitBreakerRegistry',
-    'BreakerRegistration',
+    'BreakerRegistry',
+    'BaseBreaker',
     
     # Breaker implementations
-    'BaseCircuitBreaker',
     'DrawdownBreaker',
     'VolatilityBreaker',
     'LossRateBreaker',

@@ -319,11 +319,14 @@ pytest --cov=src/main --cov-report=term-missing
 pip check
 ```
 
-### Known Setup Issues
-- **Scheduled jobs broken** (ISSUE-001) - Manual execution required
-- **Scanner integration missing** (ISSUE-002) - Use direct imports
-- **Graceful shutdown issues** (ISSUE-003) - Use Ctrl+C twice
-- **Empty modules** - core/, services/, migrations/ have no implementation
+### Known Setup Issues (Updated 2025-01-10)
+- ✅ **FIXED**: Configuration system - unified_config now handled automatically
+- ✅ **FIXED**: Import errors - ExposureLimitsChecker, SystemDashboardV2, OrderError resolved
+- **ACTIVE**: Database MetricsCollector - missing methods (see workaround in CLAUDE-OPERATIONS.md)
+- **PENDING**: Scheduled jobs broken (ISSUE-001) - Manual execution required
+- **PENDING**: Scanner registry missing (ISSUE-002) - Use direct imports
+- **PENDING**: Graceful shutdown issues (ISSUE-003) - Use Ctrl+C twice
+- **INFO**: Empty modules - core/, services/, migrations/ have no implementation
 
 ---
 

@@ -15,7 +15,6 @@ from main.utils.core import get_logger
 from main.utils.database.pool import DatabasePool
 from main.utils.database.operations import execute_with_retry
 from main.utils.resilience.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-from main.utils.database.helpers.connection_metrics import MetricsCollector
 
 logger = get_logger(__name__)
 
@@ -45,8 +44,7 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         )
         self.circuit_breaker = CircuitBreaker(cb_config)
         
-        # Metrics collector for monitoring
-        self.metrics = MetricsCollector()
+        # Note: Metrics are handled by DatabasePool, not duplicated here
         
         logger.info("AsyncDatabaseAdapter initialized with utilities")
     
@@ -72,7 +70,7 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         try:
             self._pool = await self.circuit_breaker.call(create_pool)
             logger.info("Async pool initialized with circuit breaker")
-            self.metrics.record_pool_created()
+            # Metrics are tracked by DatabasePool, not here
         except Exception as e:
             logger.error(f"Failed to initialize async pool: {e}")
             raise
@@ -83,7 +81,7 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
             await self._pool.close()
             self._pool = None
             self._closed = True
-            self.metrics.record_pool_closed()
+            # Metrics are tracked by DatabasePool, not here
             logger.info("Async pool closed")
     
     @asynccontextmanager
@@ -98,11 +96,11 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         # Use circuit breaker for connection acquisition
         connection_ctx = await self.circuit_breaker.call(get_connection)
         async with connection_ctx as connection:
-            self.metrics.record_connection_acquired()
+            # Connection metrics are tracked by DatabasePool
             try:
                 yield connection
             finally:
-                self.metrics.record_connection_released()
+                pass  # Metrics handled by pool
     
     async def execute_query(self, query: str, *args) -> Any:
         """Execute a query with retry logic and circuit breaker."""
@@ -146,10 +144,8 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         
         try:
             await self.execute_query(query, *values)
-            self.metrics.record_operation('insert', success=True)
             return True
         except Exception as e:
-            self.metrics.record_operation('insert', success=False)
             logger.error(f"Insert failed: {e}")
             return False
     
@@ -172,10 +168,8 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         
         try:
             await self.execute_query(query, *values)
-            self.metrics.record_operation('update', success=True)
             return True
         except Exception as e:
-            self.metrics.record_operation('update', success=False)
             logger.error(f"Update failed: {e}")
             return False
     
@@ -186,10 +180,8 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         
         try:
             await self.execute_query(query, *list(where.values()))
-            self.metrics.record_operation('delete', success=True)
             return True
         except Exception as e:
-            self.metrics.record_operation('delete', success=False)
             logger.error(f"Delete failed: {e}")
             return False
     
@@ -201,10 +193,8 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         
         try:
             await execute_with_retry(operation, max_retries=2)
-            self.metrics.record_operation('execute_many', success=True)
             return True
         except Exception as e:
-            self.metrics.record_operation('execute_many', success=False)
             logger.error(f"Execute many failed: {e}")
             return False
     
@@ -241,10 +231,8 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
         
         try:
             result = await self.circuit_breaker.call(run_transaction)
-            self.metrics.record_operation('transaction', success=True)
             return result
         except Exception as e:
-            self.metrics.record_operation('transaction', success=False)
             logger.error(f"Transaction failed: {e}")
             return False
     
@@ -257,10 +245,8 @@ class AsyncDatabaseAdapter(IAsyncDatabase):
             try:
                 yield conn
                 await transaction.commit()
-                self.metrics.record_operation('transaction', success=True)
             except Exception as e:
                 await transaction.rollback()
-                self.metrics.record_operation('transaction', success=False)
                 logger.error(f"Transaction rolled back: {e}")
                 raise
     

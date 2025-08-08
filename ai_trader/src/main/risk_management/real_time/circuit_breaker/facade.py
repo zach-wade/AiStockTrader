@@ -19,17 +19,18 @@ from .events import (
     CircuitBreakerEvent, BreakerTrippedEvent, BreakerResetEvent,
     BreakerWarningEvent, CircuitBreakerEventBuilder
 )
-from .config import CircuitBreakerConfig
-from .registry import CircuitBreakerRegistry
-from .breakers import BaseCircuitBreaker
+from .config import BreakerConfig
+from .registry import BreakerRegistry
+from .registry import BaseBreaker
 from main.utils.core import ErrorHandlingMixin
 from main.utils.monitoring import timer
 
 logger = logging.getLogger(__name__)
 
-# Map old names to new for compatibility
-CircuitBreakerType = BreakerType
-BreakerPriority = BreakerType  # Temporary mapping
+# These mappings are no longer needed - all references should use correct names
+# Keeping as comment for reference:
+# CircuitBreakerType was renamed to BreakerType
+# BreakerPriority is now properly defined in types.py
 
 
 @dataclass
@@ -52,13 +53,13 @@ class CircuitBreakerFacade(ErrorHandlingMixin):
     control over trading system safety mechanisms.
     """
     
-    def __init__(self, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, config: Optional[BreakerConfig] = None):
         """Initialize circuit breaker facade."""
         super().__init__()
-        self.config = config or CircuitBreakerConfig()
+        self.config = config or BreakerConfig({})
         
         # Circuit breaker registry
-        self.registry = CircuitBreakerRegistry()
+        self.registry = BreakerRegistry(self.config)
         
         # Event callbacks
         self._event_callbacks: List[Callable] = []
@@ -328,7 +329,7 @@ class CircuitBreakerFacade(ErrorHandlingMixin):
     
     async def _handle_breaker_trip(self,
                                   breaker_name: str,
-                                  breaker: BaseCircuitBreaker,
+                                  breaker: BaseBreaker,
                                   metrics: BreakerMetrics):
         """Handle a breaker trip."""
         self._tripped_breakers.add(breaker_name)
@@ -358,7 +359,7 @@ class CircuitBreakerFacade(ErrorHandlingMixin):
     
     async def _emit_warning(self,
                           breaker_name: str,
-                          breaker: BaseCircuitBreaker,
+                          breaker: BaseBreaker,
                           metrics: BreakerMetrics):
         """Emit warning event for breaker."""
         warning_level = breaker.get_warning_level()

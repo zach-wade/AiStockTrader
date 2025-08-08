@@ -15,7 +15,8 @@ from datetime import datetime
 
 from .types import BreakerType, BreakerStatus, MarketConditions, BreakerMetrics
 from .config import BreakerConfig
-from .events import BreakerEventManager, BreakerStateManager
+# TODO: BreakerEventManager and BreakerStateManager need to be implemented
+# from .events import BreakerEventManager, BreakerStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -109,11 +110,11 @@ class BreakerRegistry:
     Manages the lifecycle and coordination of individual breaker instances.
     """
     
-    def __init__(self, config: BreakerConfig, event_manager: BreakerEventManager, state_manager: BreakerStateManager):
+    def __init__(self, config: BreakerConfig, event_manager: Optional[Any] = None, state_manager: Optional[Any] = None):
         """Initialize breaker registry."""
         self.config = config
-        self.event_manager = event_manager
-        self.state_manager = state_manager
+        self.event_manager = event_manager  # TODO: Implement BreakerEventManager
+        self.state_manager = state_manager  # TODO: Implement BreakerStateManager
         self.breakers: Dict[BreakerType, BaseBreaker] = {}
         self.breaker_classes: Dict[BreakerType, Type[BaseBreaker]] = {}
         self._lock = asyncio.Lock()

@@ -555,3 +555,6 @@ __all__ = [
     # Utility
     'migrate_exception'
 ]
+
+# Backward compatibility aliases
+OrderError = OrderExecutionError  # Alias for backward compatibility

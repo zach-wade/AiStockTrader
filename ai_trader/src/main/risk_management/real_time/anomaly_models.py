@@ -152,6 +152,22 @@ class MarketRegime:
 
 
 @dataclass
+class CorrelationMatrix:
+    """Represents a correlation matrix snapshot with analysis."""
+    timestamp: datetime
+    symbols: List[str]
+    correlation_matrix: np.ndarray
+    baseline_correlation: Optional[np.ndarray] = None
+    correlation_change: Optional[np.ndarray] = None
+    max_correlation_change: float = 0.0
+    avg_correlation_change: float = 0.0
+    breakdown_score: float = 0.0
+    systemic_risk_score: float = 0.0
+    diversification_score: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class AnomalyDetectionConfig:
     """Configuration for anomaly detection system."""
     # Detection thresholds

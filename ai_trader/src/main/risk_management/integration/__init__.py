@@ -6,8 +6,14 @@ This module provides integration components for risk management including:
 - TradingEngineIntegration: Integration with trading engine for risk management
 """
 
-from .trading_engine_integration import TradingEngineIntegration
+from .trading_engine_integration import (
+    TradingEngineRiskIntegration,
+    RiskEventBridge,
+    RiskDashboardIntegration
+)
 
 __all__ = [
-    'TradingEngineIntegration',
+    'TradingEngineRiskIntegration',
+    'RiskEventBridge',
+    'RiskDashboardIntegration',
 ]

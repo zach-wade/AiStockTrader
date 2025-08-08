@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
-from .types import CircuitBreakerType, BreakerStatus, BreakerPriority
+from .types import BreakerType, BreakerStatus, BreakerPriority
 
 
 class EventType(Enum):
@@ -32,7 +32,7 @@ class CircuitBreakerEvent:
     event_id: str
     event_type: EventType
     breaker_name: str
-    breaker_type: CircuitBreakerType
+    breaker_type: BreakerType
     timestamp: datetime = field(default_factory=datetime.utcnow)
     priority: BreakerPriority = BreakerPriority.MEDIUM
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -53,9 +53,9 @@ class CircuitBreakerEvent:
 @dataclass
 class BreakerTrippedEvent(CircuitBreakerEvent):
     """Event emitted when a circuit breaker trips."""
-    trip_reason: str
-    current_value: float
-    threshold_value: float
+    trip_reason: str = ""
+    current_value: float = 0.0
+    threshold_value: float = 0.0
     affected_symbols: List[str] = field(default_factory=list)
     actions_taken: List[str] = field(default_factory=list)
     cooldown_seconds: int = 300
@@ -82,7 +82,7 @@ class BreakerTrippedEvent(CircuitBreakerEvent):
 @dataclass
 class BreakerResetEvent(CircuitBreakerEvent):
     """Event emitted when a circuit breaker resets."""
-    reset_reason: str
+    reset_reason: str = ""
     was_manual: bool = False
     trip_duration_seconds: Optional[float] = None
     conditions_cleared: List[str] = field(default_factory=list)
@@ -103,10 +103,10 @@ class BreakerResetEvent(CircuitBreakerEvent):
 @dataclass
 class BreakerWarningEvent(CircuitBreakerEvent):
     """Event emitted when approaching circuit breaker threshold."""
-    warning_level: float  # Percentage of threshold reached (e.g., 0.8 = 80%)
-    current_value: float
-    threshold_value: float
-    trend: str  # "increasing", "decreasing", "stable"
+    warning_level: float = 0.0  # Percentage of threshold reached (e.g., 0.8 = 80%)
+    current_value: float = 0.0
+    threshold_value: float = 0.0
+    trend: str = "stable"  # "increasing", "decreasing", "stable"
     estimated_time_to_breach: Optional[float] = None  # Seconds
     
     def __post_init__(self):
@@ -128,8 +128,8 @@ class BreakerWarningEvent(CircuitBreakerEvent):
 @dataclass
 class CooldownEvent(CircuitBreakerEvent):
     """Event for cooldown period changes."""
-    cooldown_type: str  # "start" or "end"
-    cooldown_duration: int  # Seconds
+    cooldown_type: str = "start"  # "start" or "end"
+    cooldown_duration: int = 0  # Seconds
     remaining_time: Optional[int] = None
     
     def __post_init__(self):
@@ -148,9 +148,9 @@ class CooldownEvent(CircuitBreakerEvent):
 @dataclass
 class ThresholdUpdateEvent(CircuitBreakerEvent):
     """Event emitted when breaker thresholds are updated."""
-    old_threshold: float
-    new_threshold: float
-    update_reason: str
+    old_threshold: float = 0.0
+    new_threshold: float = 0.0
+    update_reason: str = ""
     updated_by: Optional[str] = None  # User or system component
     
     def __post_init__(self):
@@ -170,8 +170,8 @@ class ThresholdUpdateEvent(CircuitBreakerEvent):
 @dataclass
 class BreakerStatusChangeEvent(CircuitBreakerEvent):
     """Event for breaker enable/disable status changes."""
-    enabled: bool
-    change_reason: str
+    enabled: bool = True
+    change_reason: str = ""
     changed_by: Optional[str] = None
     
     def __post_init__(self):
@@ -191,7 +191,7 @@ class CircuitBreakerEventBuilder:
     
     @staticmethod
     def build_trip_event(breaker_name: str,
-                        breaker_type: CircuitBreakerType,
+                        breaker_type: BreakerType,
                         trip_reason: str,
                         current_value: float,
                         threshold_value: float,
@@ -211,7 +211,7 @@ class CircuitBreakerEventBuilder:
     
     @staticmethod
     def build_reset_event(breaker_name: str,
-                         breaker_type: CircuitBreakerType,
+                         breaker_type: BreakerType,
                          reset_reason: str,
                          **kwargs) -> BreakerResetEvent:
         """Build a breaker reset event."""
@@ -227,7 +227,7 @@ class CircuitBreakerEventBuilder:
     
     @staticmethod
     def build_warning_event(breaker_name: str,
-                           breaker_type: CircuitBreakerType,
+                           breaker_type: BreakerType,
                            warning_level: float,
                            current_value: float,
                            threshold_value: float,

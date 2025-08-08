@@ -1,9 +1,9 @@
 # AI Trading System - Issue Registry
 
 **Created**: 2025-08-08  
-**Updated**: 2025-08-08 (Phase 2 Testing)  
-**Source**: current_issues.txt + system analysis + Phase 2 testing  
-**Total Issues**: 53+ (22 primary, 31+ sub-issues)  
+**Updated**: 2025-01-10 (Phase 2.5 Risk Management Analysis)  
+**Source**: current_issues.txt + system analysis + Phase 2 testing + Risk Management fixes  
+**Total Issues**: 58+ (27 primary, 31+ sub-issues)  
 
 ---
 
@@ -12,7 +12,7 @@
 | Priority | Count | Status |
 |----------|-------|--------|
 | P0 - Critical | 8 | 🔴 Blocking (3 NEW from testing) |
-| P1 - High | 12 | 🟡 Major Impact |
+| P1 - High | 17 | 🟡 Major Impact (5 NEW from risk_management) |
 | P2 - Medium | 18 | 🟡 Performance |
 | P3 - Low | 15+ | 🔵 Maintenance |
 
@@ -378,6 +378,98 @@ graph TD
 - **High Risk**: Database operations, graceful shutdown
 - **Medium Risk**: Scanner reliability, model training
 - **Low Risk**: UI improvements, documentation
+
+---
+
+## 🆕 Phase 2.5 - Risk Management Module Issues (2025-01-10)
+
+### Summary of Fixes Applied
+During the session on 2025-01-10, we identified and fixed critical import issues in the risk_management module:
+
+#### ✅ FIXED Issues:
+1. **CircuitBreakerType → BreakerType**: Fixed incorrect class name references throughout circuit_breaker module
+2. **Added BreakerPriority enum**: Was referenced but not defined in types.py
+3. **RiskAlertLevel alias**: Added backward compatibility alias for RiskLevel
+4. **StopLossManager → DynamicStopLossManager**: Fixed class name mismatches
+5. **Missing config classes**: Added RiskMonitorConfig, MonitoringAlert dataclasses
+6. **Dataclass inheritance issues**: Fixed default field ordering in circuit breaker events
+
+### 🔴 NEW P1 Issues - Missing Implementations
+
+#### ISSUE-RM-001: Circuit Breaker Manager Classes Missing
+- **Component**: risk_management/real_time/circuit_breaker
+- **Impact**: Circuit breaker system incomplete
+- **Status**: 🔴 Open
+- **Missing Classes**:
+  - BreakerEventManager
+  - BreakerStateManager
+- **Location**: Referenced in registry.py but not implemented
+
+#### ISSUE-RM-002: Position Sizing Modules Missing
+- **Component**: risk_management/position_sizing
+- **Impact**: Cannot use advanced position sizing strategies
+- **Status**: 🔴 Open
+- **Missing Modules**:
+  - kelly_position_sizer.py (KellyPositionSizer)
+  - volatility_position_sizer.py (VolatilityPositionSizer)
+  - optimal_f_sizer.py (OptimalFPositionSizer)
+  - base_sizer.py (BasePositionSizer)
+  - portfolio_optimizer.py
+  - risk_parity_sizer.py
+  - dynamic_sizer.py
+- **Current State**: Only var_position_sizer.py exists
+
+#### ISSUE-RM-003: Risk Metrics Calculators Missing
+- **Component**: risk_management/metrics
+- **Impact**: Cannot calculate risk metrics
+- **Status**: 🔴 Open
+- **Missing Modules**:
+  - risk_metrics_calculator.py
+  - portfolio_metrics.py
+  - position_metrics.py
+  - var_calculator.py
+  - cvar_calculator.py
+  - ratio_calculators.py
+  - drawdown_analyzer.py
+  - correlation_analyzer.py
+  - liquidity_metrics.py
+  - stress_testing.py
+- **Current State**: Only __init__.py with placeholder classes
+
+#### ISSUE-RM-004: Post-Trade Analysis Missing
+- **Component**: risk_management/post_trade
+- **Impact**: Cannot analyze trade performance
+- **Status**: 🔴 Open
+- **Missing Modules**:
+  - post_trade_analyzer.py
+  - trade_review.py
+  - risk_performance.py
+  - compliance_checker.py
+  - reconciliation.py
+  - reporting.py
+  - analytics.py
+- **Current State**: Only __init__.py with placeholder classes
+
+#### ISSUE-RM-005: Real-Time Components Incomplete
+- **Component**: risk_management/real_time
+- **Impact**: Missing risk management features
+- **Status**: 🟡 Medium
+- **Missing Classes**:
+  - DrawdownConfig, DrawdownAction (drawdown_control.py)
+  - StopLossConfig, TrailingStopLoss (stop_loss.py)
+  - LiquidationOrder, EmergencyLiquidation (position_liquidator.py)
+
+### 📊 Risk Management Module Status
+- **Files**: 47 total Python files
+- **Functional**: ~60% (core functionality works)
+- **Missing**: ~40% (advanced features not implemented)
+- **Placeholder Classes**: 15+ (added to prevent import errors)
+
+### Required Actions
+1. **Priority 1**: Implement BasePositionSizer - blocks trading engine integration
+2. **Priority 2**: Implement risk metrics calculators - needed for monitoring
+3. **Priority 3**: Complete circuit breaker system components
+4. **Priority 4**: Add post-trade analysis modules
 
 ---
 

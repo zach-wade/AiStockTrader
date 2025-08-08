@@ -16,7 +16,7 @@ from main.models.common import (
     OrderSide, TimeInForce, MarketData
 )
 from main.trading_engine.brokers.broker_interface import BrokerInterface
-from main.utils.exceptions import OrderError
+from main.utils.exceptions import OrderExecutionError
 from main.utils.core import get_logger
 
 logger = get_logger(__name__)
@@ -241,12 +241,12 @@ class MockBroker(BrokerInterface):
             return result
         
         if order_id not in self._orders:
-            raise OrderError(f"Order {order_id} not found")
+            raise OrderExecutionError(f"Order {order_id} not found")
         
         order = self._orders[order_id]
         
         if order.status != OrderStatus.PENDING:
-            raise OrderError(f"Cannot modify order with status {order.status}")
+            raise OrderExecutionError(f"Cannot modify order with status {order.status}")
         
         # Apply modifications
         if limit_price is not None:
