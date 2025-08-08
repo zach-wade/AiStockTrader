@@ -1,0 +1,143 @@
+{
+  "timestamp": "2025-08-08T19:04:04.414118",
+  "components": {
+    "Configuration": {
+      "Load unified_config": {
+        "status": "FAIL",
+        "details": "Configuration file not found: /Users/zachwade/StockMonitoring/ai_trader/src/main/config/yaml/unified_config.yaml",
+        "timestamp": "2025-08-08T19:04:06.733386"
+      }
+    },
+    "Database": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "Configuration file not found: /Users/zachwade/StockMonitoring/ai_trader/src/main/config/yaml/unified_config.yaml",
+        "timestamp": "2025-08-08T19:04:06.741348"
+      }
+    },
+    "Data Ingestion": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "No module named 'main.data_pipeline.ingestion.clients.polygon_client'",
+        "timestamp": "2025-08-08T19:04:06.757861"
+      }
+    },
+    "Features": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "Configuration file not found: /Users/zachwade/StockMonitoring/ai_trader/src/main/config/yaml/unified_config.yaml",
+        "timestamp": "2025-08-08T19:04:09.287250"
+      }
+    },
+    "Models": {
+      "Directory Structure": {
+        "status": "PASS",
+        "details": "Found subdirectories: strategies, training, event_driven, utils, __pycache__, specialists, hft, inference, monitoring, outcome_classifier_helpers",
+        "timestamp": "2025-08-08T19:04:09.288589"
+      },
+      "Strategy Import": {
+        "status": "PASS",
+        "details": "BaseStrategy imported",
+        "timestamp": "2025-08-08T19:04:09.647364"
+      },
+      "Saved Models": {
+        "status": "PASS",
+        "details": "Found 501 saved model files",
+        "timestamp": "2025-08-08T19:04:38.170124"
+      }
+    },
+    "Risk": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "cannot import name 'ExposureLimitChecker' from 'main.risk_management.pre_trade' (/Users/zachwade/StockMonitoring/ai_trader/src/main/risk_management/pre_trade/__init__.py)",
+        "timestamp": "2025-08-08T19:04:38.185791"
+      }
+    },
+    "Trading": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "cannot import name 'OrderError' from 'main.utils.exceptions' (/Users/zachwade/StockMonitoring/ai_trader/src/main/utils/exceptions.py)",
+        "timestamp": "2025-08-08T19:04:38.273522"
+      }
+    },
+    "Scanners": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "cannot import name 'get_scanner_registry' from 'main.scanners' (/Users/zachwade/StockMonitoring/ai_trader/src/main/scanners/__init__.py)",
+        "timestamp": "2025-08-08T19:04:38.274294"
+      }
+    },
+    "Monitoring": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "cannot import name 'SystemDashboard' from 'main.monitoring.dashboards' (unknown location)",
+        "timestamp": "2025-08-08T19:04:38.274349"
+      }
+    },
+    "Jobs": {
+      "Module Import": {
+        "status": "FAIL",
+        "details": "cannot import name 'OrderError' from 'main.utils.exceptions' (/Users/zachwade/StockMonitoring/ai_trader/src/main/utils/exceptions.py)",
+        "timestamp": "2025-08-08T19:04:38.298367"
+      }
+    }
+  },
+  "issues_found": [
+    {
+      "component": "Configuration",
+      "test": "Load unified_config",
+      "issue": "Cannot load configuration",
+      "timestamp": "2025-08-08T19:04:06.733395"
+    },
+    {
+      "component": "Database",
+      "test": "Module Import",
+      "issue": "Database module broken",
+      "timestamp": "2025-08-08T19:04:06.741357"
+    },
+    {
+      "component": "Data Ingestion",
+      "test": "Module Import",
+      "issue": "Ingestion module broken",
+      "timestamp": "2025-08-08T19:04:06.757867"
+    },
+    {
+      "component": "Features",
+      "test": "Module Import",
+      "issue": "Feature module broken",
+      "timestamp": "2025-08-08T19:04:09.287261"
+    },
+    {
+      "component": "Risk",
+      "test": "Module Import",
+      "issue": "Risk management broken",
+      "timestamp": "2025-08-08T19:04:38.185797"
+    },
+    {
+      "component": "Trading",
+      "test": "Module Import",
+      "issue": "Trading engine broken",
+      "timestamp": "2025-08-08T19:04:38.273531"
+    },
+    {
+      "component": "Scanners",
+      "test": "Module Import",
+      "issue": "Scanner module broken",
+      "timestamp": "2025-08-08T19:04:38.274297"
+    },
+    {
+      "component": "Monitoring",
+      "test": "Module Import",
+      "issue": "Monitoring module broken",
+      "timestamp": "2025-08-08T19:04:38.274351"
+    },
+    {
+      "component": "Jobs",
+      "test": "Module Import",
+      "issue": "Jobs module broken",
+      "timestamp": "2025-08-08T19:04:38.298374"
+    }
+  ],
+  "performance_metrics": {},
+  "overall_status": "FAIL"
+}
