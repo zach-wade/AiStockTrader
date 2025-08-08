@@ -4,6 +4,65 @@ This document provides operational procedures, service management, and troublesh
 
 ---
 
+## 🚨 PRE-PRODUCTION CHECKLIST
+
+### CRITICAL: Code Review Not Complete (Phase 5 In Progress)
+
+**WARNING**: As of 2025-08-09, only 8.3% of the codebase has been reviewed.
+- 722 of 787 files (91.7%) have NEVER been reviewed for correctness
+- System passes initialization tests but actual functionality is unverified
+- Multiple production blockers remain
+
+#### 0. Complete Code Review (PHASE 5 - IN PROGRESS)
+- [ ] Review data_pipeline module (170 files, 40K lines)
+- [ ] Review feature_pipeline module (90 files, 44K lines)
+- [ ] Review utils module (145 files, 36K lines)
+- [ ] Review models module (101 files, 24K lines)
+- [ ] Review trading_engine module (33 files, 13K lines)
+- [ ] Refactor 146 files that are >500 lines
+- [ ] Remove duplicate code and deprecated modules
+
+#### 1. Replace All Test Implementations
+- [ ] **TestPositionManager** → Real PositionManager
+  - Location: `test_helpers/test_position_manager.py`
+  - Risk: Position tracking will fail
+  - Issue: ISSUE-059
+- [ ] Search codebase for "TEST IMPLEMENTATION" warnings
+- [ ] Verify no test helpers are imported in production code
+
+#### 2. API Verification
+- [ ] Test Polygon API with live market data
+- [ ] Verify Alpaca paper trading for 1+ week
+- [ ] Confirm rate limits are properly configured
+- [ ] Test circuit breakers under load
+
+#### 3. Integration Testing
+- [ ] Run full end-to-end test with real components
+- [ ] Test multi-symbol concurrent trading
+- [ ] Verify risk management under stress
+- [ ] Test graceful shutdown and recovery
+
+#### 4. Database & Infrastructure
+- [ ] Verify partition management is working
+- [ ] Test backup and recovery procedures
+- [ ] Confirm monitoring and alerting
+- [ ] Review resource requirements
+
+#### 5. Risk Management Validation
+- [ ] Verify position limits enforcement
+- [ ] Test stop-loss mechanisms
+- [ ] Validate circuit breaker triggers
+- [ ] Confirm drawdown controls
+
+### Production Deployment Steps
+1. Complete ALL checklist items above
+2. Review with team/stakeholders
+3. Start with minimal capital
+4. Monitor closely for first week
+5. Scale gradually based on performance
+
+---
+
 ## 🚀 Service Management
 
 ### Starting Services

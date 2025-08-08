@@ -1,9 +1,9 @@
 # AI Trading System - Issue Registry
 
 **Created**: 2025-08-08  
-**Updated**: 2025-01-10 (Phase 2.5 Risk Management Analysis)  
-**Source**: current_issues.txt + system analysis + Phase 2 testing + Risk Management fixes  
-**Total Issues**: 58+ (27 primary, 31+ sub-issues)  
+**Updated**: 2025-08-09 (Phase 5 Code Review Starting)  
+**Source**: current_issues.txt + system analysis + Phase 2-4 testing + Phase 5 review plan  
+**Total Issues**: 60+ (critical code review issue added)  
 
 ---
 
@@ -11,43 +11,59 @@
 
 | Priority | Count | Status |
 |----------|-------|--------|
-| P0 - Critical | 8 | 🔴 Blocking (3 NEW from testing) |
-| P1 - High | 17 | 🟡 Major Impact (5 NEW from risk_management) |
-| P2 - Medium | 18 | 🟡 Performance |
+| P0 - Critical | 2 | 🔴 Production Blockers |
+| P1 - High | 17 | 🟡 Major Impact |
+| P2 - Medium | 18+ | 🟡 Performance/Quality |
 | P3 - Low | 15+ | 🔵 Maintenance |
+| Unknown | 722 files | ⚠️ Never Reviewed |
 
-## 🔴 SYSTEM STATUS: NON-FUNCTIONAL
-Phase 2 testing on 2025-08-08 revealed the system is completely non-operational.
-9 out of 10 major components failed basic initialization tests.
+## 🟡 SYSTEM STATUS: TESTS PASSING BUT CODE NOT REVIEWED
+- Phase 4 completed: 10/10 components pass initialization tests
+- Phase 5 starting: Only 65 of 787 files (8.3%) have been reviewed
+- 722 files (91.7%) have NEVER been examined for correctness
+- System functionality is UNKNOWN - only confirmed it doesn't crash
 
 ---
 
-## P0 - Critical Issues (System Breaking)
+## P0 - Critical Issues (Production Blockers)
 
-### 🆕 ISSUE-NEW-001: Configuration System Broken (BLOCKER)
-- **Component**: config/
-- **Impact**: Blocks entire system - nothing can initialize
-- **Status**: 🔴 Open
-- **Discovered**: Phase 2 Testing (2025-08-08)
-- **Description**: System expects `unified_config.yaml` which doesn't exist
-- **Actual Files**: app_context_config.yaml, layer_definitions.yaml, event_config.yaml, etc.
-- **Required Action**: 
-  1. Fix config loader to use correct filenames
-  2. OR create unified_config.yaml
-  3. This MUST be fixed first
+### 🆕 ISSUE-060: Code Never Reviewed (CRITICAL PRODUCTION BLOCKER)
+- **Component**: ENTIRE CODEBASE
+- **Impact**: Unknown bugs, security vulnerabilities, performance issues
+- **Status**: 🔴 IN PROGRESS - Phase 5 Review Started
+- **Discovered**: Phase 5 Planning (2025-08-09)
+- **Description**: 722 of 787 files (91.7%) have NEVER been reviewed for correctness
+- **Current Plan**: Week 1 reviewing data_pipeline (170 files)
+- **What's Unknown**:
+  - Whether data actually processes correctly
+  - Whether calculations are accurate
+  - Whether there are SQL injection vulnerabilities
+  - Whether there are memory leaks
+  - Whether error handling works
+- **Required Action**: Complete Phase 5 systematic review
 
-### 🆕 ISSUE-NEW-002: Missing OrderError Exception
-- **Component**: utils/exceptions.py
-- **Impact**: Blocks trading_engine and jobs modules
+### ISSUE-059: TestPositionManager in Production Path
+- **Component**: risk_management/real_time/live_risk_monitor.py
+- **Impact**: Will fail in production with real trades
 - **Status**: 🔴 Open
-- **Discovered**: Phase 2 Testing (2025-08-08)
-- **Error**: `cannot import name 'OrderError' from 'main.utils.exceptions'`
-- **Required Action**: Add OrderError class to exceptions.py
+- **Discovered**: Phase 3.1 (2025-08-08)
+- **Description**: System uses test implementation instead of real PositionManager
+- **Location**: test_helpers/test_position_manager.py
+- **Required Action**: Replace with full PositionManager implementation
 
-### 🆕 ISSUE-NEW-003: System-Wide Import Failures
-- **Component**: Multiple
-- **Impact**: 9/10 components cannot initialize
-- **Status**: 🔴 Open
+## P1 - High Priority Issues (Major Impact)
+
+### ISSUE-001: Scheduled Jobs Broken
+- **Component**: orchestration/jobs
+- **Impact**: No automation, manual intervention required
+- **Status**: ✅ RESOLVED - Phase 3/4
+- **Resolution**: Jobs module functional, minimal implementation (1 file)
+
+### ISSUE-002: Scanner Execution Not Integrated  
+- **Component**: scanners/, app/ai_trader.py
+- **Impact**: Cannot run scanners from main entry point
+- **Status**: ✅ RESOLVED - Phase 3
+- **Resolution**: 26 scanner implementations integrated and working
 - **Discovered**: Phase 2 Testing (2025-08-08)
 - **Missing Classes/Functions**:
   - ExposureLimitChecker (risk_management)
@@ -111,6 +127,22 @@ Phase 2 testing on 2025-08-08 revealed the system is completely non-operational.
   1. Connect health metrics
   2. Implement data collection
   3. Fix dashboard rendering
+
+### 🆕 ISSUE-059: TestPositionManager Usage (PRODUCTION BLOCKER)
+- **Component**: risk_management/real_time/live_risk_monitor.py
+- **Impact**: Position tracking will fail in production
+- **Status**: 🔴 Open - MUST FIX BEFORE PRODUCTION
+- **Discovered**: Phase 3.1 Testing (2025-08-08)
+- **Description**: System uses TestPositionManager (test implementation) instead of real PositionManager
+- **Location**: test_helpers/test_position_manager.py
+- **Error**: Will fail with real trades in production
+- **Required Action**:
+  1. Replace TestPositionManager with full PositionManager implementation
+  2. Ensure proper database integration
+  3. Test with real market data feeds
+  4. Validate position tracking accuracy
+- **Risk**: HIGH - System will not track positions correctly in live trading
+- **Note**: Also fixed PositionEventType.ALL bug during discovery
 
 ---
 
@@ -309,11 +341,56 @@ graph TD
 
 ---
 
-## Resolution Roadmap
+## Phase 5 Code Review Plan (CRITICAL)
 
-### Week 1: Critical Fixes
-- [ ] ISSUE-001: Fix scheduled jobs
-- [ ] ISSUE-002: Integrate scanner execution
+### Week 1: data_pipeline Module Review (170 files, 40K lines)
+**Day 1 - Storage Layer (25 files)**
+- [ ] Review company_repository.py (782 lines) - SQL injection check
+- [ ] Review market_data_repository.py (514 lines) - Transaction handling
+- [ ] Review feature_repository.py (522 lines) - Data integrity
+- [ ] Review repository_factory.py - Factory pattern validation
+- [ ] Check all repositories for connection leaks
+
+**Day 2 - Ingestion Layer (13 files)**
+- [ ] Review polygon_market_client.py - API rate limiting
+- [ ] Review all loaders (7 files) - Error recovery
+- [ ] Verify data validation on ingestion
+
+**Day 3 - Orchestration (17 files)**
+- [ ] Review unified_pipeline.py - Main flow
+- [ ] Review event_coordinator.py (559 lines) - Deadlock check
+- [ ] Review retention_manager.py (461 lines) - Memory leaks
+
+**Day 4 - Validation System (45 files)**
+- [ ] Review record_validator.py (545 lines)
+- [ ] Review feature_validator.py (496 lines)
+- [ ] Check validation completeness
+
+**Day 5 - Processing & Services (45 files)**
+- [ ] Review ETL flows
+- [ ] Review service container patterns
+
+### What Will Be Left After Week 1
+- **Not Reviewed**: 617 files (78.5% of codebase)
+  - feature_pipeline (90 files, 44K lines)
+  - utils (145 files, 36K lines)
+  - models (101 files, 24K lines)
+  - trading_engine (33 files, 13K lines)
+  - monitoring (36 files, 10K lines)
+  - All other modules
+
+### Estimated Timeline for Full Review
+- Week 1: data_pipeline (170 files)
+- Week 2: feature_pipeline + trading_engine (123 files)
+- Week 3: utils consolidation (145 files)
+- Week 4: models + monitoring (137 files)
+- Week 5: Remaining modules + refactoring
+- **Total: 5 weeks minimum for complete review**
+
+## Original Resolution Roadmap (Now Postponed)
+
+### After Phase 5 Review Completes
+- [ ] ISSUE-059: Replace TestPositionManager
 - [ ] ISSUE-003: Implement graceful shutdown
 - [ ] ISSUE-004: Address database audit findings
 - [ ] ISSUE-005: Fix system health dashboard

@@ -41,6 +41,7 @@ from main.feature_pipeline.calculators.risk import (
 )
 from main.risk_management.types import RiskAlert, RiskAlertLevel
 from main.models.common import OrderSide
+from main.utils.cache import get_global_cache
 
 # Import trading engine components
 from main.trading_engine.core.position_manager import (
@@ -219,11 +220,13 @@ class LiveRiskMonitor:
         self.blocked_trades = 0
         self.avg_decision_time_ms = 0.0
         
-        # Subscribe to position events
-        self.position_manager.subscribe(PositionEventType.ALL, self._handle_position_event)
+        # Subscribe to all position event types
+        # TODO: When PositionManager is fully implemented, verify this subscription mechanism
+        for event_type in PositionEventType:
+            self.position_manager.subscribe(event_type, self._handle_position_event)
         
         # Register circuit breaker callback
-        self.circuit_breaker.register_callback(self._handle_circuit_breaker_event)
+        self.circuit_breaker.add_event_callback(self._handle_circuit_breaker_event)
         
         logger.info(f"LiveRiskMonitor initialized with {risk_profile.value} profile")
     

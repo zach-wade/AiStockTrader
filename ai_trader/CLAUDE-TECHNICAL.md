@@ -37,21 +37,96 @@ pydantic>=2.0.0        # Data validation
 
 ---
 
-## 📊 Project Statistics (August 2025 Audit)
+## 🧪 Testing Philosophy & Best Practices
 
-**Source**: See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for complete analysis
+### Core Principle: Real Components Over Mocks
+
+**Why This Matters**: Mocks hide real bugs. The system had a critical bug (PositionEventType.ALL) that was hidden by mock usage for months.
+
+### Testing Hierarchy (Best to Worst)
+
+1. **Real Components** (BEST)
+   - Use actual production components
+   - Catches real integration issues
+   - Validates actual behavior
+
+2. **Test Implementations** (ACCEPTABLE)
+   - Minimal but real implementations (e.g., TestPositionManager)
+   - Implements actual interfaces
+   - No external dependencies
+   - **WARNING**: Must be replaced before production!
+
+3. **Mocks** (LAST RESORT)
+   - Only for external services you can't control
+   - Must accurately reflect real behavior
+   - Update when interfaces change
+
+### Current Test Implementations
+
+| Component | Test Implementation | Production Risk | Status |
+|-----------|-------------------|-----------------|---------|
+| PositionManager | TestPositionManager | HIGH - Will fail in production | ISSUE-059 |
+
+### Testing Rules
+
+1. **Never mock to make tests pass** - Fix the actual bug
+2. **Document all test implementations** - Mark with clear warnings
+3. **Track test implementations** - Create issues for production replacement
+4. **Integration test before production** - No test implementations in live trading
+
+### Example: TestPositionManager Pattern
+
+```python
+class TestPositionManager:
+    """
+    WARNING: TEST IMPLEMENTATION ONLY!
+    DO NOT USE IN PRODUCTION
+    Issue: ISSUE-059
+    Replace with: main.trading_engine.core.position_manager.PositionManager
+    """
+```
+
+---
+
+## 📊 Project Statistics (Updated 2025-08-09)
+
+**Source**: Automated code analysis via scripts/code_analyzer.py
+
+### Code Review Status
+| Category | Files | Status | Notes |
+|----------|-------|--------|-------|
+| Total Files | 787 | - | 233,439 lines |
+| Files Reviewed | ~65 | 8.3% | Actually examined for correctness |
+| Files Not Reviewed | 722 | 91.7% | Never examined, functionality unknown |
+| Test Files | 158 | - | 23% test-to-code ratio |
 
 ### Code Distribution
-| Category | Files | Lines | Notes |
-|----------|-------|-------|-------|
-| Main Code (src/main/) | 785 | 231,721 | Core application |
-| Test Suite (tests/) | 156 | 53,957 | 23% test-to-code ratio |
-| Scripts | 37 | 9,118 | Utility scripts |
+| Category | Files | Lines | Review Status |
+|----------|-------|-------|--------------|
+| data_pipeline | 170 | 40,305 | NOT REVIEWED |
+| utils | 145 | 36,628 | NOT REVIEWED |
+| models | 101 | 24,406 | NOT REVIEWED |
+| feature_pipeline | 90 | 44,393 | PARTIALLY REVIEWED |
+| risk_management | 51 | 16,554 | REVIEWED |
 | Examples | 11 | 2,940 | Example implementations |
-| **Total Python** | **989** | **297,736** | Entire codebase |
+
+### Code Quality Metrics (Phase 4 Analysis)
+| Metric | Count | Status |
+|--------|-------|--------|
+| Large Files (>500 lines) | 146 | 🟡 18.5% of codebase |
+| Circular Imports | 0 | 🟢 Excellent! |
+| Duplicate Code Blocks | 10 | 🟡 Mainly in scanners |
+| Empty Modules | 0 | 🟢 None found |
+| Files >1000 lines | 4 | 🔴 Dashboard files need splitting |
+
+### Top Refactoring Targets
+1. **system_dashboard_v2.py** - 1153 lines
+2. **dataloader.py** - 1069 lines  
+3. **models/common.py** - 1044 lines
+4. **trading_dashboard_v2.py** - 1038 lines
 
 ### Module Size Analysis
-#### Top 5 Largest Modules (Need Refactoring)
+#### Top 5 Largest Modules
 1. **feature_pipeline**: 44,393 lines (19.2% of codebase) 🔴
 2. **data_pipeline**: 40,305 lines (17.4% of codebase) 🔴
 3. **utils**: 36,628 lines (15.8% of codebase) 🔴

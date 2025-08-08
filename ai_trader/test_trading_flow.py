@@ -328,16 +328,20 @@ async def test_risk_management():
         
         # Test real-time risk
         try:
-            # LiveRiskMonitor requires a position_manager, not config
-            # We'll create a mock one or skip with explanation
-            from unittest.mock import Mock
-            mock_position_manager = Mock()
+            # Import the test implementation
+            # WARNING: This uses TestPositionManager - must be replaced before production!
+            from test_helpers.test_position_manager import TestPositionManager
+            
+            # Create a real (test) position manager, not a mock
+            test_position_manager = TestPositionManager(config=config)
+            
+            # Initialize LiveRiskMonitor with the test implementation
             real_time = LiveRiskMonitor(
-                position_manager=mock_position_manager,
+                position_manager=test_position_manager,
                 config=config
             )
             log_test("Risk", "Real-Time Monitor", "PASS", 
-                    "Monitor initialized with mock position manager")
+                    "Monitor initialized with TestPositionManager (REPLACE BEFORE PRODUCTION!)")
         except Exception as e:
             log_test("Risk", "Real-Time Monitor", "FAIL", 
                     str(e), "Real-time risk broken")
