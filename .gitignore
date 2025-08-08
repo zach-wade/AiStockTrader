@@ -124,6 +124,8 @@ coverage.xml
 .spyderproject
 .spyproject
 .ropeproject
+.pylanceignore
+.claude/
 
 # ============================================
 # DATABASE FILES
@@ -199,6 +201,8 @@ temp/
 scratch/
 work/
 .scratch/
+current_issues.txt
+pickup.md
 
 # ============================================
 # COMPRESSED FILES (unless explicitly needed)
