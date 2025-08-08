@@ -8,15 +8,15 @@ This document provides comprehensive setup instructions for the AI Trading Syste
 
 ### Repository Access
 ```bash
-# Clone repository (when available)
-git clone https://github.com/[username]/ai-trader.git
-cd ai-trader
+# Clone repository
+git clone https://github.com/zach-wade/AiStockTrader.git
+cd AiStockTrader/ai_trader
 
 # Preferred access method: HTTPS (for CI/CD)
-git remote set-url origin https://github.com/[username]/ai-trader.git
+git remote set-url origin https://github.com/zach-wade/AiStockTrader.git
 
 # Alternative: SSH (for development)
-git remote set-url origin git@github.com:[username]/ai-trader.git
+git remote set-url origin git@github.com:zach-wade/AiStockTrader.git
 ```
 
 ### Branch Strategy
