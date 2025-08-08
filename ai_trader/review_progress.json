@@ -1,0 +1,217 @@
+{
+  "metadata": {
+    "project": "AI Trading System",
+    "repository": "https://github.com/zach-wade/AiStockTrader",
+    "review_started": "2025-08-08",
+    "last_updated": "2025-08-08",
+    "version": "1.0"
+  },
+  "statistics": {
+    "total_files": 786,
+    "total_lines": 231764,
+    "files_reviewed": 0,
+    "lines_reviewed": 0,
+    "issues_found": 50,
+    "issues_fixed": 0,
+    "tests_added": 0,
+    "dead_code_removed_lines": 0
+  },
+  "modules": {
+    "app": {
+      "path": "src/main/app",
+      "priority": "high",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Entry points and CLI commands"
+    },
+    "backtesting": {
+      "path": "src/main/backtesting",
+      "priority": "medium",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Historical validation, possible dead code"
+    },
+    "config": {
+      "path": "src/main/config",
+      "priority": "high",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Configuration management"
+    },
+    "data_pipeline": {
+      "path": "src/main/data_pipeline",
+      "priority": "critical",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Data ingestion, storage, hot/cold routing issues"
+    },
+    "events": {
+      "path": "src/main/events",
+      "priority": "low",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Likely deprecated, needs removal"
+    },
+    "feature_pipeline": {
+      "path": "src/main/feature_pipeline",
+      "priority": "high",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Feature calculation, performance issues reported"
+    },
+    "interfaces": {
+      "path": "src/main/interfaces",
+      "priority": "critical",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Contracts and protocols, foundation for all modules"
+    },
+    "models": {
+      "path": "src/main/models",
+      "priority": "critical",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "ML models and strategies, organization issues"
+    },
+    "monitoring": {
+      "path": "src/main/monitoring",
+      "priority": "high",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Dashboards, system health tab empty"
+    },
+    "risk_management": {
+      "path": "src/main/risk_management",
+      "priority": "critical",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Circuit breakers over-triggering"
+    },
+    "scanners": {
+      "path": "src/main/scanners",
+      "priority": "high",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Not working properly, not integrated with CLI"
+    },
+    "trading_engine": {
+      "path": "src/main/trading_engine",
+      "priority": "critical",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Core execution logic"
+    },
+    "universe": {
+      "path": "src/main/universe",
+      "priority": "medium",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Symbol management, layer system"
+    },
+    "utils": {
+      "path": "src/main/utils",
+      "priority": "low",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Shared utilities"
+    },
+    "orchestration": {
+      "path": "src/main/orchestration",
+      "priority": "medium",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Job scheduling, scheduled jobs broken"
+    },
+    "services": {
+      "path": "src/main/services",
+      "priority": "medium",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "External service integrations"
+    },
+    "migrations": {
+      "path": "src/main/migrations",
+      "priority": "low",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Database migrations"
+    },
+    "jobs": {
+      "path": "src/main/jobs",
+      "priority": "medium",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Scheduled tasks, currently broken"
+    },
+    "features": {
+      "path": "src/main/features",
+      "priority": "medium",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Feature definitions"
+    },
+    "core": {
+      "path": "src/main/core",
+      "priority": "low",
+      "status": "pending",
+      "files_total": null,
+      "files_reviewed": 0,
+      "issues_found": [],
+      "notes": "Purpose unclear, needs investigation"
+    }
+  },
+  "review_log": [],
+  "daily_progress": {
+    "2025-08-08": {
+      "files_reviewed": 0,
+      "issues_found": 50,
+      "issues_fixed": 0,
+      "notes": "Initial audit setup, created tracking documents"
+    }
+  },
+  "next_actions": [
+    "Count files per module",
+    "Create dependency graph",
+    "Set up automated analysis tools",
+    "Begin reviewing critical modules",
+    "Document architecture patterns"
+  ]
+}
