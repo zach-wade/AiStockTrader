@@ -1,10 +1,10 @@
 # Utils Module Issues
 
 **Module**: utils  
-**Files**: 66 reviewed so far (45.5% of 145 total files)  
-**Status**: 🔄 IN PROGRESS - Batches 1-13 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Remaining Cache & Database Operations)  
+**Files**: 81 reviewed so far (55.9% of 145 total files)  
+**Status**: 🔄 IN PROGRESS - Batches 1-16 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Database Operations, Events, Logging, Market Data/Processing)  
 **Critical Issues**: 1 (ISSUE-323: CONFIRMED - Unsafe deserialization fallback in Redis cache backend)  
-**Total Issues**: 80 (1 critical, 28 medium, 51 low)
+**Total Issues**: 109 (1 critical, 37 medium, 71 low)
 
 ---
 
@@ -1140,6 +1140,170 @@ The main security concerns are:
 
 ---
 
+## Phase 5 Week 6 Batch 16: Market Data & Processing Utilities (5 files)
+
+### Medium Priority Issues (P2): 9 issues
+
+#### ISSUE-388: Undefined Imports in Market Data Cache
+- **Component**: market_data/cache.py
+- **Location**: Lines 49-52
+- **Impact**: Runtime errors - CacheKeyBuilder, CacheMetrics not imported
+- **Fix**: Import missing classes or define them
+- **Priority**: P2
+
+#### ISSUE-389: Missing Config Attribute Access Pattern
+- **Component**: market_data/cache.py
+- **Location**: Lines 84, 88, 92-93, 167, 313, 349, 353, 359
+- **Impact**: AttributeError when accessing config properties directly
+- **Fix**: Use dict-style access or ensure config is proper dataclass
+- **Priority**: P2
+
+#### ISSUE-390: Path Traversal in Universe Loader
+- **Component**: market_data/universe_loader.py
+- **Location**: Lines 41, 106-107
+- **Impact**: Potential directory traversal via layer parameter
+- **Fix**: Validate layer parameter to prevent path traversal
+- **Priority**: P2
+
+#### ISSUE-391: Insecure File Operations
+- **Component**: market_data/universe_loader.py
+- **Location**: Lines 48-49, 76-77, 119-120
+- **Impact**: No validation on file paths, potential to read/write arbitrary files
+- **Fix**: Add path validation and sandboxing
+- **Priority**: P2
+
+#### ISSUE-392: Missing Timezone Import
+- **Component**: processing/historical.py
+- **Location**: Line 4 (comment says FIXED but still an issue to note)
+- **Impact**: Previously had missing timezone import (now fixed)
+- **Fix**: Already fixed in code
+- **Priority**: P2 (resolved)
+
+#### ISSUE-393: Hardcoded Configuration Values
+- **Component**: processing/historical.py
+- **Location**: Lines 13-24 (TimeConstants class)
+- **Impact**: Inflexible configuration, can't adjust without code changes
+- **Fix**: Move to configuration file
+- **Priority**: P2
+
+#### ISSUE-394: Memory Exhaustion Risk in Streaming
+- **Component**: processing/streaming.py
+- **Location**: Lines 230-235
+- **Impact**: Buffer may grow unbounded before memory check
+- **Fix**: Implement stricter memory limits per buffer item
+- **Priority**: P2
+
+#### ISSUE-395: Unsafe Parquet Append Operations
+- **Component**: processing/streaming.py
+- **Location**: Lines 337-340
+- **Impact**: Reading entire parquet file into memory defeats streaming purpose
+- **Fix**: Use parquet append libraries or write to separate files
+- **Priority**: P2
+
+#### ISSUE-396: Missing Error Recovery in Stream Processing
+- **Component**: processing/streaming.py
+- **Location**: Lines 301-311
+- **Impact**: Single chunk failure doesn't retry or allow recovery
+- **Fix**: Add retry logic with exponential backoff
+- **Priority**: P2
+
+### Low Priority Issues (P3): 20 issues
+
+#### ISSUE-397: TODO Comments Without Issue Tracking
+- **Component**: market_data/cache.py
+- **Location**: Lines 99-101
+- **Impact**: Untracked technical debt
+- **Fix**: Create issues for TODOs or implement features
+- **Priority**: P3
+
+#### ISSUE-398: Inconsistent Error Handling
+- **Component**: market_data/cache.py
+- **Location**: Lines 137-139, 192-193, 225-226
+- **Impact**: Errors logged but exceptions swallowed
+- **Fix**: Consistent error propagation strategy
+- **Priority**: P3
+
+#### ISSUE-399: No Input Validation in Cache Methods
+- **Component**: market_data/cache.py
+- **Location**: Lines 103, 147, 201, 233
+- **Impact**: Can pass None/invalid values causing runtime errors
+- **Fix**: Add parameter validation
+- **Priority**: P3
+
+#### ISSUE-400: Global State in Streaming Components
+- **Component**: processing/streaming.py
+- **Location**: Lines 85-86
+- **Impact**: Thread safety concerns with shared executor
+- **Fix**: Use instance-specific executors or thread-safe patterns
+- **Priority**: P3
+
+#### ISSUE-401: Magic Numbers in Code
+- **Component**: processing/streaming.py
+- **Location**: Lines 37-40, 287, 572
+- **Impact**: Hard to understand/maintain thresholds
+- **Fix**: Define named constants with explanations
+- **Priority**: P3
+
+#### ISSUE-402: Missing Type Validation
+- **Component**: market_data/universe_loader.py
+- **Location**: Throughout
+- **Impact**: Can pass wrong types causing runtime errors
+- **Fix**: Add runtime type checking or use pydantic
+- **Priority**: P3
+
+#### ISSUE-403: No Atomic File Operations
+- **Component**: market_data/universe_loader.py
+- **Location**: Lines 119-120
+- **Impact**: Partial writes possible on failure
+- **Fix**: Write to temp file and atomic rename
+- **Priority**: P3
+
+#### ISSUE-404: Inefficient Memory Patterns
+- **Component**: processing/streaming.py
+- **Location**: Lines 233-234
+- **Impact**: Converting deque to list unnecessary
+- **Fix**: Process deque items directly
+- **Priority**: P3
+
+#### ISSUE-405: Missing Docstrings
+- **Component**: market_data/__init__.py
+- **Location**: Entire file
+- **Impact**: No module documentation
+- **Fix**: Add comprehensive module docstring
+- **Priority**: P3
+
+#### ISSUE-406: Synchronous File I/O in Async Context
+- **Component**: market_data/universe_loader.py
+- **Location**: Lines 48, 76, 119
+- **Impact**: Blocks event loop during file operations
+- **Fix**: Use aiofiles for async file I/O
+- **Priority**: P3
+
+#### ISSUE-407: No Compression for Universe Files
+- **Component**: market_data/universe_loader.py
+- **Location**: Lines 119-120
+- **Impact**: Large universe files waste disk space
+- **Fix**: Add gzip compression option
+- **Priority**: P3
+
+**Batch 16 Summary**: 29 issues total, 0 critical, 9 medium, 20 low
+
+### Overall Assessment for Batch 16:
+⚠️ **MODERATE RISK** - Runtime errors and security concerns
+- **market_data/cache.py**: Missing imports and undefined references will cause runtime failures
+- **market_data/universe_loader.py**: Path traversal and insecure file operations
+- **processing/historical.py**: Good utilities but hardcoded configuration
+- **processing/streaming.py**: Complex streaming logic with memory risks
+- **market_data/__init__.py**: Clean but minimal
+
+The main concerns are:
+- Multiple undefined imports/references that will fail at runtime
+- Path traversal vulnerabilities in file operations
+- Memory exhaustion risks in streaming operations
+- Missing input validation throughout
+
+---
+
 **Last Updated**: 2025-08-09  
-**Review Progress**: Phase 5 Week 6 Batch 15 Complete  
-**Total Issues in Utils Module**: 98 (1 critical, 34 medium, 63 low)
+**Review Progress**: Phase 5 Week 6 Batch 16 Complete  
+**Total Issues in Utils Module**: 109 (1 critical, 37 medium, 71 low)
