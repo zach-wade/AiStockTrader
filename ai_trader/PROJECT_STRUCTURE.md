@@ -5,6 +5,29 @@
 
 ---
 
+## Quality Metrics by Module (Added 2025-08-09)
+
+Based on 44.5% code review coverage:
+
+| Module | Review % | Critical Issues | Quality Rating | Notes |
+|--------|----------|-----------------|----------------|-------|
+| data_pipeline | 100% | 7 | ⚠️ POOR | SQL injection, eval() vulnerabilities |
+| feature_pipeline | 88.9% | 0 | ⭐⭐⭐⭐⭐ EXCELLENT | PhD-level math, clean architecture |
+| utils | 0% | Unknown | ❓ | 145 files unreviewed |
+| models | 0% | Unknown | ❓ | 101 ML files unreviewed |
+| trading_engine | 0% | Unknown | ❓ | Core logic unreviewed |
+| risk_management | Partial | 0 | ⭐⭐⭐ FAIR | 40% unimplemented |
+| monitoring | 0% | Unknown | ❓ | Dashboard issues reported |
+| scanners | 0% | Unknown | ⚠️ | Not integrated, not working |
+
+### Technical Debt Distribution
+- **High Debt**: data_pipeline (security issues), scanners (broken)
+- **Medium Debt**: risk_management (incomplete), monitoring (UI issues)
+- **Low Debt**: feature_pipeline (only minor issues)
+- **Unknown**: utils, models, trading_engine (unreviewed)
+
+---
+
 ## Directory Structure Overview
 
 ```
@@ -75,6 +98,35 @@
   - Fixtures: 12 files (7.7% of tests)
   - Test Utilities: 17 files (10.9% of tests)
   - Monitoring Tests: 1 file (0.6% of tests)
+
+### Architectural Patterns Discovered (Added 2025-08-09)
+
+Based on detailed code review:
+
+**Best Practices Found in feature_pipeline:**
+- Facade pattern for backward compatibility
+- Factory pattern for object creation
+- Dataclass configuration with validation
+- Parallel processing with ThreadPoolExecutor
+- Circuit breaker pattern for resilience
+- Comprehensive error handling
+- Safe division helpers throughout
+
+**Anti-Patterns Found in data_pipeline:**
+- Direct SQL string interpolation (SQL injection)
+- eval() usage for rule execution (code injection)
+- Hardcoded paths and credentials
+- Missing input validation
+- Inconsistent error handling
+- Global state management
+
+**Common Issues Across Modules:**
+- Deprecated pandas methods (fillna)
+- Magic numbers without configuration
+- Undefined function references
+- Missing type hints
+- Excessive method complexity (>100 lines)
+- Insufficient logging
 
 ### Module Size Analysis
 
