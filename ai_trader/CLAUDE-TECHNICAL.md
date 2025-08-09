@@ -2,6 +2,8 @@
 
 This document provides detailed technical specifications for the AI Trading System.
 
+**Last Updated**: 2025-08-09 (Phase 5 Week 5 Day 2 - Documentation Reorganized)
+
 ---
 
 ## 🔧 Language & Runtime Requirements
@@ -92,22 +94,22 @@ class TestPositionManager:
 
 **Source**: Automated code analysis via scripts/code_analyzer.py
 
-### Code Review Status
+### Code Review Status (Week 3 Complete)
 | Category | Files | Status | Notes |
 |----------|-------|--------|-------|
 | Total Files | 787 | - | 233,439 lines |
-| Files Reviewed | ~65 | 8.3% | Actually examined for correctness |
-| Files Not Reviewed | 722 | 91.7% | Never examined, functionality unknown |
+| Files Reviewed | 238 | 30.2% | Actually examined for correctness |
+| Files Not Reviewed | 549 | 69.8% | Never examined, functionality unknown |
 | Test Files | 158 | - | 23% test-to-code ratio |
 
 ### Code Distribution
 | Category | Files | Lines | Review Status |
 |----------|-------|-------|--------------|
-| data_pipeline | 170 | 40,305 | NOT REVIEWED |
+| data_pipeline | 170 | 40,305 | 75.3% REVIEWED (128/170 files) |
 | utils | 145 | 36,628 | NOT REVIEWED |
 | models | 101 | 24,406 | NOT REVIEWED |
-| feature_pipeline | 90 | 44,393 | PARTIALLY REVIEWED |
-| risk_management | 51 | 16,554 | REVIEWED |
+| feature_pipeline | 90 | 44,393 | 11.1% REVIEWED (10/90 files) |
+| risk_management | 51 | 16,554 | 100% REVIEWED |
 | Examples | 11 | 2,940 | Example implementations |
 
 ### Code Quality Metrics (Phase 4 Analysis)
@@ -524,7 +526,93 @@ pytest -m "not slow"
 
 ---
 
+## 🏛️ Validation Architecture (Phase 5 Week 4 Findings)
+
+### Multi-Stage Validation Pipeline
+The system implements a sophisticated three-stage validation pipeline:
+
+1. **INGEST Stage**: Raw data validation at entry point
+   - OHLCV data integrity checks
+   - Required field validation
+   - Source-specific field mapping
+
+2. **POST_ETL Stage**: Post-transformation validation
+   - DataFrame structure validation
+   - Data continuity checks
+   - Trading hours validation
+
+3. **FEATURE_READY Stage**: Pre-feature calculation validation
+   - Feature completeness checks
+   - Distribution validation
+   - Correlation analysis
+   - Feature drift detection
+
+### Key Architectural Patterns Found
+
+#### Clean Interface Implementation
+- All validators implement `IValidator` base interface
+- Specialized interfaces: `IFeatureValidator`, `IMarketDataValidator`
+- Stage-specific validators with proper routing
+- Dependency injection throughout
+
+#### Statistical Drift Detection
+```python
+# Feature drift detection with statistical analysis
+drift_score = abs(current_mean - reference_mean) / reference_std
+if drift_score > threshold:
+    # Drift detected
+```
+
+#### No SQL Injection Risk
+- All validators work exclusively with DataFrames
+- No direct SQL query construction in validation layer
+- Data access through repository pattern only
+
+### Validation Metrics
+- **NaN ratio checking**: Configurable thresholds per data type
+- **Infinite value detection**: Prevents invalid calculations
+- **Constant feature detection**: Identifies non-informative features
+- **Quality scoring**: Comprehensive quality metrics with penalties
+
+---
+
 ## 🔐 Security Considerations
+
+### Known Security Vulnerabilities (Found in Phase 5 Review)
+
+#### Critical Issues Requiring Immediate Attention (8 Total)
+1. **SQL Injection - Partition Manager** (ISSUE-144)
+   - File: data_pipeline/services/storage/partition_manager.py
+   - Pattern: Direct f-string interpolation in CREATE/DROP TABLE statements
+   - Impact: CRITICAL - Arbitrary SQL execution possible
+   - Fix: Use identifier validation before query construction
+
+2. **Code Execution via eval()** (ISSUE-103)
+   - File: data_pipeline/validation/rules/rule_executor.py
+   - Impact: Complete system compromise via malicious rule expressions
+   - Fix: Replace eval() with safe expression parser (asteval/sympy)
+
+3. **YAML Deserialization Attack** (ISSUE-104)
+   - File: data_pipeline/validation/rules/rule_parser.py
+   - Impact: Code execution via malicious YAML files
+   - Fix: Use yaml.safe_load() with validation
+
+4. **Path Traversal Vulnerability** (ISSUE-095)
+   - File: data_pipeline/validation/config/validation_profile_manager.py
+   - Impact: Arbitrary file system access
+   - Fix: Path validation and sandboxing
+
+5. **Additional SQL Injection Risks** (ISSUE-076, 061, 063, 066, 069, 078)
+   - Files affected: Multiple ingestion and repository files
+   - Pattern: Direct f-string interpolation of table names
+   - Fix: Use validate_table_name() from sql_validator.py
+
+#### Secure Components (Found in Week 2-3)
+✅ **Bulk Loading System** - Uses PostgreSQL COPY commands with proper parameterization
+✅ **Metrics & Dashboard System** - Clean configuration management, no security issues
+✅ **Validation Metrics Exporters** - Professional implementation with proper validation
+✅ **SQL Validator Module** - EXCELLENT validation with comprehensive whitelisting
+✅ **Circuit Breaker Pattern** - Well-implemented resilience patterns throughout
 
 ### Sensitive File Locations
 ```
@@ -544,10 +632,57 @@ API_KEY = 'PKY1234567890'              # ❌ Never do this
 query = "SELECT * FROM users WHERE id = $1"  # ✅ Safe
 query = f"SELECT * FROM users WHERE id = {user_id}"  # ❌ SQL injection risk
 
+# Validate table names before use
+from main.utils.security.sql_security import validate_table_name
+table = validate_table_name(table_name)  # ✅ Safe
+query = f"SELECT * FROM {table}"
+
 # Validate all inputs
 from main.utils.security.sql_security import validate_table_name
 table = validate_table_name(user_input)  # ✅ Validated
 ```
+
+---
+
+## 🏆 Excellent Architectural Patterns (Found in Week 3)
+
+### Outstanding Implementations
+1. **SQL Validator Module** (sql_validator.py)
+   - Comprehensive whitelisting of safe table names
+   - Dangerous keyword detection
+   - Pattern validation for identifiers
+   - Zero SQL injection vulnerabilities
+
+2. **Circuit Breaker Implementation**
+   - Exponential backoff with jitter
+   - Success threshold recovery
+   - Per-service isolation
+   - Monitoring integration
+
+3. **Storage Router** (storage_router.py) 
+   - Intelligent hot/cold data routing
+   - Fallback tier support
+   - Performance estimation
+   - Streaming for large datasets
+
+4. **Layer-Aware Processing**
+   - Different strategies per layer (0-3)
+   - Automatic resource allocation
+   - Efficient data retention
+   - Progressive enhancement
+
+5. **Service Locator Pattern** (service_container.py)
+   - Clean dependency injection
+   - Lazy initialization
+   - Type-safe service retrieval
+   - Easy testing/mocking
+
+### Design Patterns Properly Used
+- **Factory Pattern**: All repositories use factory creation
+- **Repository Pattern**: Clean data access abstraction
+- **Command Pattern**: ETL processors with configurable pipelines
+- **Strategy Pattern**: Multiple validators with common interface
+- **Observer Pattern**: Event-driven ingestion system
 
 ---
 
@@ -577,6 +712,7 @@ cache:market_data:AAPL:1h:20240101
 
 ---
 
-*Last Updated: 2025-08-08 22:30 (Phase 3.0 - All systems operational)*  
-*System Status: FULLY FUNCTIONAL (10/10 components passing)*
-*Version: 1.2*
+*Last Updated: 2025-08-09 (Phase 5 Week 4 Complete - Historical & Validation Subsystems)*  
+*System Status: TESTS PASSING (10/10 components) - 11 CRITICAL SECURITY FIXES REQUIRED*
+*Code Review Progress: 261/787 files (33.2%) - 526 files never examined*
+*Version: 2.4*

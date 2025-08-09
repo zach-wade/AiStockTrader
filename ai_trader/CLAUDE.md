@@ -43,16 +43,16 @@ When updating CLAUDE documentation, the AI assistant MUST:
 - **GitHub Repository**: [https://github.com/zach-wade/AiStockTrader](https://github.com/zach-wade/AiStockTrader)
 - **Local Path**: `/Users/zachwade/StockMonitoring`
 - **Main Branch**: `main`
-- **Last Updated**: 2025-08-09 (Phase 4.0 - All tests passing, code analysis complete)
+- **Last Updated**: 2025-08-09 (Phase 5 Week 5 Day 2 - Documentation Reorganized)
 
 ## 📋 Current Project Status (August 2025)
 
-### ⚠️ IMPORTANT: Tests Pass But Code Not Reviewed (2025-08-09)
+### ⚠️ IMPORTANT: Tests Pass But Code Not Fully Reviewed (2025-08-09)
 - **Test Status**: 10/10 components pass initialization tests
-- **Code Review Status**: Only ~65 of 787 files reviewed (8.3%)
+- **Code Review Status**: 295 of 787 files reviewed (37.5%)
 - **Reality Check**: We know it doesn't crash, NOT that it works correctly
-- **Production Ready**: NO - Using test implementations, code not validated
-- **Current Phase**: Phase 5 - Deep code review and refactoring needed
+- **Production Ready**: NO - 12 CRITICAL security vulnerabilities including eval() code execution
+- **Current Phase**: Phase 5 Week 5 Day 2 - feature_pipeline module in progress (27.8% complete)
 
 ### What We Actually Know vs Don't Know
 **VERIFIED** ✅:
@@ -73,32 +73,85 @@ When updating CLAUDE documentation, the AI assistant MUST:
 - Security vulnerabilities
 - Memory leaks or inefficiencies
 
-### Phase 5: Deep Code Review (IN PROGRESS - Week 1 of 5)
+### Phase 5: Deep Code Review (Week 5 Day 2 IN PROGRESS)
 
-**Current Focus: data_pipeline Module (Day 0 of 5)**
-- Starting review of 170 files (40,305 lines)
-- Day 1: Storage/Repositories (25 files) - SQL injection checks
-- Day 2: Ingestion (13 files) - API rate limiting
-- Day 3: Orchestration (17 files) - Deadlock detection
-- Day 4: Validation (45 files) - Data integrity
-- Day 5: Processing/Services (45 files) - Performance
+**Completed Reviews (295 files total)**:
+- ✅ Week 1 Day 1: Storage/Repositories (25 files) - Found SQL injection risks, placeholder implementations
+- ✅ Week 1 Day 2: Ingestion (17 files) - Found critical SQL injection, undefined functions
+- ✅ Week 1 Day 3: Orchestration & Historical (15 files) - Found more SQL injection, deadlock risks
+- ✅ Week 1 Day 4: Validation System (20 files) - Found CRITICAL code execution vulnerabilities
+- ✅ Week 1 Day 5: Processing/Services (25 files) - Found runtime errors, security issues
+- ✅ Week 2 Batch 1: Core Infrastructure (20 files) - Found CRITICAL SQL injection in partition manager
+- ✅ Week 2 Batch 2: Bulk Loaders & Validation Metrics (21 files) - EXCELLENT security, no critical issues
+- ✅ Week 3 Batch 3: Core Module Files (5 files) - EXCELLENT architecture, no issues
+- ✅ Week 3 Batch 4: Base Classes & Storage Router (5 files) - One minor MD5 issue  
+- ✅ Week 3 Batch 5: Storage & Database Components (5 files) - 2 CRITICAL SQL injection issues
+- ✅ Week 3 Batch 6: Processing Validators (5 files) - 1 undefined variable issue
+- ✅ Week 3 Batch 7: Processing Features (5 files) - Excellent patterns found
+- ✅ Week 3 Batch 8: Processing Services (5 files) - Good text processing implementation
+- ✅ Week 4 Batch 1: Validation Core Components (4 files) - Config injection risks, excellent architecture
+- ✅ Week 4 Batch 2: Validation Validators (5 files) - No SQL injection, minor issues only
+- ✅ Week 4 Batch 3: Historical Module Part 1 (5 files) - CRITICAL SQL injection in data_existence_checker
+- ✅ Week 4 Batch 4: Historical Module Part 2 (4 files) - Cache management issues only
+- ✅ Week 4 Batch 5: Validation Quality & Coverage (5 files) - MD5 usage, global state issues
+- ✅ Week 4 Batch 6: Validation Rules Engine (6 files) - ⚠️ CRITICAL eval() vulnerability CONFIRMED
+- ✅ Week 4 Batch 7-8: Validation Config (3 files) - Path traversal risks
+- ✅ Week 5 Day 1: feature_pipeline Core (20 files) - No critical issues
+- ✅ Week 5 Day 2 Batch 5: Technical Facade & Cross-Sectional (5 files) - No security issues
 
-**After Week 1 - Still Unreviewed (617 files, 78.4%)**:
-1. **feature_pipeline/** - 90 files, 44K lines (Week 2)
-2. **utils/** - 145 files, 36K lines (Week 3)
-3. **models/** - 101 files, 24K lines (Week 4)
-4. **trading_engine/** - 33 files, 13K lines (Week 2)
-5. **monitoring/** - 36 files, 10K lines (Week 4)
-6. **All other modules** - Week 5+
+**Modules Complete**: 
+- ✅ data_pipeline: 170/170 files (100%) - 35+ issues, 7 critical
+- 🔄 feature_pipeline: 25/90 files (27.8%) - 24 issues, 0 critical
 
-**Critical Issues Being Tracked**:
-- ISSUE-060: 91.7% of code never reviewed (IN PROGRESS)
+### Week 5 Plan: feature_pipeline Module
+
+**Target**: 90 files, ~44K lines of critical feature calculation code
+**Timeline**: 5 days, 18 batches of 5 files each
+**Priority**: HIGH - Features directly impact trading accuracy
+
+**Schedule**:
+- Day 1: Core infrastructure (20 files)
+- Day 2: Technical & Statistical calculators (20 files)
+- Day 3: Correlation & News analysis (20 files)
+- Day 4: Options & Integration (20 files)
+- Day 5: Remaining components (10 files)
+
+**Focus**: eval() usage, performance bottlenecks, placeholder implementations, calculation accuracy
+
+**Still Unreviewed (492 files, 62.5%)**:
+1. **feature_pipeline/** - 65 files remaining (25/90 complete)
+2. **utils/** - 145 files, 36K lines
+3. **models/** - 101 files, 24K lines
+4. **trading_engine/** - 33 files, 13K lines
+5. **monitoring/** - 36 files, 10K lines
+6. **All other modules** - 112 files
+
+**Critical Issues Found So Far** (216 total, 12 CRITICAL):
+- ISSUE-162: SQL injection in data_existence_checker.py (CRITICAL - Week 4 Batch 3) - IMMEDIATE FIX REQUIRED
+- ISSUE-144: SQL injection in partition manager (CRITICAL - Week 2 Batch 1) - IMMEDIATE FIX REQUIRED
+- ISSUE-171: eval() code execution in rule_executor.py (CRITICAL - Week 4 Batch 6) - CONFIRMED & IMMEDIATE FIX REQUIRED
+- ISSUE-104: YAML deserialization FALSE POSITIVE - yaml.safe_load() used correctly  
+- ISSUE-095: Path traversal vulnerability (CRITICAL - Day 4)
+- ISSUE-096: JSON deserialization attack (CRITICAL - Day 4)
+- ISSUE-078: SQL injection in retention_manager.py (CRITICAL - Day 3)
+- ISSUE-076: SQL injection in market_data_split.py (CRITICAL - Day 2)
+- ISSUE-071: Technical analyzer returns RANDOM data (CRITICAL - Day 1)
+- ISSUE-153: SQL injection in update() method (CRITICAL - Week 3 Batch 5) - IMMEDIATE FIX REQUIRED
+- ISSUE-154: SQL injection in delete() method (CRITICAL - Week 3 Batch 5) - IMMEDIATE FIX REQUIRED
 - ISSUE-059: TestPositionManager in production path
+- Week 4 issues: Config injection, undefined variables, cache issues (9 new issues)
+- Multiple validation system vulnerabilities (Day 4: 32 new issues)
+- Multiple SQL injection risks in 10+ files
 - 146 files >500 lines need refactoring
-- Unknown number of security vulnerabilities
-- Unknown number of performance issues
 
-### Critical Issues Status (2025-08-08)
+### Documentation Reorganization (2025-08-09)
+The issue tracking has been reorganized for better navigation:
+- **ISSUE_REGISTRY.md** - Now serves as index/summary only
+- **ISSUES_data_pipeline.md** - All data_pipeline issues (35+)
+- **ISSUES_feature_pipeline.md** - All feature_pipeline issues (24)
+- Module-specific files will be created as reviews progress
+
+### Critical Issues Status (2025-08-09)
 - ✅ **FIXED**: Risk management - All abstract methods implemented
 - ✅ **FIXED**: Feature calculation - FeatureStoreV2 base_path parameter added
 - ✅ **FIXED**: Import errors - All calculator imports working
@@ -112,20 +165,22 @@ When updating CLAUDE documentation, the AI assistant MUST:
 A systematic audit of the entire codebase is underway to ensure code quality, identify issues, and plan improvements.
 
 ### Key Audit Documents
+- **[ISSUE_REGISTRY.md](ISSUE_REGISTRY.md)** - Index/summary of all issues (216 total)
+- **[ISSUES_data_pipeline.md](ISSUES_data_pipeline.md)** - data_pipeline module issues (35+)
+- **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - feature_pipeline module issues (24)
 - **[PROJECT_AUDIT.md](PROJECT_AUDIT.md)** - Complete audit methodology and findings
-- **[ISSUE_REGISTRY.md](ISSUE_REGISTRY.md)** - 58+ categorized issues with priorities (P0-P3)
 - **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Detailed code metrics and structure analysis
 - **[COMPONENT_MAPPING.md](COMPONENT_MAPPING.md)** - Expected vs actual component mapping
 - **[review_progress.json](review_progress.json)** - Real-time tracking of review progress
 
 ### Current Audit Status (Updated: 2025-08-09)
 - **Files in Project**: 787 Python files, 233,439 lines
-- **Files Actually Reviewed**: ~65 files (8.3% coverage)
-- **Files Never Reviewed**: 722 files (91.7%)
-- **Issues Documented**: 59+ (but likely many more undiscovered)
+- **Files Actually Reviewed**: 295 files (37.5% coverage)
+- **Files Never Reviewed**: 492 files (62.5%)
+- **Issues Documented**: 216 (12 critical, ~35 high, ~45 medium, ~124 low)
 - **Large Files**: 146 files >500 lines need refactoring
-- **Progress**: Phase 4 complete, Phase 5 (actual code review) starting
-- **System Status**: 🟡 **TESTS PASSING** - But code not validated
+- **Progress**: Phase 5 Week 5 Day 2 - feature_pipeline 27.8% complete
+- **System Status**: 🔴 **NOT PRODUCTION READY** - eval() vulnerability confirmed
 
 ### Latest Test Results (2025-08-09)
 - **Components Tested**: 10 major subsystems
@@ -1005,8 +1060,8 @@ order_repo = factory.create_order_repository(db)  # Type: IOrderRepository
 
 ---
 
-*Last Updated: 2025-08-09 (Phase 5 Starting - Deep Code Review Needed)*
-*Version: 5.0*
+*Last Updated: 2025-08-09 (Phase 5 Week 5 Day 2 - Documentation Reorganized)*
+*Version: 5.4*
 *GitHub: https://github.com/zach-wade/AiStockTrader*
-*System Status: TESTS PASSING - But only 8.3% of code actually reviewed*
-*Production Ready: NO - Code not validated, using test implementations*
+*System Status: NOT PRODUCTION READY - 37.5% of code reviewed, 12 CRITICAL vulnerabilities*
+*Production Ready: NO - eval() code execution vulnerability CONFIRMED*

@@ -2,6 +2,10 @@
 
 This document provides comprehensive setup instructions for the AI Trading System.
 
+**Last Updated**: 2025-08-09 (Phase 5 Week 5 Day 2 - 37.5% code coverage, documentation reorganized)
+**Repository**: https://github.com/zach-wade/AiStockTrader
+**Local Path**: /Users/zachwade/StockMonitoring/ai_trader
+
 ---
 
 ## 📦 Repository Information
@@ -203,6 +207,62 @@ python scripts/load_sample_data.py
 
 # Generate mock historical data
 python scripts/generate_mock_data.py --symbols AAPL,MSFT,GOOGL --days 30
+```
+
+---
+
+## 🔐 Security Setup (CRITICAL - 8 SECURITY VULNERABILITIES FOUND)
+
+### ⚠️ CRITICAL SECURITY ALERT (2025-08-09)
+**DO NOT DEPLOY TO PRODUCTION** - 8 critical security vulnerabilities found during Phase 5 code review:
+
+1. **SQL Injection in Partition Manager** (ISSUE-144) - Arbitrary SQL execution possible
+2. **Code Execution via eval()** (ISSUE-103) - Complete system compromise possible  
+3. **YAML Deserialization Attack** (ISSUE-104) - Code execution via malicious YAML
+4. **Path Traversal Vulnerability** (ISSUE-095) - Arbitrary file system access
+5. **Additional SQL Injection Issues** - Multiple files affected
+
+**SECURE COMPONENTS** (Ready for production):
+✅ Bulk Loading System - Uses PostgreSQL COPY commands securely
+✅ Metrics & Dashboard System - Clean configuration, no vulnerabilities
+
+### Immediate Security Fixes Required
+
+Before running the system, apply these critical security patches:
+
+```bash
+# 1. Fix SQL injection vulnerabilities
+# Files to patch immediately:
+# - src/main/data_pipeline/ingestion/loaders/market_data_split.py (lines 478-479, 505)
+# - src/main/data_pipeline/storage/repositories/*.py (multiple files)
+
+# 2. Validate all table names
+# Add this import to affected files:
+from main.utils.security.sql_security import validate_table_name
+
+# 3. Replace MD5 with SHA256
+# File: src/main/data_pipeline/ingestion/clients/polygon_news_client.py (line 232)
+# Change: hashlib.md5() → hashlib.sha256()
+
+# 4. Fix path traversal vulnerability
+# File: src/main/data_pipeline/ingestion/loaders/base.py (lines 374-423)
+# Add path validation using Path.resolve()
+```
+
+### Security Best Practices
+
+```python
+# NEVER do this - SQL injection risk
+query = f"INSERT INTO {table_name}"  # ❌ VULNERABLE
+
+# ALWAYS do this - validated table names
+from main.utils.security.sql_security import validate_table_name
+safe_table = validate_table_name(table_name)
+query = f"INSERT INTO {safe_table}"  # ✅ SAFE
+
+# Use parameterized queries for values
+query = "SELECT * FROM users WHERE id = $1"  # ✅ SAFE
+await db.execute(query, user_id)
 ```
 
 ---
@@ -481,8 +541,10 @@ psql -c "SELECT layer, COUNT(*) FROM companies GROUP BY layer;"
 
 ## 🔍 Validation & Testing
 
-### Current System Status (2025-08-08)
-**System Status**: FULLY FUNCTIONAL (10/10 components passing - PHASE 3.0 COMPLETE)
+### Current System Status (2025-08-09)
+**System Status**: TESTS PASSING (10/10 components) - 8 CRITICAL SECURITY FIXES REQUIRED
+**Code Review Progress**: 208 of 787 files reviewed (26.4%) - 579 files never examined
+**Phase 5 Status**: Week 2 Batch 2 COMPLETE - Bulk loaders SECURE, validation metrics EXCELLENT
 
 #### Recent Major Fixes:
 - ✅ All risk calculator abstract methods implemented
@@ -684,5 +746,6 @@ Once setup is complete, you should be able to:
 
 ---
 
-*Last Updated: 2025-08-08 22:30 (Phase 3.0 - All systems operational)*
-*Version: 1.3*
+*Last Updated: 2025-08-09 (Phase 5 Week 4 Complete - Historical & Validation Systems)*
+*System Status: TESTS PASSING - 11 CRITICAL SECURITY FIXES REQUIRED*
+*Version: 2.4*
