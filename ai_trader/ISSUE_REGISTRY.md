@@ -1,16 +1,16 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 4.0  
-**Updated**: 2025-08-09 (Documentation Reorganized)  
-**Total Issues**: 216  
-**Files Reviewed**: 295 of 787 (37.5%)  
-**System Status**: 🔴 NOT PRODUCTION READY - Critical security vulnerabilities
+**Version**: 5.2  
+**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 9 - utils module in progress)  
+**Total Issues**: 338 (data_pipeline: 196, feature_pipeline: 93, utils: 49)  
+**Files Reviewed**: 306 of 787 (38.9%)  
+**System Status**: 🔴 NOT PRODUCTION READY - 13 critical vulnerabilities (12 data_pipeline, 1 utils)
 
 ---
 
 ## 🚨 Critical Security Vulnerabilities (Immediate Action Required)
 
-### 12 Critical Issues Requiring Immediate Fixes:
+### 13 Critical Issues Requiring Immediate Fixes:
 
 1. **ISSUE-171**: eval() Code Execution in Rule Engine → [data_pipeline](ISSUES_data_pipeline.md#issue-171-eval-code-execution-in-rule-engine)
 2. **ISSUE-162**: SQL Injection in Data Existence Checker → [data_pipeline](ISSUES_data_pipeline.md#issue-162-sql-injection-in-data-existence-checker)
@@ -24,6 +24,7 @@
 10. **ISSUE-071**: Technical analyzer returns RANDOM data → [data_pipeline](ISSUES_data_pipeline.md#issue-071-technical-analyzer-returns-random-data)
 11. **ISSUE-103**: Code Execution via eval() (Duplicate of ISSUE-171)
 12. **ISSUE-104**: YAML Deserialization (FALSE POSITIVE - yaml.safe_load used correctly)
+13. **ISSUE-323**: Unsafe Deserialization Fallback in Redis Cache → [utils](ISSUES_utils.md#issue-323-unsafe-deserialization-fallback)
 
 ---
 
@@ -31,27 +32,27 @@
 
 | Module | Files | Reviewed | Issues | Critical | High | Medium | Low | Status |
 |--------|-------|----------|--------|----------|------|--------|-----|--------|
-| **data_pipeline** | 170 | 170 (100%) | 35+ | 7 | 5 | 10 | 13+ | ✅ COMPLETE |
-| **feature_pipeline** | 90 | 25 (27.8%) | 24 | 0 | 0 | 12 | 12 | 🔄 IN PROGRESS |
-| **utils** | 145 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
+| **data_pipeline** | 170 | 170 (100%) | 196 | 12 | 25 | 84 | 75 | ✅ COMPLETE |
+| **feature_pipeline** | 90 | 90 (100%) | 93 | 0 | 11 | 49 | 33 | ✅ COMPLETE |
+| **utils** | 145 | 46 (31.7%) | 49 | 1 | 2 | 16 | 30 | 🔄 IN PROGRESS |
 | **models** | 101 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **trading_engine** | 33 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **monitoring** | 36 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **Other modules** | 212 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
-| **TOTAL** | **787** | **295 (37.5%)** | **216** | **12** | **~35** | **~45** | **~124** | - |
+| **TOTAL** | **787** | **306 (38.9%)** | **338** | **13** | **38** | **149** | **138** | - |
 
 ---
 
 ## 📁 Module-Specific Issue Files
 
 ### Completed Modules
-- **[ISSUES_data_pipeline.md](ISSUES_data_pipeline.md)** - 170 files reviewed, 35+ issues including 7 critical security vulnerabilities
+- **[ISSUES_data_pipeline.md](ISSUES_data_pipeline.md)** - 170 files reviewed, 196 issues including 12 critical security vulnerabilities
+- **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 90 files reviewed, 93 issues with zero critical security vulnerabilities
 
 ### In Progress
-- **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 25/90 files reviewed, 24 issues found (no critical)
+- **[ISSUES_utils.md](ISSUES_utils.md)** - 46/145 files reviewed (Batches 1-9), 49 issues found (1 critical)
 
 ### Pending Review
-- **ISSUES_utils.md** - To be created when review starts
 - **ISSUES_models.md** - To be created when review starts
 - **ISSUES_trading_engine.md** - To be created when review starts
 - **ISSUES_monitoring.md** - To be created when review starts
@@ -84,17 +85,18 @@
 
 ## 📈 Review Progress
 
-### Current Phase: Phase 5 Week 5 Day 2
-- **Started**: 2025-08-09
-- **Current Module**: feature_pipeline
-- **Progress Today**: 5 files reviewed (Batch 5)
-- **Total Progress**: 295/787 files (37.5%)
+### Current Phase: Phase 5 Week 6 Batch 9
+- **Started**: 2025-08-09  
+- **Current Module**: utils (Batches 1-9 complete)
+- **Progress Today**: 46 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, and resilience/security modules
+- **Total Progress**: 306/787 files (38.9%)
 
 ### Review Timeline
 - **Phase 1-4**: Initial exploration and issue discovery
 - **Phase 5 Week 1-4**: data_pipeline complete review (170 files)
-- **Phase 5 Week 5**: feature_pipeline review (in progress)
-- **Estimated Completion**: ~10 more weeks at current pace
+- **Phase 5 Week 5**: feature_pipeline complete review (90 files)  
+- **Phase 5 Week 6**: utils module review (in progress, 41/145 files)
+- **Estimated Completion**: ~8 more weeks at current pace
 
 ---
 
