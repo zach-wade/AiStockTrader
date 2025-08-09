@@ -1,10 +1,10 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 5.4  
-**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 11 - utils module in progress)  
-**Total Issues**: 354 (data_pipeline: 196, feature_pipeline: 93, utils: 65)  
-**Files Reviewed**: 316 of 787 (40.2%)  
-**System Status**: 🔴 NOT PRODUCTION READY - 13 critical vulnerabilities (12 data_pipeline, 1 utils)
+**Version**: 5.8  
+**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 15 - utils module in progress)  
+**Total Issues**: 387 (data_pipeline: 196, feature_pipeline: 93, utils: 98)  
+**Files Reviewed**: 336 of 787 (42.7%)  
+**System Status**: 🔴 NOT PRODUCTION READY - 13 critical vulnerabilities (12 data_pipeline, 1 utils CONFIRMED)
 
 ---
 
@@ -24,7 +24,7 @@
 10. **ISSUE-071**: Technical analyzer returns RANDOM data → [data_pipeline](ISSUES_data_pipeline.md#issue-071-technical-analyzer-returns-random-data)
 11. **ISSUE-103**: Code Execution via eval() (Duplicate of ISSUE-171)
 12. **ISSUE-104**: YAML Deserialization (FALSE POSITIVE - yaml.safe_load used correctly)
-13. **ISSUE-323**: Unsafe Deserialization Fallback in Redis Cache → [utils](ISSUES_utils.md#issue-323-unsafe-deserialization-fallback)
+13. **ISSUE-323**: CONFIRMED - Unsafe Deserialization Fallback in Redis Cache → [utils](ISSUES_utils.md#issue-323-confirmed-unsafe-deserialization-fallback-in-redis-cache)
 
 ---
 
@@ -34,12 +34,12 @@
 |--------|-------|----------|--------|----------|------|--------|-----|--------|
 | **data_pipeline** | 170 | 170 (100%) | 196 | 12 | 25 | 84 | 75 | ✅ COMPLETE |
 | **feature_pipeline** | 90 | 90 (100%) | 93 | 0 | 11 | 49 | 33 | ✅ COMPLETE |
-| **utils** | 145 | 56 (38.6%) | 65 | 1 | 2 | 23 | 39 | 🔄 IN PROGRESS |
+| **utils** | 145 | 76 (52.4%) | 98 | 1 | 2 | 34 | 61 | 🔄 IN PROGRESS |
 | **models** | 101 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **trading_engine** | 33 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **monitoring** | 36 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **Other modules** | 212 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
-| **TOTAL** | **787** | **316 (40.2%)** | **354** | **13** | **38** | **156** | **147** | - |
+| **TOTAL** | **787** | **336 (42.7%)** | **387** | **13** | **38** | **167** | **169** | - |
 
 ---
 
@@ -50,7 +50,7 @@
 - **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 90 files reviewed, 93 issues with zero critical security vulnerabilities
 
 ### In Progress
-- **[ISSUES_utils.md](ISSUES_utils.md)** - 56/145 files reviewed (Batches 1-11), 65 issues found (1 critical)
+- **[ISSUES_utils.md](ISSUES_utils.md)** - 76/145 files reviewed (Batches 1-15), 98 issues found (1 critical CONFIRMED)
 
 ### Pending Review
 - **ISSUES_models.md** - To be created when review starts
@@ -85,11 +85,11 @@
 
 ## 📈 Review Progress
 
-### Current Phase: Phase 5 Week 6 Batch 11
+### Current Phase: Phase 5 Week 6 Batch 15
 - **Started**: 2025-08-09  
-- **Current Module**: utils (Batches 1-11 complete)
-- **Progress Today**: 56 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, and app context modules
-- **Total Progress**: 316/787 files (40.2%)
+- **Current Module**: utils (Batches 1-15 complete)
+- **Progress Today**: 76 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, app context, cache, database operations, events, and logging modules
+- **Total Progress**: 336/787 files (42.7%)
 
 ### Review Timeline
 - **Phase 1-4**: Initial exploration and issue discovery

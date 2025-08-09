@@ -1,9 +1,10 @@
 # Utils Module Issues
 
 **Module**: utils  
-**Files**: 56 reviewed so far (38.6% of 145 total files)  
-**Status**: 🔄 IN PROGRESS - Batches 1-11 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context)  
-**Critical Issues**: 1 (ISSUE-323: Unsafe deserialization fallback in Redis cache backend)
+**Files**: 66 reviewed so far (45.5% of 145 total files)  
+**Status**: 🔄 IN PROGRESS - Batches 1-13 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Remaining Cache & Database Operations)  
+**Critical Issues**: 1 (ISSUE-323: CONFIRMED - Unsafe deserialization fallback in Redis cache backend)  
+**Total Issues**: 80 (1 critical, 28 medium, 51 low)
 
 ---
 
@@ -747,6 +748,187 @@ The main security concerns are:
 ### Overall Assessment for Batch 11:
 ⚠️ **MODERATE SECURITY** - Several medium-priority issues found
 - **context.py**: Well-structured but has configuration access and resource cleanup issues
+
+---
+
+## Phase 5 Week 6 Batch 12: Cache Module Issues (5 files)
+
+### Medium Priority Issues (P2): 2 issues
+
+#### ISSUE-355: MD5 Hash Usage for Cache Keys
+- **Component**: keys.py
+- **Location**: Lines 162, 190 (MD5 for query and parameter hashing)
+- **Impact**: MD5 is cryptographically broken, vulnerable to collisions
+- **Attack Vector**: Cache poisoning through hash collisions
+- **Fix**: Replace MD5 with SHA256 or xxHash for non-cryptographic use
+- **Assessment**: MEDIUM - Cache poisoning risk
+- **Priority**: P2
+
+#### ISSUE-356: Pattern-Based Key Deletion Without Validation
+- **Component**: simple_cache.py
+- **Location**: Lines 115-120 (wildcard pattern deletion)
+- **Impact**: Potential for unintended cache clearing
+- **Attack Vector**: Malicious cache_type values could clear unintended keys
+- **Fix**: Validate cache_type and sanitize patterns before use
+- **Assessment**: MEDIUM - Data loss risk
+- **Priority**: P2
+
+### Low Priority Issues (P3): 4 issues
+
+#### ISSUE-357: Exception Swallowing in Cache Operations
+- **Component**: simple_cache.py
+- **Location**: Lines 52-54, 80-82, 99-101, 124-126 (generic exception handling)
+- **Impact**: Silent failures hide underlying issues
+- **Attack Vector**: None - debugging/monitoring issue
+- **Fix**: Log specific exceptions and consider re-raising critical ones
+- **Assessment**: LOW - Operational visibility issue
+- **Priority**: P3
+
+#### ISSUE-358: Weak Compression Error Handling
+- **Component**: compression.py
+- **Location**: Lines 51-52, 63-64 (returning original data on compression failure)
+- **Impact**: Silent fallback may hide compression issues
+- **Attack Vector**: None - operational issue
+- **Fix**: Add metrics for compression failures, consider failing fast
+- **Assessment**: LOW - Monitoring issue
+- **Priority**: P3
+
+#### ISSUE-359: Timestamp Parsing Without Timezone Awareness
+- **Component**: keys.py
+- **Location**: Lines 221, 228 (datetime.now() without timezone)
+- **Impact**: Incorrect expiry calculations in different timezones
+- **Attack Vector**: None - correctness issue
+- **Fix**: Use datetime.now(timezone.utc) consistently
+- **Assessment**: LOW - Data correctness issue
+- **Priority**: P3
+
+#### ISSUE-360: Missing Validation for Cache Entry Data
+- **Component**: models.py
+- **Location**: Lines 15-27 (CacheEntry accepts Any data type)
+- **Impact**: Potential for storing malicious or oversized data
+- **Attack Vector**: Cache pollution with invalid data
+- **Fix**: Add size limits and type validation for cache entries
+- **Assessment**: LOW - Data integrity issue
+- **Priority**: P3
+
+**Batch 12 Summary**: 6 issues total, 0 critical, 2 medium, 4 low
+
+### Overall Assessment for Batch 12:
+✅ **GOOD SECURITY** - Cache module is well-designed with minor issues
+- **simple_cache.py**: Clean wrapper with good error handling
+- **compression.py**: Professional implementation with multiple algorithms
+- **keys.py**: Comprehensive key generation but uses MD5 (needs upgrade)
+- **metrics.py**: Excellent metrics collection and health monitoring
+- **models.py**: Well-structured data models with proper encapsulation
+
+---
+
+## Phase 5 Week 6 Batch 13: Remaining Cache & Database Operations (5 files)
+
+### Critical Priority Issues (P0): CONFIRMED ISSUE-323
+
+#### ISSUE-323 CONFIRMED: Unsafe Deserialization Fallback in Redis Cache
+- **Component**: cache/backends.py  
+- **Location**: Lines 255-259 (RedisBackend.get method)
+- **Impact**: CRITICAL - Code execution via malicious cache data
+- **Attack Vector**: If secure deserialization fails, falls back to unsafe pickle
+- **Code Evidence**:
+  ```python
+  try:
+      entry_dict = secure_loads(data)
+  except Exception as secure_error:
+      logger.warning(f"SECURITY WARNING: Secure deserialization failed ({secure_error}), falling back to unsafe pickle")
+      entry_dict = secure_loads(data)  # BUG: Still calling secure_loads, not unsafe!
+  ```
+- **Fix**: Remove fallback entirely or fix the fallback to actually use a different method
+- **Assessment**: CRITICAL - Confirmed vulnerability
+- **Priority**: P0
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-361: Undefined Config Attribute Access
+- **Component**: background_tasks.py
+- **Location**: Lines 48, 52, 78, 143, 224-226 (self.config references)
+- **Impact**: Runtime AttributeError - BackgroundTasksService has no config attribute
+- **Attack Vector**: Service crash on startup or during operation
+- **Fix**: Add config parameter to __init__ and store as self.config
+- **Assessment**: MEDIUM - Service will fail at runtime
+- **Priority**: P2
+
+#### ISSUE-362: Global State in Cache Module
+- **Component**: cache/__init__.py
+- **Location**: Lines 42-56 (global _global_cache)
+- **Impact**: Testing difficulties, potential race conditions
+- **Attack Vector**: State pollution between tests/instances
+- **Fix**: Use dependency injection instead of global singleton
+- **Assessment**: MEDIUM - Architecture issue
+- **Priority**: P2
+
+#### ISSUE-363: SQL Injection Risk in Dynamic Column References
+- **Component**: database/operations.py
+- **Location**: Line 249 (getattr(model_class, field))
+- **Impact**: Potential SQL injection if field names come from user input
+- **Attack Vector**: Malicious field names in filters parameter
+- **Fix**: Validate field names against model's actual columns
+- **Assessment**: MEDIUM - Depends on input source
+- **Priority**: P2
+
+### Low Priority Issues (P3): 5 issues
+
+#### ISSUE-364: Memory Leak in Redis Connection
+- **Component**: cache/backends.py
+- **Location**: Lines 236-241 (Redis connection creation)
+- **Impact**: Connection leak if multiple calls before first completes
+- **Attack Vector**: Resource exhaustion through rapid concurrent calls
+- **Fix**: Use asyncio.Lock to protect connection creation
+- **Assessment**: LOW - Resource management issue
+- **Priority**: P3
+
+#### ISSUE-365: Missing Error Recovery in Background Tasks
+- **Component**: background_tasks.py
+- **Location**: Lines 84, 96 (exception handling without recovery)
+- **Impact**: Background tasks stop permanently on error
+- **Attack Vector**: DoS by triggering task errors
+- **Fix**: Add retry logic or restart mechanism
+- **Assessment**: LOW - Availability issue
+- **Priority**: P3
+
+#### ISSUE-366: Weak Size Estimation for Cache Entries
+- **Component**: cache/backends.py
+- **Location**: Lines 207, 209 (secure_dumps for size, fallback to 1024)
+- **Impact**: Incorrect memory tracking, potential OOM
+- **Attack Vector**: Cache pollution with underestimated large objects
+- **Fix**: Improve size estimation logic
+- **Assessment**: LOW - Performance issue
+- **Priority**: P3
+
+#### ISSUE-367: Race Condition in Task Status Check
+- **Component**: background_tasks.py
+- **Location**: Lines 216-217 (task status check without lock)
+- **Impact**: Inconsistent status reporting
+- **Attack Vector**: None - correctness issue
+- **Fix**: Add lock for task status checks
+- **Assessment**: LOW - Data consistency issue
+- **Priority**: P3
+
+#### ISSUE-368: Missing Input Validation in Batch Operations
+- **Component**: database/operations.py
+- **Location**: Lines 65-68 (batch_upsert parameters)
+- **Impact**: Potential for malformed data to cause errors
+- **Attack Vector**: Invalid constraint names or field names
+- **Fix**: Validate inputs before processing
+- **Assessment**: LOW - Robustness issue
+- **Priority**: P3
+
+**Batch 13 Summary**: 9 issues total, 1 critical (confirmed ISSUE-323), 3 medium, 5 low
+
+### Overall Assessment for Batch 13:
+🔴 **CRITICAL SECURITY ISSUE CONFIRMED** - ISSUE-323 verified in Redis cache backend
+- **cache/__init__.py**: Clean but uses global state anti-pattern
+- **cache/backends.py**: CRITICAL unsafe deserialization vulnerability confirmed
+- **cache/background_tasks.py**: Missing config attribute causes runtime errors
+- **cache/types.py**: Clean enum definitions, no issues
+- **database/operations.py**: Well-structured batch operations with minor validation gaps
 - **validation.py**: Comprehensive validation but has path traversal and ReDoS risks
 - **app/__init__.py**: Clean module initialization
 - **core.py**: Well-organized utility aggregation
@@ -760,6 +942,204 @@ The main security concerns are:
 
 ---
 
+## Phase 5 Week 6 Batch 14: Events Module Issues (5 files)
+
+### Medium Priority Issues (P2): 2 issues
+
+#### ISSUE-369: Arbitrary Callback Execution Without Validation
+- **Component**: manager.py
+- **Location**: Lines 356-368 (callback execution), 244-249 (middleware execution)
+- **Impact**: Any registered callback could execute arbitrary code without validation
+- **Attack Vector**: Malicious callbacks could compromise system if registration is exposed
+- **Fix**: Add callback validation, sandboxing for untrusted callbacks, or whitelist allowed callbacks
+- **Assessment**: MEDIUM - Code execution risk if callback registration is exposed
+- **Priority**: P2
+
+#### ISSUE-370: Unbounded Event History Memory Growth
+- **Component**: manager.py
+- **Location**: Lines 283-285
+- **Impact**: Event history limited to 1000 entries but no size limits on event data
+- **Attack Vector**: Large event payloads could consume significant memory (1000 * large_payload)
+- **Fix**: Add size-based eviction policy in addition to count limit
+- **Assessment**: MEDIUM - Memory exhaustion risk with large events
+- **Priority**: P2
+
+### Low Priority Issues (P3): 5 issues
+
+#### ISSUE-371: Global State Pattern in Event Manager
+- **Component**: global_manager.py
+- **Location**: Line 15
+- **Impact**: Global singleton makes testing difficult and can cause state pollution
+- **Fix**: Use dependency injection or factory pattern instead
+- **Assessment**: LOW - Architecture concern
+- **Priority**: P3
+
+#### ISSUE-372: Weak Reference Implementation Issues
+- **Component**: types.py
+- **Location**: Lines 49-53
+- **Impact**: WeakMethod may not work correctly for all callback types (lambdas, closures)
+- **Fix**: Improve weak reference handling with better type checking
+- **Assessment**: LOW - Edge case handling
+- **Priority**: P3
+
+#### ISSUE-373: Race Condition in Once Wrapper
+- **Component**: mixin.py
+- **Location**: Lines 33-41
+- **Impact**: Callback could execute multiple times if concurrent events trigger before removal
+- **Fix**: Add thread-safe removal mechanism using locks
+- **Assessment**: LOW - Concurrency edge case
+- **Priority**: P3
+
+#### ISSUE-374: Missing Callback Parameter Validation
+- **Component**: manager.py
+- **Location**: Lines 73-81
+- **Impact**: No validation of callback parameters (priority, retry settings)
+- **Fix**: Add parameter validation for bounds and types
+- **Assessment**: LOW - Input validation
+- **Priority**: P3
+
+#### ISSUE-375: Class Decorator Side Effects
+- **Component**: decorators.py
+- **Location**: Lines 50-63
+- **Impact**: Modifying __init__ could break multiple inheritance or super() chains
+- **Fix**: Use metaclass or more careful decoration approach
+- **Assessment**: LOW - Inheritance compatibility
+- **Priority**: P3
+
+**Batch 14 Summary**: 7 issues total, 0 critical, 2 medium, 5 low
+
+### Overall Assessment for Batch 14:
+⚠️ **MODERATE SECURITY** - Callback execution risks found
+- **types.py**: Clean data structures with minor weak reference issues
+- **manager.py**: Comprehensive but has callback execution and memory risks
+- **mixin.py**: Simple mixin with race condition in once() method
+- **decorators.py**: Useful decorators but modifies class __init__
+- **global_manager.py**: Global state anti-pattern
+
+The main security concerns are:
+- Arbitrary code execution through unvalidated callbacks
+- Memory exhaustion through unbounded event storage
+- Global state making testing difficult
+- Race conditions in concurrent callback execution
+
+---
+
+## Phase 5 Week 6 Batch 15: Logging Module Issues (5 files)
+
+### Medium Priority Issues (P2): 4 issues
+
+#### ISSUE-376: Information Disclosure in Error Logs
+- **Component**: error_logger.py
+- **Location**: Lines 190-192 (frame globals), 232-234 (caller information)
+- **Impact**: Exposes internal module structure, function names, and potentially sensitive global variables
+- **Attack Vector**: Logs could reveal system internals to attackers if exposed
+- **Fix**: Sanitize frame information, only log necessary details
+- **Assessment**: MEDIUM - Information disclosure risk
+- **Priority**: P2
+
+#### ISSUE-377: Log Injection Vulnerability
+- **Component**: error_logger.py, performance_logger.py, trade_logger.py
+- **Location**: Line 351 (error_logger), throughout other files
+- **Impact**: User input directly written to logs without sanitization
+- **Attack Vector**: CRLF injection, log forging, confusing log analysis tools
+- **Fix**: Sanitize all user inputs, escape special characters (\n, \r, etc.)
+- **Assessment**: MEDIUM - Log integrity compromise
+- **Priority**: P2
+
+#### ISSUE-378: Undefined Variable 'metrics_adapter'
+- **Component**: performance_logger.py
+- **Location**: Line 139
+- **Impact**: NameError crash during initialization when metrics_adapter not provided
+- **Attack Vector**: Service crash during startup
+- **Fix**: Add metrics_adapter parameter to __init__ method signature
+- **Assessment**: MEDIUM - Runtime failure
+- **Priority**: P2
+
+#### ISSUE-379: Missing numpy Import
+- **Component**: error_logger.py
+- **Location**: Line 526 (np.mean usage)
+- **Impact**: NameError when generating error reports
+- **Attack Vector**: Report generation failure
+- **Fix**: Add `import numpy as np` at top of file
+- **Assessment**: MEDIUM - Feature failure
+- **Priority**: P2
+
+### Low Priority Issues (P3): 7 issues
+
+#### ISSUE-380: Global Exception Hook Override
+- **Component**: error_logger.py
+- **Location**: Line 145
+- **Impact**: Overrides sys.excepthook globally, affects entire application
+- **Fix**: Store original hook and restore on cleanup
+- **Assessment**: LOW - Side effect concern
+- **Priority**: P3
+
+#### ISSUE-381: Unbounded Error History Memory
+- **Component**: error_logger.py
+- **Location**: Line 70
+- **Impact**: 10,000 error events in memory could consume significant resources
+- **Fix**: Add size-based eviction or periodic cleanup
+- **Assessment**: LOW - Memory concern
+- **Priority**: P3
+
+#### ISSUE-382: File System Path Traversal Risk
+- **Component**: All logging files
+- **Location**: Lines 66 (error), 134 (performance), 134 (trade)
+- **Impact**: User-controlled log_dir could write to arbitrary locations
+- **Fix**: Validate and sanitize log directory paths
+- **Assessment**: LOW - Requires config access
+- **Priority**: P3
+
+#### ISSUE-383: JSON Serialization Failures
+- **Component**: error_logger.py, performance_logger.py
+- **Location**: Lines 374-375 (error), JSON handlers
+- **Impact**: Non-serializable objects cause logging failures
+- **Fix**: Add proper JSON encoder with fallback handling
+- **Assessment**: LOW - Error handling
+- **Priority**: P3
+
+#### ISSUE-384: Hardcoded Emojis in Logs
+- **Component**: core/logging.py
+- **Location**: Lines 38-44
+- **Impact**: May cause display issues in non-Unicode terminals
+- **Fix**: Make emoji usage configurable
+- **Assessment**: LOW - Compatibility
+- **Priority**: P3
+
+#### ISSUE-385: Missing numpy Import in Performance Logger
+- **Component**: performance_logger.py
+- **Location**: numpy usage throughout
+- **Impact**: Runtime failures when calculating metrics
+- **Fix**: Add numpy import
+- **Assessment**: LOW - Missing dependency
+- **Priority**: P3
+
+#### ISSUE-386: Race Conditions in Buffer Management
+- **Component**: trade_logger.py
+- **Location**: Buffer operations throughout
+- **Impact**: Potential data loss in concurrent environments
+- **Fix**: Add thread-safe buffer operations with locks
+- **Assessment**: LOW - Concurrency issue
+- **Priority**: P3
+
+**Batch 15 Summary**: 11 issues total, 0 critical, 4 medium, 7 low
+
+### Overall Assessment for Batch 15:
+⚠️ **MODERATE SECURITY** - Information disclosure and log injection risks
+- **error_logger.py**: Comprehensive but exposes too much information
+- **performance_logger.py**: Missing imports and parameter definition
+- **trade_logger.py**: Well-structured but needs thread safety
+- **core/logging.py**: Good utilities but hardcoded emojis
+- **__init__.py**: Clean exports
+
+The main security concerns are:
+- Information disclosure through verbose error logging
+- Log injection vulnerabilities from unsanitized inputs
+- Path traversal risks in log directory configuration
+- Multiple runtime errors from missing imports/parameters
+
+---
+
 **Last Updated**: 2025-08-09  
-**Review Progress**: Phase 5 Week 6 Batch 11 Complete  
-**Total Issues in Utils Module**: 58 (1 critical, 23 medium, 34 low)
+**Review Progress**: Phase 5 Week 6 Batch 15 Complete  
+**Total Issues in Utils Module**: 98 (1 critical, 34 medium, 63 low)
