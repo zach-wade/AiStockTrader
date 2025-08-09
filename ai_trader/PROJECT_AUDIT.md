@@ -1,11 +1,11 @@
 # AI Trading System - Comprehensive Project Audit
 
 **Started**: 2025-08-08  
-**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 9 - utils module review in progress)  
+**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 11 - utils module review in progress)  
 **Repository**: https://github.com/zach-wade/AiStockTrader  
 **Total Files**: 787 Python files  
 **Total Lines**: 233,439 lines of code  
-**Files Actually Reviewed**: 306 of 787 (38.9%)  
+**Files Actually Reviewed**: 316 of 787 (40.2%)  
 **System Status**: 🔴 CRITICAL SECURITY VULNERABILITY - eval() CONFIRMED (13 CRITICAL ISSUES: 12 in data_pipeline, 1 in utils)  
 
 ---
@@ -33,7 +33,7 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 | Lines of Code (Main) | 231,721 | 🔍 To Analyze |
 | Lines of Code (Tests) | 53,957 | 🟡 23% test-to-code ratio |
 | Main Modules | 20 | 🔍 To Audit |
-| Known Issues | 338 | 🔴 To Fix (13 CRITICAL) |
+| Known Issues | 354 | 🔴 To Fix (13 CRITICAL) |
 | Test Coverage | ~23% ratio | 🟡 Needs improvement |
 | Documentation | 88 MD files | 🟡 To Complete |
 
@@ -53,7 +53,7 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 | scanners/ | 34 | 13,867 | 🔍 Pending | High | Not working, not integrated |
 | trading_engine/ | 33 | 13,543 | 🔍 Pending | Critical | Core execution logic |
 | universe/ | 3 | 578 | 🔍 Pending | Medium | Symbol management |
-| utils/ | 145 | 36,628 | 🔄 IN PROGRESS | Medium | 3rd largest, 46/145 files reviewed (31.7%) - 49 issues, 1 critical |
+| utils/ | 145 | 36,628 | 🔄 IN PROGRESS | Medium | 3rd largest, 56/145 files reviewed (38.6%) - 65 issues, 1 critical |
 | orchestration/ | 2 | 439 | 🔍 Pending | Medium | Job scheduling broken |
 | services/ | 0 | 0 | ❓ Empty | Medium | No implementation found |
 | migrations/ | 0 | 0 | ❓ Empty | Low | No migrations present |
@@ -68,8 +68,8 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 ### SYSTEM STATUS: TESTS PASS BUT CODE NOT PROPERLY REVIEWED
 **Current Reality Check**: 
 - ✅ 10/10 components pass initialization tests
-- ⚠️ Only 306 of 787 files actually reviewed (38.9%)
-- ⚠️ 481 files have NEVER been looked at in detail
+- ⚠️ Only 316 of 787 files actually reviewed (40.2%)
+- ⚠️ 471 files have NEVER been looked at in detail
 - ⚠️ We don't know if the code actually works, only that it doesn't crash on startup
 - 🔴 Using TestPositionManager instead of real implementation (production blocker)
 - 🔴 CONFIRMED: eval() code execution vulnerability in rule_executor.py

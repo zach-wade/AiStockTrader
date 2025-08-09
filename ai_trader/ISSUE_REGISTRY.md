@@ -1,9 +1,9 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 5.2  
-**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 9 - utils module in progress)  
-**Total Issues**: 338 (data_pipeline: 196, feature_pipeline: 93, utils: 49)  
-**Files Reviewed**: 306 of 787 (38.9%)  
+**Version**: 5.4  
+**Updated**: 2025-08-09 (Phase 5 Week 6 Batch 11 - utils module in progress)  
+**Total Issues**: 354 (data_pipeline: 196, feature_pipeline: 93, utils: 65)  
+**Files Reviewed**: 316 of 787 (40.2%)  
 **System Status**: 🔴 NOT PRODUCTION READY - 13 critical vulnerabilities (12 data_pipeline, 1 utils)
 
 ---
@@ -34,12 +34,12 @@
 |--------|-------|----------|--------|----------|------|--------|-----|--------|
 | **data_pipeline** | 170 | 170 (100%) | 196 | 12 | 25 | 84 | 75 | ✅ COMPLETE |
 | **feature_pipeline** | 90 | 90 (100%) | 93 | 0 | 11 | 49 | 33 | ✅ COMPLETE |
-| **utils** | 145 | 46 (31.7%) | 49 | 1 | 2 | 16 | 30 | 🔄 IN PROGRESS |
+| **utils** | 145 | 56 (38.6%) | 65 | 1 | 2 | 23 | 39 | 🔄 IN PROGRESS |
 | **models** | 101 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **trading_engine** | 33 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **monitoring** | 36 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **Other modules** | 212 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
-| **TOTAL** | **787** | **306 (38.9%)** | **338** | **13** | **38** | **149** | **138** | - |
+| **TOTAL** | **787** | **316 (40.2%)** | **354** | **13** | **38** | **156** | **147** | - |
 
 ---
 
@@ -50,7 +50,7 @@
 - **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 90 files reviewed, 93 issues with zero critical security vulnerabilities
 
 ### In Progress
-- **[ISSUES_utils.md](ISSUES_utils.md)** - 46/145 files reviewed (Batches 1-9), 49 issues found (1 critical)
+- **[ISSUES_utils.md](ISSUES_utils.md)** - 56/145 files reviewed (Batches 1-11), 65 issues found (1 critical)
 
 ### Pending Review
 - **ISSUES_models.md** - To be created when review starts
@@ -85,11 +85,11 @@
 
 ## 📈 Review Progress
 
-### Current Phase: Phase 5 Week 6 Batch 9
+### Current Phase: Phase 5 Week 6 Batch 11
 - **Started**: 2025-08-09  
-- **Current Module**: utils (Batches 1-9 complete)
-- **Progress Today**: 46 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, and resilience/security modules
-- **Total Progress**: 306/787 files (38.9%)
+- **Current Module**: utils (Batches 1-11 complete)
+- **Progress Today**: 56 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, and app context modules
+- **Total Progress**: 316/787 files (40.2%)
 
 ### Review Timeline
 - **Phase 1-4**: Initial exploration and issue discovery

@@ -18,10 +18,10 @@
   "statistics": {
     "total_files": 787,
     "total_lines": 233439,
-    "files_reviewed": 306,
-    "files_actually_reviewed_in_detail": 306,
-    "lines_reviewed": 119244,
-    "issues_found": 338,
+    "files_reviewed": 316,
+    "files_actually_reviewed_in_detail": 316,
+    "lines_reviewed": 123331,
+    "issues_found": 354,
     "issues_fixed": 17,
     "tests_added": 32,
     "dead_code_removed_lines": 0,
@@ -81,7 +81,15 @@
     "utils_batch_8_files": 5,
     "utils_batch_8_lines": 2640,
     "utils_batch_8_issues": 7,
-    "utils_batch_8_critical_issues": 0
+    "utils_batch_8_critical_issues": 0,
+    "utils_batch_10_files": 5,
+    "utils_batch_10_lines": 1492,
+    "utils_batch_10_issues": 8,
+    "utils_batch_10_critical_issues": 0,
+    "utils_batch_11_files": 5,
+    "utils_batch_11_lines": 2595,
+    "utils_batch_11_issues": 8,
+    "utils_batch_11_critical_issues": 0
   },
   "modules": {
     "app": {
@@ -208,7 +216,7 @@
       "priority": "medium",
       "status": "in_progress",
       "files_total": 145,
-      "files_reviewed": 41,
+      "files_reviewed": 56,
       "issues_found": [
         "ISSUE-290: Information Disclosure in JWT Validation",
         "ISSUE-291: Weak Entropy Calculation", 
@@ -232,10 +240,20 @@
         "ISSUE-328: Import Error Handling in DI Container",
         "ISSUE-329: File Path Construction Without Validation",
         "ISSUE-330: SQL Query Parameter Construction",
-        "ISSUE-331: Uncontrolled Resource Creation"
+        "ISSUE-331: Uncontrolled Resource Creation",
+        "ISSUE-332-338: Batch 9 minor issues",
+        "ISSUE-339: Hardcoded API Credentials in Memory",
+        "ISSUE-340: HTML Injection in Email Alerts",
+        "ISSUE-341: Missing SSL/TLS Validation for Webhooks",
+        "ISSUE-342: Command Injection Risk in CLI Utilities",
+        "ISSUE-343-346: Batch 10 minor issues",
+        "ISSUE-347: Configuration Access Without Validation",
+        "ISSUE-348: Path Traversal in Path Validation",
+        "ISSUE-349: Regex DoS in API Key Validation",
+        "ISSUE-350-354: Batch 11 minor issues"
       ],
       "critical_issues": 1,
-      "notes": "Week 6 Batches 1-8 complete: authentication (6 files, 8 issues), core utilities (5 files, 6 issues), database helpers (5 files, 3 issues), config management (5 files, 4 issues), monitoring (5 files, 3 issues), network/HTTP (5 files, 6 issues), data processing (5 files, 5 issues), remaining core utils (5 files, 7 issues). ONE CRITICAL vulnerability found in Redis cache backend (unsafe deserialization fallback). Utils module: 41/145 files reviewed (28.3%)."
+      "notes": "Week 6 Batches 1-11 complete: authentication (6 files, 8 issues), core utilities (5 files, 6 issues), database helpers (5 files, 3 issues), config management (5 files, 4 issues), monitoring (5 files, 3 issues), network/HTTP (5 files, 6 issues), data processing (5 files, 5 issues), core utils (5 files, 7 issues), resilience/security (5 files, 7 issues), alerting/API (5 files, 8 issues), app context (5 files, 8 issues). ONE CRITICAL vulnerability found in Redis cache backend (unsafe deserialization fallback). Utils module: 56/145 files reviewed (38.6%)."
     },
     "orchestration": {
       "path": "src/main/orchestration",
