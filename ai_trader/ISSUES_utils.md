@@ -1,10 +1,167 @@
 # Utils Module Issues
 
 **Module**: utils  
-**Files**: 81 reviewed so far (55.9% of 145 total files)  
-**Status**: 🔄 IN PROGRESS - Batches 1-16 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Database Operations, Events, Logging, Market Data/Processing)  
+**Files**: 116 reviewed so far (80.0% of 145 total files)  
+**Status**: 🔄 IN PROGRESS - Batches 1-23 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Database Operations, Events, Logging, Market Data/Processing, State Management, Root Utilities, Data Utilities, Factories & Time, Processing/Review/Security, Scanner Utilities, Trading Utilities)  
 **Critical Issues**: 1 (ISSUE-323: CONFIRMED - Unsafe deserialization fallback in Redis cache backend)  
-**Total Issues**: 109 (1 critical, 37 medium, 71 low)
+**Total Issues**: 197 (1 critical, 2 high, 60 medium, 134 low)
+
+---
+
+## Phase 5 Week 6 Batch 23: Trading Utilities Issues (5 files)
+
+### Medium Priority Issues (P2): 2 issues
+
+#### ISSUE-487: Global Singleton Anti-Pattern
+- **Component**: global_manager.py
+- **Location**: Lines 16, 26-27, 33-34, 40-43 - Global mutable state
+- **Impact**: Makes testing difficult, potential state leakage between tests
+- **Fix**: Replace with dependency injection or context-managed instance
+- **Priority**: P2
+
+#### ISSUE-488: Missing Error Handling in Import/Export
+- **Component**: io.py
+- **Location**: Lines 67, 206 - json.loads() without try/except
+- **Impact**: Crashes on malformed JSON input
+- **Fix**: Add proper error handling for JSON parsing failures
+- **Priority**: P2
+
+### Low Priority Issues (P3): 7 issues
+
+#### ISSUE-489: Missing UniverseManager Import
+- **Component**: __init__.py
+- **Location**: Line 31 - imports UniverseManager but file not in batch
+- **Impact**: Import error if manager.py is missing or has issues
+- **Fix**: Ensure manager.py is properly implemented
+- **Priority**: P3
+
+#### ISSUE-490: Hardcoded Values in Filter Presets
+- **Component**: filters.py
+- **Location**: Lines 93-131 - Hardcoded market cap, volume, PE ratios
+- **Impact**: Not configurable, may become outdated
+- **Fix**: Move to configuration file or make parameterizable
+- **Priority**: P3
+
+#### ISSUE-491: Division by Zero Risk
+- **Component**: analysis.py
+- **Location**: Lines 42-43, 78, 123, 134, 170, 219, 249
+- **Impact**: Potential division by zero if denominators are empty/zero
+- **Fix**: Add zero checks before division operations
+- **Priority**: P3
+
+#### ISSUE-492: Missing Input Validation
+- **Component**: io.py, analysis.py
+- **Location**: Multiple functions lack parameter validation
+- **Impact**: Potential crashes on invalid input
+- **Fix**: Add input validation for all public methods
+- **Priority**: P3
+
+#### ISSUE-493: Inconsistent Date Handling
+- **Component**: analysis.py
+- **Location**: Lines 55, 154 - datetime.now() without timezone
+- **Impact**: Timezone-related bugs in different environments
+- **Fix**: Use timezone-aware datetime consistently
+- **Priority**: P3
+
+#### ISSUE-494: No Size Limits on Export
+- **Component**: io.py
+- **Location**: Lines 24-52, 144-161 - No limits on export size
+- **Impact**: Memory issues with large universes
+- **Fix**: Add pagination or streaming for large exports
+- **Priority**: P3
+
+#### ISSUE-495: Missing Type Validation in Filter.apply()
+- **Component**: types.py
+- **Location**: Lines 51-71 - No type checking on data parameter
+- **Impact**: Runtime errors if wrong data type passed
+- **Fix**: Add isinstance checks or type hints enforcement
+- **Priority**: P3
+
+---
+
+## Phase 5 Week 6 Batch 22: Scanner Utilities Issues (5 files)
+
+### High Priority Issues (P1): 2 issues
+
+#### ISSUE-477: SQL Injection via Table Names in Query Builder
+- **Component**: query_builder.py
+- **Location**: Lines 87, 151, 246, 318, 374 - Direct table name interpolation in SQL queries
+- **Impact**: CRITICAL - SQL injection if table names come from user input
+- **Attack Vector**: `build_volume_spike_query()` uses f-string with 'market_data' table directly
+- **Fix**: Use sql_security module to validate all table names before query construction
+- **Assessment**: HIGH risk - While currently using hardcoded table names, the pattern is dangerous
+- **Priority**: P1
+
+#### ISSUE-478: Unvalidated Dynamic SQL Construction
+- **Component**: query_builder.py  
+- **Location**: Lines 71-109, 144-193, 227-269, 364-387 - Dynamic SQL with f-strings
+- **Impact**: SQL injection risk if any parameters are not properly sanitized
+- **Attack Vector**: Any user-controlled input that reaches query parameters
+- **Fix**: Ensure all dynamic values use parameterized queries, validate identifiers
+- **Assessment**: HIGH risk - Complex queries with many injection points
+- **Priority**: P1
+
+### Medium Priority Issues (P2): 4 issues
+
+#### ISSUE-479: AsyncTask Memory Leak in Cache Manager
+- **Component**: cache_manager.py
+- **Location**: Lines 113, 343-364 - _maintenance_task created but never cancelled
+- **Impact**: Memory leak and zombie tasks on cache manager destruction
+- **Fix**: Add proper cleanup in __del__ or close() method to cancel maintenance task
+- **Priority**: P2
+
+#### ISSUE-480: Race Condition in Cache Eviction
+- **Component**: cache_manager.py
+- **Location**: Lines 312-340 - Non-atomic read-modify-write on memory_cache
+- **Impact**: Cache corruption under concurrent access
+- **Fix**: Use asyncio.Lock to protect cache modifications
+- **Priority**: P2
+
+#### ISSUE-481: Hardcoded Configuration Values
+- **Component**: cache_manager.py, data_access.py
+- **Location**: cache_manager.py lines 103-110, data_access.py lines 28-33
+- **Impact**: Inflexible configuration, requires code changes for tuning
+- **Fix**: Move TTL strategies and timeouts to configuration
+- **Priority**: P2
+
+#### ISSUE-482: Type Confusion in Datetime Handling
+- **Component**: cache_manager.py
+- **Location**: Line 386 - Assumes result['timestamp'] is datetime but could be string
+- **Impact**: Runtime TypeError if timestamp is string
+- **Fix**: Add type checking and conversion for timestamp fields
+- **Priority**: P2
+
+### Low Priority Issues (P3): 4 issues
+
+#### ISSUE-483: Inefficient Percentile Calculation
+- **Component**: metrics_collector.py
+- **Location**: Lines 131-134 - Uses sorted() on every metric recording
+- **Impact**: O(n log n) performance for each metric
+- **Fix**: Use heap-based percentile tracking or approximate algorithms
+- **Priority**: P3
+
+#### ISSUE-484: Missing Error Recovery in Data Access
+- **Component**: data_access.py
+- **Location**: Lines 124-135 - Catches errors but doesn't retry or use fallback
+- **Impact**: Transient failures cause data loss
+- **Fix**: Implement retry logic with exponential backoff
+- **Priority**: P3
+
+#### ISSUE-485: Incomplete Cache Invalidation
+- **Component**: data_access.py
+- **Location**: Lines 332-338 - Comment indicates pattern deletion not implemented
+- **Impact**: Stale cache data may persist
+- **Fix**: Implement proper Redis SCAN-based pattern deletion
+- **Priority**: P3
+
+#### ISSUE-486: No Query Result Caching
+- **Component**: query_builder.py
+- **Location**: Line 50 - query_cache initialized but never used
+- **Impact**: Repeated query construction overhead
+- **Fix**: Implement query plan caching with cache invalidation
+- **Priority**: P3
+
+**Batch 22 Summary**: 10 issues total, 0 critical, 2 high, 4 medium, 4 low
 
 ---
 
@@ -1304,6 +1461,604 @@ The main concerns are:
 
 ---
 
-**Last Updated**: 2025-08-09  
-**Review Progress**: Phase 5 Week 6 Batch 16 Complete  
-**Total Issues in Utils Module**: 109 (1 critical, 37 medium, 71 low)
+## Phase 5 Week 6 Batch 17: State Management (5 files)
+
+### Files Reviewed
+- backends.py (336 lines) - Storage backend implementations
+- context.py (88 lines) - State context managers
+- manager.py (427 lines) - Main state orchestrator
+- persistence.py (199 lines) - Checkpoint and recovery
+- types.py (115 lines) - Data types and config
+
+### Medium Priority Issues (P2): 5 issues
+
+#### ISSUE-408: MD5 Hash Usage for Security
+- **Component**: backends.py
+- **Location**: Line 266
+- **Impact**: Using MD5 for filename generation when SHA256 would be more secure
+- **Fix**: Replace `hashlib.md5()` with `hashlib.sha256()`
+- **Priority**: P2
+
+#### ISSUE-409: Global State Anti-Pattern
+- **Component**: manager.py
+- **Location**: Lines 415-427
+- **Impact**: Global singleton state manager without proper initialization control
+- **Fix**: Use dependency injection instead of global instance
+- **Priority**: P2
+
+#### ISSUE-410: Incomplete Checkpoint Restoration
+- **Component**: persistence.py
+- **Location**: Lines 98-101
+- **Impact**: Checkpoint restoration doesn't actually restore data, just metadata
+- **Fix**: Implement full data backup and restoration in checkpoints
+- **Priority**: P2
+
+#### ISSUE-411: Potential Import Errors
+- **Component**: manager.py
+- **Location**: Lines 87, 94
+- **Impact**: Importing from `main.utils.core` without error handling could fail at runtime
+- **Fix**: Add try/except with fallback implementations
+- **Priority**: P2
+
+#### ISSUE-412: Thread Safety Risk in File Operations
+- **Component**: backends.py
+- **Location**: Line 326 (JSON file operations)
+- **Impact**: JSON file operations without proper locking could cause race conditions
+- **Fix**: Use file locking or atomic operations for mapping file
+- **Priority**: P2
+
+### Low Priority Issues (P3): 12 issues
+
+#### ISSUE-413: Hardcoded Configuration Values
+- **Component**: backends.py, manager.py
+- **Location**: backends.py:60, manager.py:74
+- **Impact**: Max size and intervals hardcoded instead of configurable
+- **Fix**: Move to configuration with defaults
+- **Priority**: P3
+
+#### ISSUE-414: Missing Error Recovery
+- **Component**: context.py
+- **Location**: Lines 62-64
+- **Impact**: Checkpoint rollback doesn't handle partial failures
+- **Fix**: Add detailed error recovery and logging
+- **Priority**: P3
+
+#### ISSUE-415: Inefficient Key Pattern Matching
+- **Component**: backends.py
+- **Location**: Line 162
+- **Impact**: Using fnmatch for every key instead of regex compilation
+- **Fix**: Pre-compile regex patterns for better performance
+- **Priority**: P3
+
+#### ISSUE-416: No TTL Implementation for File Backend
+- **Component**: backends.py
+- **Location**: Line 290
+- **Impact**: TTL comment says handled by cleanup but cleanup is empty (line 336)
+- **Fix**: Implement TTL cleanup based on file timestamps
+- **Priority**: P3
+
+#### ISSUE-417: Memory Leak Risk
+- **Component**: context.py
+- **Location**: Line 18
+- **Impact**: Lock dictionary grows unbounded without cleanup
+- **Fix**: Implement lock cleanup for released resources
+- **Priority**: P3
+
+#### ISSUE-418: Missing Validation
+- **Component**: types.py
+- **Location**: StateConfig dataclass
+- **Impact**: No validation on StateConfig fields (URLs, paths, etc.)
+- **Fix**: Add validators in __post_init__ method
+- **Priority**: P3
+
+#### ISSUE-419: Incomplete Error Metrics
+- **Component**: manager.py
+- **Location**: Line 194
+- **Impact**: Serialization errors incremented for all failures, not just serialization
+- **Fix**: Differentiate between validation, serialization, and storage errors
+- **Priority**: P3
+
+#### ISSUE-420: No Connection Pooling
+- **Component**: backends.py
+- **Location**: Line 213
+- **Impact**: Redis connection created without pooling
+- **Fix**: Use connection pool for better resource management
+- **Priority**: P3
+
+#### ISSUE-421: Synchronous File I/O
+- **Component**: backends.py
+- **Location**: Lines 277, 288
+- **Impact**: Using synchronous file operations in async context
+- **Fix**: Use aiofiles for async file operations
+- **Priority**: P3
+
+#### ISSUE-422: Missing Compression Implementation
+- **Component**: types.py
+- **Location**: Line 106
+- **Impact**: Compression flag exists but not implemented
+- **Fix**: Implement compression using zlib or lz4
+- **Priority**: P3
+
+#### ISSUE-423: Missing Encryption Implementation
+- **Component**: types.py
+- **Location**: Line 107
+- **Impact**: Encryption flag exists but not implemented
+- **Fix**: Implement encryption using cryptography library
+- **Priority**: P3
+
+#### ISSUE-424: Placeholder Batch Operations
+- **Component**: context.py
+- **Location**: Lines 80-81
+- **Impact**: Batch operations context does nothing
+- **Fix**: Implement actual batching logic for performance
+- **Priority**: P3
+
+### Summary
+- **Critical**: 0 new critical issues
+- **Medium**: 5 new issues (MD5 usage, global state, incomplete restoration, import risks, thread safety)
+- **Low**: 12 new issues (configuration, performance, missing implementations)
+- **Total New Issues**: 17 (ISSUE-408 through ISSUE-424)
+
+---
+
+## Phase 5 Week 6 Batch 18: Root Utility Files (5 files)
+
+### Files Reviewed
+- core.py (82 lines) - Core utility re-exports
+- exceptions.py (560 lines) - Exception hierarchy
+- database.py (54 lines) - Database utility re-exports
+- layer_utils.py (251 lines) - Layer system utilities
+- math_utils.py (164 lines) - Mathematical utilities
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-425: Circular Import Risk
+- **Component**: core.py, exceptions.py
+- **Location**: core.py:19, exceptions.py:10
+- **Impact**: Importing from subdirectory .core which may import from this file, creating circular dependency
+- **Fix**: Restructure imports to avoid circular dependencies
+- **Priority**: P2
+
+#### ISSUE-426: Information Disclosure in Exceptions
+- **Component**: exceptions.py
+- **Location**: Lines 43-44
+- **Impact**: Original error details exposed in exception messages could leak sensitive information
+- **Fix**: Sanitize error messages, log full details but return sanitized messages to users
+- **Priority**: P2
+
+#### ISSUE-427: YAML Loading Without Schema Validation
+- **Component**: layer_utils.py
+- **Location**: Line 98
+- **Impact**: Loading YAML config without schema validation could lead to unexpected data types
+- **Fix**: Add schema validation using jsonschema or similar
+- **Priority**: P2
+
+### Low Priority Issues (P3): 11 issues
+
+#### ISSUE-428: Import-Only Module Pattern
+- **Component**: core.py
+- **Location**: Entire file
+- **Impact**: File just re-exports from .core subdirectory, creating confusion about actual implementation location
+- **Fix**: Consider consolidating or documenting this pattern clearly
+- **Priority**: P3
+
+#### ISSUE-429: Import-Only Module Pattern
+- **Component**: database.py
+- **Location**: Entire file
+- **Impact**: File just re-exports from .database subdirectory
+- **Fix**: Consider consolidating or documenting this pattern clearly
+- **Priority**: P3
+
+#### ISSUE-430: Duplicate Import Aliasing
+- **Component**: database.py
+- **Location**: Lines 43-44
+- **Impact**: Creating aliases for already imported items adds confusion
+- **Fix**: Remove redundant aliases
+- **Priority**: P3
+
+#### ISSUE-431: Hardcoded Configuration Values
+- **Component**: database.py
+- **Location**: Lines 51-54
+- **Impact**: Default pool settings hardcoded instead of config-driven
+- **Fix**: Move to configuration file
+- **Priority**: P3
+
+#### ISSUE-432: Built-in Name Shadowing
+- **Component**: exceptions.py
+- **Location**: Line 218
+- **Impact**: ConnectionError shadows Python's built-in ConnectionError
+- **Fix**: Rename to DatabaseConnectionError or similar
+- **Priority**: P3
+
+#### ISSUE-433: Technical Debt - Backward Compatibility
+- **Component**: exceptions.py
+- **Location**: Line 560
+- **Impact**: Maintaining alias for old exception name
+- **Fix**: Plan migration and removal of old aliases
+- **Priority**: P3
+
+#### ISSUE-434: Hardcoded API Rate Limits
+- **Component**: layer_utils.py
+- **Location**: Lines 39-44
+- **Impact**: API rate limits hardcoded instead of configuration-driven
+- **Fix**: Move to configuration file
+- **Priority**: P3
+
+#### ISSUE-435: Hardcoded Batch Sizes
+- **Component**: layer_utils.py
+- **Location**: Lines 136-141
+- **Impact**: Batch sizes hardcoded instead of configurable
+- **Fix**: Move to configuration
+- **Priority**: P3
+
+#### ISSUE-436: Hardcoded Cache TTLs
+- **Component**: layer_utils.py
+- **Location**: Lines 178-183
+- **Impact**: Cache TTLs hardcoded instead of configurable
+- **Fix**: Move to configuration
+- **Priority**: P3
+
+#### ISSUE-437: Deprecated pandas Method
+- **Component**: math_utils.py
+- **Location**: Line 41
+- **Impact**: Using fillna which may be deprecated for certain operations
+- **Fix**: Use modern pandas methods
+- **Priority**: P3
+
+#### ISSUE-438: Broad Exception Handling
+- **Component**: math_utils.py
+- **Location**: Lines 48, 88, 116, 145
+- **Impact**: Catching all exceptions hides specific errors
+- **Fix**: Catch specific exception types
+- **Priority**: P3
+
+### Summary
+- **Critical**: 0 new critical issues
+- **Medium**: 3 new issues (circular imports, information disclosure, YAML validation)
+- **Low**: 11 new issues (import patterns, hardcoded values, naming conflicts)
+- **Total New Issues**: 14 (ISSUE-425 through ISSUE-438)
+
+---
+
+## Phase 5 Week 6 Batch 19: Data Utilities Module (5 files)
+
+### Files Reviewed
+- analysis.py (210 lines) - Data analysis and statistical operations
+- processor.py (552 lines) - Data processing and transformation
+- types.py (57 lines) - Data types and validation structures
+- utils.py (113 lines) - Utility functions for data manipulation
+- validators.py (180 lines) - Data validation system
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-439: MD5 Hash Usage for DataFrame Hashing
+- **Component**: utils.py
+- **Location**: Line 92
+- **Impact**: MD5 is cryptographically broken and should not be used for hashing
+- **Fix**: Replace with SHA256 for secure hashing
+- **Priority**: P2
+
+#### ISSUE-440: Division by Zero Risk in Statistical Operations
+- **Component**: analysis.py
+- **Location**: Lines 91, 96, 101, 140, 146
+- **Impact**: Potential runtime errors when denominators are zero
+- **Fix**: Add zero checks before division operations
+- **Priority**: P2
+
+#### ISSUE-441: Pickle Deserialization Security Risk
+- **Component**: processor.py
+- **Location**: Lines 285, 333
+- **Impact**: Using pickle for deserialization can execute arbitrary code
+- **Fix**: Use secure serialization methods or validate sources
+- **Priority**: P2
+
+### Low Priority Issues (P3): 10 issues
+
+#### ISSUE-442: Global Singleton Anti-Pattern
+- **Component**: analysis.py, processor.py, validators.py
+- **Location**: Lines 205, 547, 175 respectively
+- **Impact**: Global state makes testing difficult and can cause issues in multi-threaded environments
+- **Fix**: Use dependency injection instead of global instances
+- **Priority**: P3
+
+#### ISSUE-443: Bare Exception Handling in Data Processing
+- **Component**: processor.py
+- **Location**: Lines 103, 109, 313, 333
+- **Impact**: Catching bare exceptions hides specific errors
+- **Fix**: Catch specific exception types
+- **Priority**: P3
+
+#### ISSUE-444: Inconsistent Error Handling
+- **Component**: utils.py
+- **Location**: Line 30
+- **Impact**: Catching multiple exception types together prevents specific handling
+- **Fix**: Handle TypeError and ZeroDivisionError separately
+- **Priority**: P3
+
+#### ISSUE-445: Inefficient DataFrame Operations
+- **Component**: processor.py
+- **Location**: Lines 81, 93
+- **Impact**: Using astype(str) on entire columns is inefficient for large DataFrames
+- **Fix**: Use vectorized string operations more efficiently
+- **Priority**: P3
+
+#### ISSUE-446: Missing Input Validation
+- **Component**: analysis.py
+- **Location**: Lines 24-39
+- **Impact**: No validation that df is actually a DataFrame
+- **Fix**: Add isinstance checks and proper error handling
+- **Priority**: P3
+
+#### ISSUE-447: Hardcoded Aggregation Functions
+- **Component**: processor.py
+- **Location**: Line 46
+- **Impact**: Default aggfunc='mean' is hardcoded without configuration
+- **Fix**: Make configurable or document why mean is default
+- **Priority**: P3
+
+#### ISSUE-448: Incomplete OHLC Validation
+- **Component**: processor.py
+- **Location**: Lines 416-425
+- **Impact**: OHLC validation only logs warnings but doesn't raise for critical issues
+- **Fix**: Add option to raise exceptions for critical validation failures
+- **Priority**: P3
+
+#### ISSUE-449: Missing Timezone Handling
+- **Component**: processor.py
+- **Location**: Line 444
+- **Impact**: Forcing UTC without checking existing timezone could lose information
+- **Fix**: Check and preserve existing timezone information when appropriate
+- **Priority**: P3
+
+#### ISSUE-450: Inefficient Memory Usage in Profiling
+- **Component**: processor.py
+- **Location**: Lines 500-501
+- **Impact**: memory_usage(deep=True) called multiple times unnecessarily
+- **Fix**: Cache the result and reuse it
+- **Priority**: P3
+
+#### ISSUE-451: Lambda Functions in Validators
+- **Component**: validators.py
+- **Location**: Lines 38-49
+- **Impact**: Complex lambda functions reduce readability and debuggability
+- **Fix**: Convert to proper named methods
+- **Priority**: P3
+
+### Summary
+- **Critical**: 0 new critical issues
+- **Medium**: 3 new issues (MD5 usage, division by zero risks, pickle security)
+- **Low**: 10 new issues (global singletons, exception handling, efficiency)
+- **Total New Issues**: 13 (ISSUE-439 through ISSUE-451)
+
+---
+
+## Phase 5 Week 6 Batch 20: Factories & Time Utilities (5 files)
+
+### Files Reviewed
+- di_container.py (288 lines) - Dependency injection container
+- services.py (99 lines) - Service factory for DataFetcher
+- utility_manager.py (400 lines) - Centralized utility management
+- __init__.py (9 lines) - Module exports
+- time/interval_utils.py (247 lines) - Time interval utilities
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-452: Global Singleton Anti-Pattern in DI Container
+- **Component**: di_container.py
+- **Location**: Line 221
+- **Impact**: Global state makes testing difficult and prevents multiple container instances
+- **Fix**: Make container instantiation explicit rather than global singleton
+- **Priority**: P2
+
+#### ISSUE-453: Undefined ResilienceStrategies Class
+- **Component**: utility_manager.py
+- **Location**: Lines 37, 72, 85, 346, 383-400
+- **Impact**: Runtime NameError when trying to create resilience managers
+- **Fix**: Import ResilienceStrategies from resilience module or fix import
+- **Priority**: P2
+
+#### ISSUE-454: Missing Import Dependencies
+- **Component**: utility_manager.py
+- **Location**: Lines 103, 106
+- **Impact**: Functions initialize_global_cache() and get_global_cache() are not imported
+- **Fix**: Add proper imports from cache module
+- **Priority**: P2
+
+### Low Priority Issues (P3): 10 issues
+
+#### ISSUE-455: Hardcoded Service Type Detection
+- **Component**: utility_manager.py
+- **Location**: Lines 152-156, 214-218
+- **Impact**: Service type determined by string matching in name, fragile approach
+- **Fix**: Use explicit service type parameter or configuration
+- **Priority**: P3
+
+#### ISSUE-456: Hardcoded Configuration Values
+- **Component**: utility_manager.py
+- **Location**: Lines 129-149, 173-211
+- **Impact**: Default configurations hardcoded instead of configuration-driven
+- **Fix**: Move to configuration files with ability to override
+- **Priority**: P3
+
+#### ISSUE-457: Thread Safety Issue in Double-Checked Locking
+- **Component**: utility_manager.py
+- **Location**: Lines 320-324
+- **Impact**: Double-checked locking pattern not thread-safe in Python
+- **Fix**: Use simpler locking or threading.local()
+- **Priority**: P3
+
+#### ISSUE-458: Circular Import Risk
+- **Component**: di_container.py
+- **Location**: Lines 239-286
+- **Impact**: Configure function imports from many modules, risk of circular imports
+- **Fix**: Lazy imports or separate configuration module
+- **Priority**: P3
+
+#### ISSUE-459: Missing Error Handling in Factory
+- **Component**: services.py
+- **Location**: Lines 43-99
+- **Impact**: No error handling if dependencies fail to initialize
+- **Fix**: Add try-except blocks with proper error messages
+- **Priority**: P3
+
+#### ISSUE-460: Inconsistent Type Hints
+- **Component**: services.py
+- **Location**: Lines 35-38
+- **Impact**: ConfigType fallback may not match actual usage
+- **Fix**: Ensure consistent type definitions across module
+- **Priority**: P3
+
+#### ISSUE-461: Approximate Month Duration
+- **Component**: interval_utils.py
+- **Location**: Lines 38-39
+- **Impact**: Using 30 days for month is inaccurate
+- **Fix**: Document limitation or use calendar-aware calculation
+- **Priority**: P3
+
+#### ISSUE-462: Hardcoded Trading Hours
+- **Component**: interval_utils.py
+- **Location**: Line 205
+- **Impact**: Assumes 6.5 hour trading day, not configurable
+- **Fix**: Make trading hours configurable or document assumption
+- **Priority**: P3
+
+#### ISSUE-463: Silent Failure in Validation
+- **Component**: interval_utils.py
+- **Location**: Lines 224-226
+- **Impact**: Validation returns False instead of raising exception
+- **Fix**: Consider raising ValueError for better error handling
+- **Priority**: P3
+
+#### ISSUE-464: Unused weakref Import
+- **Component**: utility_manager.py
+- **Location**: Line 10
+- **Impact**: Import not used, code clutter
+- **Fix**: Remove unused import
+- **Priority**: P3
+
+### Summary
+- **Critical**: 0 new critical issues
+- **Medium**: 3 new issues (global singleton, undefined class, missing imports)
+- **Low**: 10 new issues (hardcoded values, thread safety, configuration)
+- **Total New Issues**: 13 (ISSUE-452 through ISSUE-464)
+
+---
+
+---
+
+## Phase 5 Week 6 Batch 21: Processing, Review & Security Modules (5 files)
+
+### Files Reviewed
+- processing/historical.py (443 lines) - Historical data processing utilities
+- processing/streaming.py (590 lines) - Streaming data processing with memory management
+- review/pattern_check.py (346 lines) - Code pattern and anti-pattern detection
+- review/syntax_check.py (485 lines) - Syntax and import validation
+- security/sql_security.py (329 lines) - SQL injection prevention (CRITICAL MODULE)
+
+### CRITICAL POSITIVE FINDING:
+✅ **sql_security.py is EXCELLENT** - Proper SQL injection prevention with:
+- Comprehensive identifier validation
+- Keyword blacklisting
+- Pattern matching for valid identifiers
+- Safe query builder with parameterized queries
+- No vulnerabilities found in this security module
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-465: Hardcoded Configuration Values
+- **Component**: historical.py
+- **Location**: Lines 13-23, 64-74, 218-239
+- **Impact**: Configuration values hardcoded instead of config-driven
+- **Fix**: Move intervals, batch sizes, and processing limits to configuration
+- **Priority**: P2
+
+#### ISSUE-466: Potential Memory Leak in Streaming
+- **Component**: streaming.py
+- **Location**: Lines 85, 233-234
+- **Impact**: ThreadPoolExecutor not properly cleaned up if exception occurs before close()
+- **Fix**: Use context manager or ensure cleanup in __del__
+- **Priority**: P2
+
+#### ISSUE-467: Inefficient Parquet Append
+- **Component**: streaming.py
+- **Location**: Lines 337-340
+- **Impact**: Reading entire file to append is inefficient for large files
+- **Fix**: Use pyarrow's append functionality or write to separate files
+- **Priority**: P2
+
+### Low Priority Issues (P3): 9 issues
+
+#### ISSUE-468: Approximate Month Calculation
+- **Component**: historical.py
+- **Location**: Lines 22, 154
+- **Impact**: Using 30 days for month is inaccurate
+- **Fix**: Use calendar-aware calculation or document limitation
+- **Priority**: P3
+
+#### ISSUE-469: Hardcoded Trading Hours
+- **Component**: historical.py
+- **Location**: Lines 231-238
+- **Impact**: Assumes 6.5 hour trading day, not configurable
+- **Fix**: Make trading hours configurable
+- **Priority**: P3
+
+#### ISSUE-470: Broad Exception Handling
+- **Component**: pattern_check.py, syntax_check.py
+- **Location**: pattern_check.py:206, syntax_check.py:93
+- **Impact**: Catching all exceptions hides specific errors
+- **Fix**: Catch specific exception types
+- **Priority**: P3
+
+#### ISSUE-471: Modifying sys.path
+- **Component**: syntax_check.py
+- **Location**: Lines 40-41
+- **Impact**: Modifying global sys.path can cause side effects
+- **Fix**: Use importlib or restore sys.path after checking
+- **Priority**: P3
+
+#### ISSUE-472: Hardcoded Line Length Limit
+- **Component**: pattern_check.py
+- **Location**: Line 185
+- **Impact**: 120 character limit hardcoded
+- **Fix**: Make configurable or follow project standard
+- **Priority**: P3
+
+#### ISSUE-473: Hardcoded File Size Limit
+- **Component**: pattern_check.py
+- **Location**: Line 196
+- **Impact**: 500 line limit hardcoded
+- **Fix**: Make configurable based on project standards
+- **Priority**: P3
+
+#### ISSUE-474: Missing Async Function Detection
+- **Component**: syntax_check.py
+- **Location**: Lines 208-210
+- **Impact**: Simple heuristic may miss many async functions
+- **Fix**: Use more comprehensive async function list or type checking
+- **Priority**: P3
+
+#### ISSUE-475: Pattern Detection Limitations
+- **Component**: pattern_check.py
+- **Location**: Lines 50-77
+- **Impact**: Regex patterns may miss obfuscated SQL injection
+- **Fix**: Add more comprehensive patterns or use AST analysis
+- **Priority**: P3
+
+#### ISSUE-476: No Rate Limiting in Streaming
+- **Component**: streaming.py
+- **Location**: Entire file
+- **Impact**: No built-in rate limiting for external data sources
+- **Fix**: Add configurable rate limiting
+- **Priority**: P3
+
+### Summary
+- **Critical**: 0 new critical issues (sql_security.py is excellent!)
+- **Medium**: 3 new issues (configuration, memory management, performance)
+- **Low**: 9 new issues (hardcoded values, exception handling, patterns)
+- **Total New Issues**: 12 (ISSUE-465 through ISSUE-476)
+
+---
+
+**Last Updated**: 2025-08-10  
+**Review Progress**: Phase 5 Week 6 Batch 21 Complete  
+**Total Issues in Utils Module**: 178 (1 critical, 54 medium, 123 low)

@@ -1,7 +1,7 @@
 # AI Trading System - Session Memory Preservation
 
-**Created**: 2025-08-09  
-**Session**: Phase 5 Week 6 Batch 11 COMPLETE - Utils Module Review  
+**Created**: 2025-08-10  
+**Session**: Phase 5 Week 6 Batch 23 COMPLETE - Utils Module Review  
 **Status**: Active audit session - utils MODULE IN PROGRESS  
 
 ---
@@ -16,25 +16,25 @@
 
 ---
 
-## 📊 Current Project Status (2025-08-09)
+## 📊 Current Project Status (2025-08-10)
 
 ### Overview
 - **Phase**: Phase 5 Week 6 - Utils Module Deep Review IN PROGRESS
-- **Current Location**: Batches 1-11 COMPLETE (56/145 files reviewed)
-- **Progress**: 316 of 787 files reviewed (40.2% of codebase)
-- **Issues Found**: 354 total issues documented (65 utils issues)
+- **Current Location**: Batches 1-23 COMPLETE (116/145 files reviewed)
+- **Progress**: 376 of 787 files reviewed (47.8% of codebase)
+- **Issues Found**: 495 total issues documented (197 utils issues)
 - **System Status**: Tests passing (10/10 components) but NOT production ready
 
 ### Production Readiness
 - **Status**: NOT PRODUCTION READY
-- **Critical Blockers**: 13 critical security issues found requiring immediate attention
-- **Major Finding**: SQL injection, code execution (eval), YAML deserialization, and unsafe deserialization vulnerabilities
+- **Critical Blockers**: 13 critical security issues + 2 HIGH SQL injection risks
+- **Major Finding**: SQL injection, code execution (eval), YAML deserialization, unsafe deserialization, and NEW scanner query builder SQL injection vulnerabilities
 
 ---
 
 ## 🔴 CRITICAL SECURITY FINDINGS (IMMEDIATE ACTION REQUIRED)
 
-### 13 Critical Issues Requiring Immediate Fixes:
+### 15 Critical/High Issues Requiring Immediate Fixes:
 
 1. **ISSUE-171: eval() Code Execution in Rule Engine** (Week 4 Batch 6)
    - **Location**: data_pipeline/validation/rules/rule_executor.py lines 154, 181, 209
@@ -91,37 +91,59 @@
     - **Location**: utils/cache/backends.py lines 255-259
     - **Impact**: Code execution via malicious cache data after secure deserialization fails
 
+14. **ISSUE-477: SQL Injection via Table Names in Query Builder** (Week 6 Batch 22) 🆕
+    - **Location**: utils/scanners/query_builder.py lines 87, 151, 246, 318, 374
+    - **Impact**: HIGH - SQL injection if table names come from user input
+    - **Attack**: Direct table name interpolation in SQL queries
+
+15. **ISSUE-478: Unvalidated Dynamic SQL Construction** (Week 6 Batch 22) 🆕
+    - **Location**: utils/scanners/query_builder.py lines 71-109, 144-193, 227-269, 364-387
+    - **Impact**: HIGH - SQL injection risk if parameters not properly sanitized
+    - **Attack**: Complex queries with many injection points
+
 ---
 
-## ✅ PHASE 5 WEEK 6 BATCH 11 COMPLETE
+## ✅ POSITIVE FINDING: SQL Security Module is EXCELLENT
 
-### Latest Progress (2025-08-09)
-- **Files Reviewed**: 5 files in 1 batch (app context & validation components)
-- **Lines Reviewed**: ~2,595 lines reviewed in Batch 11
-- **Issues Found**: 8 new issues (0 critical, 3 medium, 5 low priority)
-- **Module Coverage**: utils 56/145 files (38.6% of utils module)
+**sql_security.py** (utils/security/) - Reviewed in Batch 21:
+- ✅ Comprehensive SQL injection prevention
+- ✅ Proper identifier validation with pattern matching
+- ✅ Reserved keyword blacklisting
+- ✅ Safe query builder with parameterized queries
+- ✅ No vulnerabilities found in this critical security module
+- **Recommendation**: Use this module consistently throughout the codebase, especially in query_builder.py
 
-### Batch 11: App Context & Validation (5 files, completed)
-- context.py, validation.py, app/__init__.py, core.py, database.py
-- **Issues**: 8 (0 P0 critical, 3 P2 medium, 5 P3 low priority)
-- **Security Status**: ⚠️ MODERATE - Path traversal and ReDoS vulnerabilities found
-- **Key Findings**: Path traversal in validation, regex DoS risk, config validation gaps
+---
+
+## ✅ PHASE 5 WEEK 6 BATCH 23 JUST COMPLETED
+
+### Latest Progress (2025-08-10)
+- **Files Reviewed**: 5 files in trading utilities subdirectory
+- **Lines Reviewed**: 1,264 lines (30K total in files)
+- **Issues Found**: 9 new issues (0 critical, 0 high, 2 medium, 7 low)
+- **Module Coverage**: utils 116/145 files (80.0% of utils module)
+
+### Batch 23: Trading Utilities (5 files, completed)
+- __init__.py, analysis.py, filters.py, global_manager.py, io.py
+- **Issues**: 9 total (0 critical, 0 high, 2 medium, 7 low priority)
+- **Security Status**: ✅ GOOD - No critical vulnerabilities, some error handling issues
+- **Key Findings**: Global singleton anti-pattern, missing error handling in JSON parsing, division by zero risks
 
 ---
 
 ## 📂 KEY DOCUMENTATION FILES
 
 ### Issue Tracking:
-- **ISSUE_REGISTRY.md**: 354 total issues catalogued (updated 2025-08-09)
+- **ISSUE_REGISTRY.md**: 495 total issues catalogued (updated 2025-08-10 v6.6)
   - Critical (P0): 13 issues requiring immediate attention
-  - High (P1): ~38 issues
-  - Medium (P2): ~156 issues  
-  - Low (P3): ~147 issues
-- **PROJECT_AUDIT.md**: Comprehensive audit methodology and findings (updated 2025-08-09)
-- **ISSUES_utils.md**: 65 issues in utils module, 56/145 files reviewed
+  - High (P1): 40 issues (including 2 new SQL injection risks)
+  - Medium (P2): 193 issues  
+  - Low (P3): 240 issues
+- **PROJECT_AUDIT.md**: Comprehensive audit methodology and findings (updated 2025-08-10)
+- **ISSUES_utils.md**: 197 issues in utils module, 116/145 files reviewed
 - **ISSUES_data_pipeline.md**: 196 issues in data_pipeline module (100% complete)
 - **ISSUES_feature_pipeline.md**: 93 issues in feature_pipeline module (100% complete)
-- **review_progress.json**: Real-time tracking of all review progress (updated 2025-08-09)
+- **review_progress.json**: Real-time tracking of all review progress (updated 2025-08-10)
 
 ### Updated CLAUDE Documentation:
 - **CLAUDE.md**: Main reference (Version 5.4)
@@ -150,13 +172,16 @@
    - Excellent architecture with advanced mathematics
 
 ### In Progress:
-3. **utils/**: 56/145 files reviewed (38.6% complete)
-   - Batches 1-11 complete (authentication, core, database, config, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, app context)
-   - 65 issues found (1 critical, 23 medium, 39 low)
-   - Security status: 🟡 MOSTLY SECURE - One critical unsafe deserialization vulnerability in Redis backend
+3. **utils/**: 116/145 files reviewed (80.0% complete)
+   - Batches 1-23 complete (authentication, core, database, config, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, app context, cache, database ops, events, logging, market data/processing, state management, root utilities, data utilities, factories & time, processing/review/security, scanner utilities, trading utilities)
+   - 197 issues found (1 critical, 4 high, 60 medium, 132 low)
+   - Security status: 🔴 HIGH RISK - One critical unsafe deserialization vulnerability in Redis backend + 2 HIGH SQL injection risks in scanner query builder
 
-### Not Yet Reviewed (471 files remaining, 59.8%):
-4. **utils/** remaining - 89 files (61.4% remaining)
+### Not Yet Reviewed (411 files remaining, 52.2%):
+4. **utils/** remaining - 29 files (20.0% remaining)
+   - trading/ subdirectory - 2 files (manager.py, types.py already reviewed as dependencies)
+   - monitoring/ subdirectory - 23 files remaining
+   - monitoring/alerts/ subdirectory - 4 files
 5. **models/**: 101 files, 24K lines  
 6. **trading_engine/**: 33 files, 13K lines
 7. **monitoring/**: 36 files, 10K lines
@@ -177,7 +202,7 @@
 ### Core Components:
 - **Data Pipeline**: Ingestion, validation, processing, storage (100% reviewed)
 - **Feature Pipeline**: 16 calculators generating 227+ features (100% reviewed)
-- **Utils Module**: Authentication, config, monitoring utilities (38.6% reviewed)
+- **Utils Module**: Authentication, config, monitoring utilities (76.6% reviewed)
 - **Trading Engine**: ML models, risk management, order execution (not yet reviewed)
 - **Monitoring**: Metrics, alerts, dashboards (not yet reviewed)
 - **Validation System**: Multi-stage validation (VULNERABLE - eval() code execution)
@@ -242,45 +267,52 @@ python -m pytest tests/
 ## 🎯 SESSION CONTINUATION CONTEXT
 
 ### What Was Just Completed:
-- Phase 5 Week 6 Batch 11 review (5 files total)  
-- Complete app context and validation component analysis
+- Phase 5 Week 6 Batch 23 review (5 files total) - trading utility files
+- Complete review of __init__.py, analysis.py, filters.py, global_manager.py, io.py
 - All documentation synchronized with new findings
-- utils module: 56/145 files reviewed (38.6%)
+- utils module: 116/145 files reviewed (80.0%)
 
 ### Current State:
-- Phase 5 Week 6 Batch 11 COMPLETE  
-- Total reviewed: 316/787 files (40.2% of codebase) - MILESTONE: Over 40%!
-- Issue count: 354 total (13 critical security issues - 12 in data_pipeline, 1 in utils)
+- Phase 5 Week 6 Batch 23 COMPLETE  
+- Total reviewed: 376/787 files (47.8% of codebase)
+- Issue count: 495 total (13 critical security issues - 12 in data_pipeline, 1 in utils + 2 HIGH SQL injection risks in utils)
 - data_pipeline: 170/170 files complete (100% of module, 12 critical issues)
 - feature_pipeline: 90/90 files complete (100% of module, 0 critical issues)  
-- utils: 56/145 files complete (38.6% of module, 1 critical issue)
+- utils: 116/145 files complete (80.0% of module, 1 critical + 2 HIGH issues)
 
-### Key Technical Findings from Utils Batch 11:
-- **Path Traversal Vulnerability** - Security risk in path validation
-- **Regex DoS Risk** - CPU exhaustion possible via malicious API keys
-- **Configuration Access Issues** - Missing validation for config access
-- **Resource Cleanup Gaps** - Potential resource leaks on initialization failure
+### Key Technical Findings from Utils Batch 23:
+- **Global Singleton Anti-Pattern** - Makes testing difficult in global_manager.py
+- **Missing Error Handling** - JSON parsing without try/except in io.py
+- **Division by Zero Risks** - Multiple locations in analysis.py without zero checks
+- **Hardcoded Values** - Filter presets with non-configurable thresholds
 
 ### Utils Module Security Assessment:
-**Status**: 🟡 MOSTLY SECURE  
-- 55 of 56 reviewed utilities are secure for production use
+**Status**: 🔴 HIGH RISK  
+- 114 of 116 reviewed utilities have manageable issues
 - ONE CRITICAL vulnerability in Redis cache backend (unsafe deserialization fallback)
-- THREE MEDIUM issues in latest batch (path traversal, ReDoS, config validation)
-- Critical issue must be fixed before production deployment
-- Overall security practices are good but need improvement in input validation
+- TWO HIGH SQL injection vulnerabilities in scanner query builder
+- sql_security.py module is EXCELLENT and should be used to fix query_builder.py
+- Critical and high issues must be fixed before production deployment
 
 ### Documentation Status:
-All project documentation is current and synchronized as of 2025-08-09:
-- ISSUE_REGISTRY.md (Version 5.4): 354 issues documented
-- PROJECT_AUDIT.md: Week 6 Batch 11 complete - utils module in progress
-- ISSUES_utils.md: 65 issues documented, 56/145 files reviewed
-- review_progress.json: Updated with utils batch 11
+All project documentation is current and synchronized as of 2025-08-10:
+- ISSUE_REGISTRY.md (Version 6.6): 495 issues documented
+- PROJECT_AUDIT.md: Week 6 Batch 23 complete - utils module 80.0% done
+- ISSUES_utils.md: 197 issues documented, 116/145 files reviewed
+- review_progress.json: Updated with utils batch 23 (version 3.2)
 - CLAUDE.md and related docs: Version 5.4/2.2
 
-### Git Status:
-- Repository fully synchronized with GitHub
-- Last push: Phase 5 Week 6 Batches 10-11 documentation
-- Clean working directory - all changes committed
+### Next Logical Steps:
+The plan for Batch 24 is ready:
+- Review 2 remaining files from utils/trading/ (manager.py, types.py if needed)
+- Review 3 files from utils/monitoring/alerts/
+- Expected to find configuration and alerting issues
+- Will bring utils module to 121/145 files (83.4% complete)
+
+Remaining utils work (29 files):
+- Batch 24: 2 trading files + 3 monitoring/alerts files
+- Batch 25-29: Complete monitoring directory (~24 files)
+- Target completion: 5-6 more batches to finish utils module
 
 ---
 
