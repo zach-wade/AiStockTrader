@@ -1,9 +1,9 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 7.2  
-**Updated**: 2025-08-10 (Phase 5 Week 7 Batch 1 - models module review started)  
-**Total Issues**: 579 (data_pipeline: 196, feature_pipeline: 93, utils: 268, models: 13, 9 untracked)  
-**Files Reviewed**: 410 of 787 (52.1%)  
+**Version**: 7.3  
+**Updated**: 2025-08-10 (Phase 5 Week 7 Batch 2 - models training core reviewed)  
+**Total Issues**: 591 (data_pipeline: 196, feature_pipeline: 93, utils: 268, models: 25, 9 untracked)  
+**Files Reviewed**: 415 of 787 (52.7%)  
 **System Status**: 🔴 NOT PRODUCTION READY - 14 critical vulnerabilities (12 data_pipeline, 1 utils, 1 models)
 
 ---
@@ -48,11 +48,11 @@
 | **data_pipeline** | 170 | 170 (100%) | 196 | 12 | 25 | 84 | 75 | ✅ COMPLETE |
 | **feature_pipeline** | 90 | 90 (100%) | 93 | 0 | 11 | 49 | 33 | ✅ COMPLETE |
 | **utils** | 145 | 145 (100%) | 268 | 1 | 8 | 85 | 174 | ✅ COMPLETE |
-| **models** | 101 | 5 (4.95%) | 13 | 1 | 3 | 4 | 5 | 🔄 IN PROGRESS |
+| **models** | 101 | 10 (9.9%) | 25 | 1 | 5 | 9 | 10 | 🔄 IN PROGRESS |
 | **trading_engine** | 33 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **monitoring** | 36 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **Other modules** | 212 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
-| **TOTAL** | **787** | **410 (52.1%)** | **579** | **14** | **47** | **222** | **296** | - |
+| **TOTAL** | **787** | **415 (52.7%)** | **591** | **14** | **49** | **231** | **301** | - |
 
 ---
 
@@ -64,7 +64,7 @@
 - **[ISSUES_utils.md](ISSUES_utils.md)** - 145 files reviewed, 268 issues found (1 critical CONFIRMED, 8 HIGH priority)
 
 ### In Progress
-- **[ISSUES_models.md](ISSUES_models.md)** - 5 files reviewed, 13 issues found (1 critical, 3 high priority) - includes code duplication analysis
+- **[ISSUES_models.md](ISSUES_models.md)** - 10 files reviewed, 25 issues found (1 critical, 5 high priority) - Batch 2 training core complete
 
 ### Pending Review
 - **ISSUES_trading_engine.md** - To be created when review starts
@@ -138,15 +138,25 @@ This registry has been reorganized for better navigation:
 - **Archive**: Historical Phase 1-4 issues in separate archive
 
 ### Issue Numbering
-- ISSUE-001 to ISSUE-208: Sequential discovery order
+- ISSUE-001 to ISSUE-591: Sequential discovery order
 - ISSUE-RM-XXX: Risk management specific issues
-- New issues continue sequential numbering
+- **NEW** Integration Issues (2025-08-10):
+  - I-INTEGRATION-XXX: Cross-module integration problems
+  - I-CONTRACT-XXX: Interface contract violations  
+  - I-FACTORY-XXX: Factory pattern inconsistencies
+  - I-DATAFLOW-XXX: Data flow breakdowns between modules
+  - I-CONFIG-XXX: Configuration sharing problems
+  - I-ERROR-XXX: Error propagation failures
 
-### Review Methodology
+### Enhanced Review Methodology (Updated 2025-08-10)
 - Batch-based review (5 files per batch)
 - Security-first analysis
 - Architecture quality assessment
 - Performance and maintainability checks
+- **NEW**: Cross-module integration analysis
+- **NEW**: Interface contract compliance verification
+- **NEW**: Factory pattern consistency checks
+- **NEW**: Data flow verification between modules
 
 ---
 
