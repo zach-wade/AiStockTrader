@@ -3,8 +3,8 @@
     "project": "AI Trading System",
     "repository": "https://github.com/zach-wade/AiStockTrader",
     "review_started": "2025-08-08",
-    "last_updated": "2025-08-10T21:00:00",
-    "version": "3.4",
+    "last_updated": "2025-08-10T22:00:00",
+    "version": "3.5",
     "phase_2_completed": true,
     "phase_2_5_completed": true,
     "phase_2_8_verification": true,
@@ -12,23 +12,24 @@
     "phase_3_0_complete": true,
     "phase_3_1_test_implementation": true,
     "phase_4_0_code_analysis": true,
-    "phase_5_deep_review": "WEEK_6_UTILS_BATCH_26_COMPLETE",
-    "system_status": "NOT_PRODUCTION_READY_13_CRITICAL"
+    "phase_5_deep_review": "WEEK_7_MODELS_BATCH_1_IN_PROGRESS",
+    "system_status": "NOT_PRODUCTION_READY_14_CRITICAL"
   },
   "statistics": {
     "total_files": 787,
     "total_lines": 233439,
-    "files_reviewed": 391,
-    "files_actually_reviewed_in_detail": 391,
-    "lines_reviewed": 142100,
-    "issues_found": 531,
+    "files_reviewed": 410,
+    "files_actually_reviewed_in_detail": 410,
+    "lines_reviewed": 146211,
+    "issues_found": 579,
     "issues_fixed": 17,
     "tests_added": 32,
     "dead_code_removed_lines": 0,
     "large_files_found": 146,
     "circular_imports_found": 0,
     "duplicate_code_blocks": 10,
-    "critical_security_issues": 13,
+    "critical_security_issues": 14,
+    "code_duplication_percentage": 15,
     "week_2_batch_1_complete": true,
     "week_2_batch_2_complete": true,
     "week_3_batches_3_5_complete": true,
@@ -153,7 +154,13 @@
     "utils_batch_26_lines": 1432,
     "utils_batch_26_issues": 10,
     "utils_batch_26_critical_issues": 0,
-    "utils_batch_26_medium_issues": 5
+    "utils_batch_26_medium_issues": 5,
+    "utils_batch_27_files": 5,
+    "utils_batch_27_lines": 1780,
+    "utils_batch_27_issues": 14,
+    "utils_batch_27_critical_issues": 0,
+    "utils_batch_27_high_issues": 1,
+    "utils_batch_27_medium_issues": 5
   },
   "modules": {
     "app": {
@@ -223,11 +230,11 @@
     "models": {
       "path": "src/main/models",
       "priority": "critical",
-      "status": "working",
+      "status": "in_progress",
       "files_total": 101,
-      "files_reviewed": 0,
-      "issues_found": [],
-      "notes": "516 trained models available and working"
+      "files_reviewed": 5,
+      "issues_found": ["Missing imports (CRITICAL)", "Code duplication ~15%", "Missing abstractions", "Hardcoded config", "Position update bugs"],
+      "notes": "Week 7 Batch 1 complete: 5/101 files (4.95%). Found 13 issues (1 critical, 3 high). Significant code duplication with utils module."
     },
     "monitoring": {
       "path": "src/main/monitoring",
@@ -851,28 +858,45 @@
       "critical_issues": 0
     }
   },
+  "week_7_models_review": {
+    "status": "IN_PROGRESS",
+    "batch_1": {
+      "files": ["common.py", "ml_signal_adapter.py", "ml_trading_integration.py", "ml_trading_service.py", "outcome_classifier.py"],
+      "lines": 2331,
+      "issues_found": 13,
+      "critical_issues": 1,
+      "high_issues": 3,
+      "code_duplication_found": true,
+      "status": "COMPLETE"
+    },
+    "total_files": 101,
+    "files_reviewed": 5,
+    "percentage_complete": 4.95
+  },
   "next_actions": [
+    "IMMEDIATE: Fix ISSUE-567 undefined imports in ml_trading_integration.py",
     "IMMEDIATE: Fix eval() code execution vulnerability in rule_executor.py",
     "IMMEDIATE: Fix 10+ SQL injection vulnerabilities in data_pipeline",
-    "Begin utils module review (145 files) - Next target for Week 6",
+    "Extract duplicated code patterns to utils module",
+    "Continue models module review (96 files remaining)",
     "Replace TestPositionManager with real implementation",
-    "Remove duplicate code in scanners",
-    "Consolidate utils module",
+    "Create shared interfaces module",
     "Then do live API verification",
     "Then do integration testing"
   ],
   "system_health": {
     "overall_status": "TESTS_PASSING_BUT_NOT_VALIDATED",
-    "percentage_code_reviewed": 47.1,
+    "percentage_code_reviewed": 52.1,
     "components_status": {
       "initialization": "10/10 passing",
       "actual_functionality": "UNKNOWN - not tested",
-      "code_quality": "GOOD for reviewed modules - 52.9% remaining modules never reviewed"
+      "code_quality": "GOOD for reviewed modules - 47.9% remaining modules never reviewed"
     },
     "production_ready": false,
     "production_blockers": [
-      "52.9% of code never reviewed for correctness",
-      "13 critical + 2 HIGH security vulnerabilities found",
+      "47.9% of code never reviewed for correctness",
+      "14 critical + 10 HIGH security vulnerabilities found",
+      "~15% code duplication across modules",
       "SQL injection vulnerabilities in data_pipeline",
       "Unsafe deserialization vulnerability in utils cache backend",
       "eval() code execution vulnerability in rule engine",
