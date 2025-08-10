@@ -1,10 +1,229 @@
 # Utils Module Issues
 
 **Module**: utils  
-**Files**: 116 reviewed so far (80.0% of 145 total files)  
-**Status**: 🔄 IN PROGRESS - Batches 1-23 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Database Operations, Events, Logging, Market Data/Processing, State Management, Root Utilities, Data Utilities, Factories & Time, Processing/Review/Security, Scanner Utilities, Trading Utilities)  
+**Files**: 131 reviewed so far (90.3% of 145 total files)  
+**Status**: 🔄 IN PROGRESS - Batches 1-26 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Database Operations, Events, Logging, Market Data/Processing, State Management, Root Utilities, Data Utilities, Factories & Time, Processing/Review/Security, Scanner Utilities, Trading Utilities, Monitoring Core, Monitoring Components, Dashboard Components)  
 **Critical Issues**: 1 (ISSUE-323: CONFIRMED - Unsafe deserialization fallback in Redis cache backend)  
-**Total Issues**: 197 (1 critical, 2 high, 60 medium, 134 low)
+**Total Issues**: 233 (1 critical, 6 high, 72 medium, 154 low)
+
+---
+
+## Phase 5 Week 6 Batch 25: Monitoring Components Issues (5 files)
+
+### Files Reviewed
+- function_tracker.py - Function performance tracking
+- memory.py - Memory monitoring and management
+- alerts.py - Alert management system
+- migration.py - Monitor migration utilities
+- types.py - Monitoring type definitions
+
+### High Priority Issues (P1): 1 issue
+
+#### ISSUE-511: Undefined alert_manager Reference
+- **Component**: migration.py
+- **Location**: Lines 231, 232
+- **Impact**: AttributeError at runtime when get_system_health_score() called
+- **Details**: self.alert_manager.get_active_alerts() referenced but alert_manager doesn't exist in PerformanceMonitor parent class
+- **Fix**: Check if alert_manager exists or handle the AttributeError
+- **Priority**: P1
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-512: Global Mutable State
+- **Component**: memory.py
+- **Location**: Line 449 - Global _memory_monitor singleton
+- **Impact**: Makes testing difficult, potential state leakage
+- **Fix**: Consider dependency injection pattern
+- **Priority**: P2
+
+#### ISSUE-513: Missing Exception Logging
+- **Component**: function_tracker.py
+- **Location**: Line 67 - Exception e assigned but never used
+- **Impact**: Lost debugging information on function failures
+- **Fix**: Add logger.error(f"Function {func_name} failed: {e}")
+- **Priority**: P2
+
+#### ISSUE-514: Hardcoded Memory Thresholds
+- **Component**: memory.py
+- **Location**: Lines 48-55 - Default thresholds in dataclass
+- **Impact**: Not configurable via configuration system
+- **Fix**: Load from config or make parameterizable
+- **Priority**: P2
+
+### Low Priority Issues (P3): 7 issues
+
+#### ISSUE-515: Unbounded Growth
+- **Component**: function_tracker.py
+- **Location**: Line 25 - function_metrics defaultdict
+- **Impact**: Memory leak with many unique function names
+- **Fix**: Add periodic cleanup or max functions limit
+- **Priority**: P3
+
+#### ISSUE-516: Division by Zero Risk
+- **Component**: memory.py
+- **Location**: Lines 188, 418
+- **Impact**: Arbitrary value (0.1) used to avoid division by zero
+- **Fix**: Add proper checks before division
+- **Priority**: P3
+
+#### ISSUE-517: Thread Safety Concern
+- **Component**: memory.py
+- **Location**: Line 296 - Daemon thread without proper cleanup
+- **Impact**: Could lose data on abrupt shutdown
+- **Fix**: Ensure proper thread cleanup on shutdown
+- **Priority**: P3
+
+#### ISSUE-518: Missing Method Implementation
+- **Component**: migration.py
+- **Location**: Line 108 - get_metric_history referenced
+- **Impact**: Method not defined in parent class, will fail at runtime
+- **Fix**: Add proper implementation or import
+- **Priority**: P3
+
+#### ISSUE-519: Hardcoded Alert Thresholds
+- **Component**: alerts.py
+- **Location**: Lines 238-250 - Default system thresholds
+- **Impact**: Not configurable via config system
+- **Fix**: Load from configuration system
+- **Priority**: P3
+
+#### ISSUE-520: No Rate Limiting
+- **Component**: alerts.py
+- **Location**: Lines 180-186 - Alert callbacks
+- **Impact**: Could spam callbacks in high alert scenarios
+- **Fix**: Add rate limiting or debouncing
+- **Priority**: P3
+
+#### ISSUE-521: Missing Error Handling
+- **Component**: memory.py
+- **Location**: Line 108 - num_fds() could raise exception
+- **Impact**: Could crash on some systems
+- **Fix**: Wrap in try/except block
+- **Priority**: P3
+
+---
+
+## Phase 5 Week 6 Batch 24: Monitoring Core Issues (5 files)
+
+### Files Reviewed
+- metrics.py - Unified metrics definitions and types
+- monitor.py - Main performance monitoring coordinator
+- global_monitor.py - Global monitor singleton
+- enhanced.py - Enhanced monitoring with DB persistence
+- collectors.py - System metrics collection
+
+### High Priority Issues (P1): 1 issue
+
+#### ISSUE-496: Undefined alert_manager Reference
+- **Component**: monitor.py
+- **Location**: Lines 114, 160, 164, 201, 247-248, 272, 351, 373, 378
+- **Impact**: AttributeError at runtime when alert methods called
+- **Details**: self.alert_manager referenced but never initialized after being commented out
+- **Fix**: Either remove all alert_manager references or properly initialize it
+- **Priority**: P1
+
+### Medium Priority Issues (P2): 4 issues
+
+#### ISSUE-497: Inconsistent Error Handling in Enhanced Monitor
+- **Component**: enhanced.py
+- **Location**: Line 386 - self.alert_manager.add_alert() without null check
+- **Impact**: NoneType error if alert_manager not provided
+- **Fix**: Add null check before accessing alert_manager
+- **Priority**: P2
+
+#### ISSUE-498: Hardcoded SQL Table Creation
+- **Component**: enhanced.py
+- **Location**: Lines 497-509, 552-566 - Direct SQL CREATE TABLE statements
+- **Impact**: No schema versioning or migration tracking
+- **Fix**: Use proper database migration system
+- **Priority**: P2
+
+#### ISSUE-499: Missing Import Validation
+- **Component**: global_monitor.py
+- **Location**: Line 28 - Imports from main.utils.database at module level
+- **Impact**: ImportError if database module not available
+- **Fix**: Move import inside function or add proper error handling
+- **Priority**: P2
+
+#### ISSUE-500: Incorrect Attribute Access
+- **Component**: monitor.py
+- **Location**: Line 291 - metric.disk_percent doesn't exist
+- **Impact**: AttributeError when exporting to CSV
+- **Details**: Should be metric.disk_usage_percent based on SystemResources definition
+- **Fix**: Use correct attribute name
+- **Priority**: P2
+
+### Low Priority Issues (P3): 10 issues
+
+#### ISSUE-501: Global Mutable State Pattern
+- **Component**: global_monitor.py
+- **Location**: Line 18 - Global _global_monitor singleton
+- **Impact**: Makes testing difficult, state leakage between tests
+- **Fix**: Consider dependency injection pattern
+- **Priority**: P3
+
+#### ISSUE-502: Synchronous I/O in Async Context
+- **Component**: enhanced.py
+- **Location**: Line 519 - json.dumps() in async function
+- **Impact**: Could block event loop with large data
+- **Fix**: Use asyncio.to_thread() for CPU-bound operations
+- **Priority**: P3
+
+#### ISSUE-503: Missing Docstrings
+- **Component**: metrics.py
+- **Location**: Lines 70-77 - PipelineStatus class lacks docstring
+- **Impact**: Poor documentation, unclear purpose
+- **Fix**: Add comprehensive docstrings
+- **Priority**: P3
+
+#### ISSUE-504: Hardcoded Retention Period
+- **Component**: enhanced.py
+- **Location**: Lines 44, 755 - Default 168 hours (7 days) hardcoded
+- **Impact**: Not configurable per metric
+- **Fix**: Make configurable via config system
+- **Priority**: P3
+
+#### ISSUE-505: No Connection Pooling Limits
+- **Component**: enhanced.py
+- **Location**: Lines 495, 550, 646, 773 - Multiple db_pool.acquire()
+- **Impact**: Could exhaust connection pool
+- **Fix**: Add connection limit checks
+- **Priority**: P3
+
+#### ISSUE-506: Inefficient HTML Generation
+- **Component**: monitor.py
+- **Location**: Lines 306-361 - Building HTML with list append
+- **Impact**: Inefficient string operations
+- **Fix**: Consider using template engine like Jinja2
+- **Priority**: P3
+
+#### ISSUE-507: Missing Error Handling for psutil
+- **Component**: collectors.py
+- **Location**: Line 75 - ._asdict() without null check
+- **Impact**: Could fail on some systems
+- **Fix**: Add null checks before accessing attributes
+- **Priority**: P3
+
+#### ISSUE-508: No Rate Limiting in Persistence
+- **Component**: enhanced.py
+- **Location**: Lines 453-487 - Persistence loop without rate limiting
+- **Impact**: Could overwhelm database with high metric volume
+- **Fix**: Add rate limiting mechanism
+- **Priority**: P3
+
+#### ISSUE-509: Magic Numbers
+- **Component**: enhanced.py
+- **Location**: Lines 334-345 - Hardcoded threshold values
+- **Impact**: Not configurable, maintenance burden
+- **Fix**: Move to configuration
+- **Priority**: P3
+
+#### ISSUE-510: Potential Memory Leak
+- **Component**: enhanced.py
+- **Location**: Line 99 - Deque in defaultdict with no cleanup
+- **Impact**: Could grow unbounded with unique metric names
+- **Fix**: Add periodic cleanup for old metric names
+- **Priority**: P3
 
 ---
 
@@ -2059,6 +2278,103 @@ The main concerns are:
 
 ---
 
+## Phase 5 Week 6 Batch 26: Dashboard Components Issues (5 files)
+
+### Files Reviewed
+- dashboard_adapters.py (343 lines) - Dashboard adapters for utils monitoring
+- dashboard_factory.py (283 lines) - Dashboard factory pattern implementation
+- metrics_adapter.py (94 lines) - Metrics adapter for IMetricsRecorder interface
+- rate_monitor_dashboard.py (156 lines) - Rate monitoring dashboard for backfill
+- __init__.py (556 lines) - Module public API with comprehensive MetricsCollector implementation
+
+### Medium Priority Issues (P2): 5 issues
+
+#### ISSUE-522: Missing Import numpy in MetricsCollector
+- **Component**: __init__.py
+- **Location**: Lines 209, 214-218, 241, 246, 277, 294
+- **Impact**: Runtime ImportError when using histogram statistics
+- **Details**: Function-level numpy imports will fail if numpy not installed
+- **Fix**: Add `import numpy as np` at module level instead of function-level imports
+- **Priority**: P2
+
+#### ISSUE-523: No Error Handling for Missing Rate Stats
+- **Component**: rate_monitor_dashboard.py
+- **Location**: Lines 110-111
+- **Impact**: AttributeError if stats values are None
+- **Details**: Direct attribute access without null checking
+- **Fix**: Add null checks before accessing stat attributes
+- **Priority**: P2
+
+#### ISSUE-524: Thread Safety Issue in MetricsCollector
+- **Component**: __init__.py
+- **Location**: Lines 376-382
+- **Impact**: Potential race condition when modifying deque during iteration
+- **Details**: Modifying collection while iterating in clear_old_metrics
+- **Fix**: Create new deque instead of modifying during iteration
+- **Priority**: P2
+
+#### ISSUE-525: Missing Validation for Dashboard Config
+- **Component**: dashboard_factory.py
+- **Location**: Lines 55-65, 110-120, 162-172
+- **Impact**: Invalid config values could cause runtime errors
+- **Details**: No validation for port ranges, host values
+- **Fix**: Add validation for port ranges (1-65535), host values
+- **Priority**: P2
+
+#### ISSUE-526: Memory Leak in MetricsCollector Background Thread
+- **Component**: __init__.py
+- **Location**: Lines 441-463
+- **Impact**: Thread may not properly terminate on shutdown
+- **Details**: Background aggregation thread may not cleanly terminate
+- **Fix**: Add proper cleanup and thread termination logic
+- **Priority**: P2
+
+### Low Priority Issues (P3): 5 issues
+
+#### ISSUE-527: Hardcoded Escape Sequences in Dashboard Output
+- **Component**: rate_monitor_dashboard.py
+- **Location**: Lines 90, 92, 149
+- **Impact**: Double backslashes in print statements may not render correctly
+- **Details**: Using "\\\\n" instead of raw strings or single backslash
+- **Fix**: Use raw strings or single backslash for escape sequences
+- **Priority**: P3
+
+#### ISSUE-528: Missing Type Hints in Adapter Classes
+- **Component**: dashboard_adapters.py
+- **Location**: Lines 39-74, 254-309
+- **Impact**: Reduced type safety and IDE support
+- **Details**: Async methods missing return type hints
+- **Fix**: Add proper type hints for async methods
+- **Priority**: P3
+
+#### ISSUE-529: Unchecked Division by Zero
+- **Component**: dashboard_adapters.py
+- **Location**: Line 289
+- **Impact**: Potential ZeroDivisionError in error rate calculation
+- **Details**: Although there's a check, could be more defensive
+- **Fix**: Already has check but could be more defensive
+- **Priority**: P3
+
+#### ISSUE-530: Circular Import Risk with Enhanced Monitor
+- **Component**: dashboard_adapters.py
+- **Location**: Lines 330-335
+- **Impact**: Potential circular import when creating enhanced monitor
+- **Details**: Importing and modifying global monitor at runtime
+- **Fix**: Use lazy imports or dependency injection
+- **Priority**: P3
+
+#### ISSUE-531: Stub Dashboard Missing Interface Methods
+- **Component**: dashboard_factory.py
+- **Location**: Lines 260-283
+- **Impact**: Stub implementation incomplete for IDashboard interface
+- **Details**: StubDashboard class may be missing required interface methods
+- **Fix**: Implement all required interface methods
+- **Priority**: P3
+
+**Batch 26 Summary**: 10 issues total, 0 critical, 0 high, 5 medium, 5 low
+
+---
+
 **Last Updated**: 2025-08-10  
-**Review Progress**: Phase 5 Week 6 Batch 21 Complete  
-**Total Issues in Utils Module**: 178 (1 critical, 54 medium, 123 low)
+**Review Progress**: Phase 5 Week 6 Batch 26 Complete  
+**Total Issues in Utils Module**: 233 (1 critical, 6 high, 72 medium, 154 low)

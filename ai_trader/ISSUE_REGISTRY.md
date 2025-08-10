@@ -1,10 +1,10 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 6.6  
-**Updated**: 2025-08-10 (Phase 5 Week 6 Batch 23 - utils module in progress)  
-**Total Issues**: 495 (data_pipeline: 196, feature_pipeline: 93, utils: 197, 9 untracked in Batch 16)  
-**Files Reviewed**: 376 of 787 (47.8%)  
-**System Status**: 🔴 NOT PRODUCTION READY - 15 critical vulnerabilities (12 data_pipeline, 1 utils CONFIRMED, 2 HIGH SQL injection risks in utils)
+**Version**: 6.8  
+**Updated**: 2025-08-10 (Phase 5 Week 6 Batch 26 - utils module in progress)  
+**Total Issues**: 531 (data_pipeline: 196, feature_pipeline: 93, utils: 233, 9 untracked in Batch 16)  
+**Files Reviewed**: 391 of 787 (49.7%)  
+**System Status**: 🔴 NOT PRODUCTION READY - 13 critical vulnerabilities (12 data_pipeline, 1 utils CONFIRMED)
 
 ---
 
@@ -46,12 +46,12 @@
 |--------|-------|----------|--------|----------|------|--------|-----|--------|
 | **data_pipeline** | 170 | 170 (100%) | 196 | 12 | 25 | 84 | 75 | ✅ COMPLETE |
 | **feature_pipeline** | 90 | 90 (100%) | 93 | 0 | 11 | 49 | 33 | ✅ COMPLETE |
-| **utils** | 145 | 116 (80.0%) | 197 | 1 | 4 | 60 | 132 | 🔄 IN PROGRESS |
+| **utils** | 145 | 131 (90.3%) | 233 | 1 | 6 | 72 | 154 | 🔄 IN PROGRESS |
 | **models** | 101 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **trading_engine** | 33 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **monitoring** | 36 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **Other modules** | 212 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
-| **TOTAL** | **787** | **376 (47.8%)** | **486** | **13** | **40** | **193** | **240** | - |
+| **TOTAL** | **787** | **386 (49.0%)** | **512** | **13** | **42** | **200** | **257** | - |
 
 ---
 
@@ -62,7 +62,7 @@
 - **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 90 files reviewed, 93 issues with zero critical security vulnerabilities
 
 ### In Progress
-- **[ISSUES_utils.md](ISSUES_utils.md)** - 111/145 files reviewed (Batches 1-22), 188 issues found (1 critical CONFIRMED, 2 HIGH SQL injection risks)
+- **[ISSUES_utils.md](ISSUES_utils.md)** - 121/145 files reviewed (Batches 1-24), 212 issues found (1 critical CONFIRMED, 5 HIGH priority)
 
 ### Pending Review
 - **ISSUES_models.md** - To be created when review starts
@@ -97,7 +97,7 @@
 
 ## 📈 Review Progress
 
-### Current Phase: Phase 5 Week 6 Batch 22
+### Current Phase: Phase 5 Week 6 Batch 24
 - **Started**: 2025-08-10  
 - **Current Module**: utils (Batches 1-22 complete)
 - **Progress Today**: 111 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, app context, cache, database operations, events, logging, market data/processing, state management, root utility modules, data utilities, factories, time utilities, processing modules, review tools, security, and scanner utilities

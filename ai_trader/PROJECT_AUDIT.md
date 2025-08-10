@@ -1,12 +1,12 @@
 # AI Trading System - Comprehensive Project Audit
 
 **Started**: 2025-08-08  
-**Updated**: 2025-08-10 (Phase 5 Week 6 Batch 23 - utils module review in progress)  
+**Updated**: 2025-08-10 (Phase 5 Week 6 Batch 26 - utils module review in progress)  
 **Repository**: https://github.com/zach-wade/AiStockTrader  
 **Total Files**: 787 Python files  
 **Total Lines**: 233,439 lines of code  
-**Files Actually Reviewed**: 376 of 787 (47.8%)  
-**System Status**: 🔴 CRITICAL SECURITY VULNERABILITY - eval() & ISSUE-323 CONFIRMED (13 CRITICAL + 2 HIGH SQL injection risks in utils)  
+**Files Actually Reviewed**: 391 of 787 (49.7%)  
+**System Status**: 🔴 CRITICAL SECURITY VULNERABILITY - eval() & ISSUE-323 CONFIRMED (13 CRITICAL vulnerabilities)  
 
 ---
 
@@ -33,7 +33,7 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 | Lines of Code (Main) | 231,721 | 🔍 To Analyze |
 | Lines of Code (Tests) | 53,957 | 🟡 23% test-to-code ratio |
 | Main Modules | 20 | 🔍 To Audit |
-| Known Issues | 486 | 🔴 To Fix (13 CRITICAL + 2 HIGH) |
+| Known Issues | 531 | 🔴 To Fix (13 CRITICAL + 2 HIGH) |
 | Test Coverage | ~23% ratio | 🟡 Needs improvement |
 | Documentation | 88 MD files | 🟡 To Complete |
 
@@ -53,7 +53,7 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 | scanners/ | 34 | 13,867 | 🔍 Pending | High | Not working, not integrated |
 | trading_engine/ | 33 | 13,543 | 🔍 Pending | Critical | Core execution logic |
 | universe/ | 3 | 578 | 🔍 Pending | Medium | Symbol management |
-| utils/ | 145 | 36,628 | 🔄 IN PROGRESS | Medium | 3rd largest, 116/145 files reviewed (80.0%) - 197 issues, 1 critical CONFIRMED + 2 HIGH SQL injection. ✅ sql_security.py excellent! |
+| utils/ | 145 | 36,628 | 🔄 IN PROGRESS | Medium | 3rd largest, 131/145 files reviewed (90.3%) - 233 issues, 1 critical CONFIRMED + 6 HIGH priority. ✅ sql_security.py excellent! |
 | orchestration/ | 2 | 439 | 🔍 Pending | Medium | Job scheduling broken |
 | services/ | 0 | 0 | ❓ Empty | Medium | No implementation found |
 | migrations/ | 0 | 0 | ❓ Empty | Low | No migrations present |
@@ -68,8 +68,8 @@ This document tracks the comprehensive audit of the AI Trading System, documenti
 ### SYSTEM STATUS: TESTS PASS BUT CODE NOT PROPERLY REVIEWED
 **Current Reality Check**: 
 - ✅ 10/10 components pass initialization tests
-- ⚠️ Only 376 of 787 files actually reviewed (47.8%)
-- ⚠️ 411 files have NEVER been looked at in detail
+- ⚠️ Only 391 of 787 files actually reviewed (49.7%)
+- ⚠️ 396 files have NEVER been looked at in detail
 - ⚠️ We don't know if the code actually works, only that it doesn't crash on startup
 - 🔴 Using TestPositionManager instead of real implementation (production blocker)
 - 🔴 CONFIRMED: eval() code execution vulnerability in rule_executor.py
