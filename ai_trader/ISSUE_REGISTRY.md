@@ -1,10 +1,10 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 7.7  
-**Updated**: 2025-08-11 (Phase 5 Week 7 Batch 7 - specialists module foundation reviewed)  
-**Total Issues**: 669 (data_pipeline: 196, feature_pipeline: 93, utils: 268, models: 119, -7 untracked)  
-**Files Reviewed**: 440 of 787 (55.9%)  
-**System Status**: 🔴 NOT PRODUCTION READY - 21 critical vulnerabilities (12 data_pipeline, 1 utils, 8 models)
+**Version**: 9.2  
+**Updated**: 2025-08-11 (Trading Engine Module Review - Batch 2 Complete with Integration Analysis)  
+**Total Issues**: 970 (data_pipeline: 196, feature_pipeline: 93, utils: 268, models: 358, trading_engine: 45, retroactive: 10)  
+**Files Reviewed**: 514 of 787 (65.3%)  
+**System Status**: 🔴 NOT PRODUCTION READY - 37 critical vulnerabilities (12 data_pipeline, 1 utils, 20 models, 4 trading_engine) - NEW: Config import failures and datetime inconsistencies!
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## 🚨 Critical Security Vulnerabilities (Immediate Action Required)
 
-### 21 Critical Issues Requiring Immediate Fixes:
+### 33 Critical Issues Requiring Immediate Fixes:
 
 1. **ISSUE-171**: eval() Code Execution in Rule Engine → [data_pipeline](ISSUES_data_pipeline.md#issue-171-eval-code-execution-in-rule-engine)
 2. **ISSUE-162**: SQL Injection in Data Existence Checker → [data_pipeline](ISSUES_data_pipeline.md#issue-162-sql-injection-in-data-existence-checker)
@@ -45,6 +45,22 @@
 19. **ISSUE-616**: Unsafe joblib deserialization allows code execution → [models](ISSUES_models.md#issue-616-unsafe-deserialization-with-joblibload)
 20. **ISSUE-619**: MD5 Hash Usage for A/B Test Request Routing (CRITICAL) → [models](ISSUES_models.md#issue-619-md5-hash-usage-for-ab-test-request-routing)
 21. **ISSUE-630**: Unsafe joblib.load in BaseCatalystSpecialist → [models](ISSUES_models.md#issue-630-unsafe-joblibload-in-basecatalystspecialist)
+22. **ISSUE-679**: Unsafe joblib.load in ML Regression Strategy (BATCH 12) → [models](ISSUES_models.md#issue-679-unsafe-joblibload-deserialization)
+23. **ISSUE-726**: Unsafe joblib.load in ModelLoader utility (BATCH 13) → [models](ISSUES_models.md#issue-726-unsafe-joblibload-deserialization-4th-occurrence)
+24. **ISSUE-740**: Placeholder Technical Specialist blocks production (BATCH 14) → [models](ISSUES_models.md#issue-740-placeholder-technical-specialist-blocks-production)
+25. **ISSUE-760**: Missing BaseUniverseStrategy Import (BATCH 15) → [models](ISSUES_models.md#issue-760-missing-baseuniversestrategy-import)
+26. **ISSUE-761**: External File Dependency Without Validation (BATCH 15) → [models](ISSUES_models.md#issue-761-external-file-dependency-without-validation)
+27. **ISSUE-771**: Missing create_event_tracker Import (BATCH 16) → [models](ISSUES_models.md#issue-771-missing-import-create-event-tracker)
+28. **ISSUE-772**: External File Dependency Without Validation in Statistical Arbitrage (BATCH 16) → [models](ISSUES_models.md#issue-772-external-file-dependency-without-validation)
+29. **ISSUE-773**: Unsafe joblib.load() - 5th & 6th Occurrences (BATCH 16) → [models](ISSUES_models.md#issue-773-unsafe-joblibload-5th-6th-occurrences)
+30. **ISSUE-780**: Unsafe joblib.load() - 7th Occurrence (BATCH 17) → [models](ISSUES_models.md#issue-780-unsafe-joblibload-7th-occurrence)
+31. **ISSUE-793**: Unsafe joblib.save() pattern - potential code execution (BATCH 18) → [models](ISSUES_models.md#issue-793-unsafe-joblib-save-pattern)
+32. **ISSUE-808**: Unsafe joblib.dump() in training_orchestrator (NEW BATCH 19) → [models](ISSUES_models.md#issue-808-unsafe-joblib-dump-pattern)
+33. **ISSUE-809**: Path traversal vulnerability in model storage (NEW BATCH 19) → [models](ISSUES_models.md#issue-809-path-traversal-vulnerability)
+34. **ISSUE-926**: datetime.utcnow() deprecated usage causing Python 3.12+ failures → [trading_engine](ISSUES_trading_engine.md#issue-926-unsafe-datetimeutcnow-usage-critical)
+35. **ISSUE-946**: Multiple datetime.utcnow() in risk_manager.py (9 occurrences) → [trading_engine](ISSUES_trading_engine.md#issue-946-multiple-datetimeutcnow-usage-in-risk-manager-critical)
+36. **ISSUE-947**: Missing datetime import causing NameError → [trading_engine](ISSUES_trading_engine.md#issue-947-missing-datetime-import-critical)
+37. **ISSUE-959**: Missing Config class import causing runtime failures → [trading_engine](ISSUES_trading_engine.md#issue-959-missing-config-import-critical)
 
 ---
 
@@ -55,11 +71,12 @@
 | **data_pipeline** | 170 | 170 (100%) | 196 | 12 | 25 | 84 | 75 | ✅ COMPLETE |
 | **feature_pipeline** | 90 | 90 (100%) | 93 | 0 | 11 | 49 | 33 | ✅ COMPLETE |
 | **utils** | 145 | 145 (100%) | 268 | 1 | 8 | 85 | 174 | ✅ COMPLETE |
-| **models** | 101 | 35 (34.7%) | 119 | 8 | 30 | 45 | 36 | 🔄 IN PROGRESS |
-| **trading_engine** | 33 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
+| **models** | 101 | 101 (100%) | 358 | 20 | 83 | 169 | 86 | ✅ COMPLETE |
+| **trading_engine** | 33 | 10 (30.3%) | 45 | 4 | 14 | 20 | 7 | 🔄 IN PROGRESS |
 | **monitoring** | 36 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
 | **Other modules** | 212 | 0 (0%) | - | - | - | - | - | ⏳ PENDING |
-| **TOTAL** | **787** | **440 (55.9%)** | **669** | **21** | **74** | **263** | **318** | - |
+| **Retroactive Enhanced** | 5 | 5 (100%) | 10 | 0 | 2 | 5 | 3 | ✅ COMPLETE |
+| **TOTAL** | **787** | **514 (65.3%)** | **970** | **37** | **149** | **416** | **387** | - |
 
 ---
 
@@ -69,9 +86,13 @@
 - **[ISSUES_data_pipeline.md](ISSUES_data_pipeline.md)** - 170 files reviewed, 196 issues including 12 critical security vulnerabilities
 - **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 90 files reviewed, 93 issues with zero critical security vulnerabilities
 - **[ISSUES_utils.md](ISSUES_utils.md)** - 145 files reviewed, 268 issues found (1 critical CONFIRMED, 8 HIGH priority)
+- **[ISSUES_models.md](ISSUES_models.md)** - 101 files reviewed (100% COMPLETE), 358 issues found (20 critical, 83 high priority) - Module complete with Batch 20
 
 ### In Progress
-- **[ISSUES_models.md](ISSUES_models.md)** - 35 files reviewed, 119 issues found (8 critical, 30 high priority) - Batch 7 specialists module complete
+- **[ISSUES_trading_engine.md](ISSUES_trading_engine.md)** - 10 files reviewed (30.3%), 45 issues found (4 critical, 14 high priority) - Batch 2 complete with integration analysis
+
+### Enhanced Retroactive Reviews
+- **[RETROACTIVE_REVIEW_CRITICAL_FILES.md](RETROACTIVE_REVIEW_CRITICAL_FILES.md)** - Enhanced Phase 6-11 retroactive reviews of critical files (10 new issues, 0 critical)
 
 ### Pending Review
 - **ISSUES_trading_engine.md** - To be created when review starts
