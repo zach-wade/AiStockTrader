@@ -1,10 +1,10 @@
 # Utils Module Issues
 
 **Module**: utils  
-**Files**: 131 reviewed so far (90.3% of 145 total files)  
-**Status**: 🔄 IN PROGRESS - Batches 1-26 Complete (Authentication, Core, Database, Config, Monitoring, Network/HTTP, Data Processing, Core Utils, Resilience/Security, Alerting/API, App Context, Cache Module, Database Operations, Events, Logging, Market Data/Processing, State Management, Root Utilities, Data Utilities, Factories & Time, Processing/Review/Security, Scanner Utilities, Trading Utilities, Monitoring Core, Monitoring Components, Dashboard Components)  
+**Files**: 145 reviewed (100% COMPLETE)  
+**Status**: ✅ COMPLETE - All 29 Batches Reviewed  
 **Critical Issues**: 1 (ISSUE-323: CONFIRMED - Unsafe deserialization fallback in Redis cache backend)  
-**Total Issues**: 233 (1 critical, 6 high, 72 medium, 154 low)
+**Total Issues**: 268 (1 critical, 8 high, 85 medium, 174 low)
 
 ---
 
@@ -2375,6 +2375,297 @@ The main concerns are:
 
 ---
 
+## Phase 5 Week 6 Batch 27: Dashboard & Enhanced Monitoring (5 files)
+
+### Files Reviewed
+- dashboard_adapters.py - Dashboard integration adapters
+- dashboard_factory.py - Dashboard creation factory  
+- enhanced.py - Enhanced monitoring with DB persistence
+- examples.py - Usage examples
+- global_monitor.py - Global monitor singleton
+
+### High Priority Issues (P1): 1 issue
+
+#### ISSUE-532: AttributeError Risk in Alert Manager
+- **Component**: enhanced.py
+- **Location**: Line 386
+- **Impact**: Runtime error when alert_manager is None
+- **Details**: self.alert_manager.add_alert(alert) called but alert_manager is optional
+- **Fix**: Check if alert_manager exists before calling methods
+- **Priority**: P1
+
+### Medium Priority Issues (P2): 5 issues
+
+#### ISSUE-533: Hardcoded Dashboard Ports
+- **Component**: dashboard_factory.py
+- **Location**: Lines 59, 114, 166 - Ports 8080, 8052, 8054
+- **Impact**: Not configurable via configuration system
+- **Fix**: Load from configuration system
+- **Priority**: P2
+
+#### ISSUE-534: Global Mutable State
+- **Component**: enhanced.py
+- **Location**: Line 796 - _enhanced_monitor singleton
+- **Impact**: Testing difficulties, state leakage
+- **Fix**: Use dependency injection pattern
+- **Priority**: P2
+
+#### ISSUE-535: SQL Injection Risk
+- **Component**: enhanced.py
+- **Location**: Lines 497-509 - CREATE TABLE statement
+- **Impact**: Potential SQL injection if table names modified
+- **Details**: Direct string interpolation in SQL DDL
+- **Fix**: Use parameterized queries or validate table names
+- **Priority**: P2
+
+#### ISSUE-536: Unbounded Queue Growth
+- **Component**: enhanced.py
+- **Location**: Line 111 - _persistence_queue
+- **Impact**: Memory exhaustion under high load
+- **Fix**: Add maxsize parameter to asyncio.Queue
+- **Priority**: P2
+
+#### ISSUE-537: Race Condition in Task Start
+- **Component**: enhanced.py
+- **Location**: Lines 286-294 - start() method
+- **Impact**: Tasks could start multiple times
+- **Fix**: Use proper locking around _is_running check
+- **Priority**: P2
+
+### Low Priority Issues (P3): 8 issues
+
+#### ISSUE-538: Missing Alert Manager Check
+- **Component**: dashboard_adapters.py
+- **Location**: Line 46
+- **Impact**: AttributeError if alert_manager missing
+- **Priority**: P3
+
+#### ISSUE-539: Inconsistent Error Handling
+- **Component**: dashboard_factory.py
+- **Location**: Throughout file
+- **Impact**: Some methods raise, others log and raise
+- **Priority**: P3
+
+#### ISSUE-540: Memory Leak Potential
+- **Component**: enhanced.py
+- **Location**: Line 99 - defaultdict with lambda
+- **Impact**: Could retain references unnecessarily
+- **Priority**: P3
+
+#### ISSUE-541: Division by Zero Risk
+- **Component**: enhanced.py
+- **Location**: statistics.mean() calls
+- **Impact**: Could raise on empty lists
+- **Priority**: P3
+
+#### ISSUE-542: Hardcoded Retention Hours
+- **Component**: enhanced.py
+- **Location**: Line 44 - retention_hours=168
+- **Impact**: Not configurable
+- **Priority**: P3
+
+#### ISSUE-543: Missing Aggregation Validation
+- **Component**: enhanced.py
+- **Location**: get_metric_value method
+- **Impact**: Invalid aggregation types silently return None
+- **Priority**: P3
+
+#### ISSUE-544: Thread Safety Concern
+- **Component**: global_monitor.py
+- **Location**: Global state modifications
+- **Impact**: Race conditions in multi-threaded apps
+- **Priority**: P3
+
+#### ISSUE-545: Hardcoded Example Values
+- **Component**: examples.py
+- **Location**: Throughout file
+- **Impact**: Not production-ready examples
+- **Priority**: P3
+
+**Batch 27 Summary**: 14 issues total, 0 critical, 1 high, 5 medium, 8 low
+
+---
+
+## Phase 5 Week 6 Batch 28: Alert Channels Issues (5 files)
+
+### Files Reviewed
+- monitoring/alerts/email_channel.py - Email alert channel
+- monitoring/alerts/slack_channel.py - Slack alert channel  
+- monitoring/alerts/sms_channel.py - SMS alert channel
+- monitoring/rate_monitor_dashboard.py - Rate monitoring dashboard
+- monitoring/collectors.py - System metrics collectors
+
+### High Priority Issues (P1): 1 issue
+
+#### ISSUE-546: HTML Injection in Email Templates
+- **Component**: email_channel.py
+- **Location**: Lines 100, 114-116
+- **Impact**: HTML content not escaped, user data directly rendered
+- **Details**: Alert data fields inserted into HTML without escaping, could allow HTML/JavaScript injection
+- **Fix**: Use HTML escaping for all user-provided data in templates
+- **Priority**: P1
+
+### Medium Priority Issues (P2): 5 issues
+
+#### ISSUE-547: Credentials in Memory
+- **Component**: email_channel.py and sms_channel.py
+- **Location**: email_channel.py lines 165-166, sms_channel.py lines 250-252, 262-263
+- **Impact**: API credentials and passwords stored in plaintext memory
+- **Fix**: Use secure credential storage or at minimum encrypt in memory
+- **Priority**: P2
+
+#### ISSUE-548: Undefined Variables
+- **Component**: email_channel.py and slack_channel.py
+- **Location**: email_channel.py line 189, slack_channel.py lines 193, 222
+- **Impact**: AttributeError at runtime
+- **Details**: self.enabled used before initialization, alert.component and alert.id may not exist
+- **Fix**: Initialize variables properly, add getattr() with defaults
+- **Priority**: P2
+
+#### ISSUE-549: SSL/TLS Not Validated
+- **Component**: email_channel.py and slack_channel.py
+- **Location**: email_channel.py line 382
+- **Impact**: MITM attack vulnerability
+- **Details**: Uses default SSL context without certificate validation
+- **Fix**: Validate SSL certificates properly
+- **Priority**: P2
+
+#### ISSUE-550: Command Injection Risk
+- **Component**: sms_channel.py
+- **Location**: Line 74
+- **Impact**: Potential command injection via SMS message
+- **Details**: Message parameter passed directly to Twilio SDK
+- **Fix**: Sanitize message content before passing to SDK
+- **Priority**: P2
+
+#### ISSUE-551: Webhook URL Validation Weak
+- **Component**: slack_channel.py
+- **Location**: Lines 105-112
+- **Impact**: Could accept malicious URLs
+- **Details**: Only checks domain, not full URL validation
+- **Fix**: Use proper URL parsing and validation
+- **Priority**: P2
+
+### Low Priority Issues (P3): 7 issues
+
+#### ISSUE-552: Resource Leak
+- **Component**: email_channel.py
+- **Location**: Line 201
+- **Impact**: Batch processor task not properly cancelled
+- **Priority**: P3
+
+#### ISSUE-553: Race Condition
+- **Component**: slack_channel.py
+- **Location**: Lines 71-72
+- **Impact**: Thread keys dictionary not thread-safe
+- **Priority**: P3
+
+#### ISSUE-554: Information Disclosure
+- **Component**: sms_channel.py
+- **Location**: Line 334
+- **Impact**: Error messages expose masked phone numbers
+- **Priority**: P3
+
+#### ISSUE-555: Division by Zero
+- **Component**: rate_monitor_dashboard.py
+- **Location**: Line 97
+- **Impact**: Crash if limit is 0
+- **Priority**: P3
+
+#### ISSUE-556: Missing Error Handling
+- **Component**: collectors.py
+- **Location**: Line 45
+- **Impact**: Returns None silently on first collection
+- **Priority**: P3
+
+#### ISSUE-557: Hardcoded Values
+- **Component**: rate_monitor_dashboard.py
+- **Location**: Lines 33-36
+- **Impact**: Rate limits hardcoded instead of from config
+- **Priority**: P3
+
+#### ISSUE-558: Print Statements
+- **Component**: rate_monitor_dashboard.py
+- **Location**: Lines 91-103
+- **Impact**: Uses print() instead of logging
+- **Priority**: P3
+
+**Batch 28 Summary**: 13 issues total, 0 critical, 1 high, 5 medium, 7 low
+
+---
+
+---
+
+## Phase 5 Week 6 Batch 29: Final Monitoring Files (4 files) - UTILS MODULE COMPLETE
+
+### Files Reviewed
+- monitoring/monitor.py - Main performance monitor
+- monitoring/metrics_adapter.py - Metrics adapter interface
+- monitoring/metrics_utils/buffer.py - Metrics buffering
+- monitoring/metrics_utils/exporter.py - Metrics export functionality
+
+### Medium Priority Issues (P2): 3 issues
+
+#### ISSUE-559: Undefined alert_manager
+- **Component**: monitor.py
+- **Location**: Lines 114, 160, 164, 201, 247-251, 272, 351, 373, 378
+- **Impact**: AttributeError at runtime
+- **Details**: Multiple references to self.alert_manager which was removed
+- **Fix**: Remove all alert_manager references or restore the component
+- **Priority**: P2
+
+#### ISSUE-560: Undefined disk_percent
+- **Component**: monitor.py
+- **Location**: Lines 291, 331
+- **Impact**: AttributeError when exporting
+- **Details**: SystemResources doesn't have disk_percent, should be disk_usage_percent
+- **Fix**: Change to correct attribute name
+- **Priority**: P2
+
+#### ISSUE-561: Global Mutable State
+- **Component**: buffer.py
+- **Location**: Line 292
+- **Impact**: Potential issues in concurrent scenarios
+- **Details**: Global buffer instance could cause race conditions
+- **Fix**: Use thread-local storage or proper singleton pattern
+- **Priority**: P2
+
+### Low Priority Issues (P3): 5 issues
+
+#### ISSUE-562: Missing Import
+- **Component**: buffer.py
+- **Location**: Lines 235, 259
+- **Impact**: Performance - importing inside functions
+- **Priority**: P3
+
+#### ISSUE-563: Thread Safety
+- **Component**: buffer.py
+- **Location**: Line 186
+- **Impact**: Time-based flush check not thread-safe
+- **Priority**: P3
+
+#### ISSUE-564: Path Creation
+- **Component**: exporter.py
+- **Location**: Line 32
+- **Impact**: Creates directories without permission check
+- **Priority**: P3
+
+#### ISSUE-565: Error Handling
+- **Component**: exporter.py
+- **Location**: Lines 58, 89, 118
+- **Impact**: Double error reporting (log + raise)
+- **Priority**: P3
+
+#### ISSUE-566: Inefficient String Building
+- **Component**: monitor.py
+- **Location**: Lines 306-362
+- **Impact**: Performance - building HTML with string concatenation
+- **Priority**: P3
+
+**Batch 29 Summary**: 8 issues total, 0 critical, 0 high, 3 medium, 5 low
+
+---
+
 **Last Updated**: 2025-08-10  
-**Review Progress**: Phase 5 Week 6 Batch 26 Complete  
-**Total Issues in Utils Module**: 233 (1 critical, 6 high, 72 medium, 154 low)
+**Review Status**: ✅ UTILS MODULE COMPLETE  
+**Total Issues in Utils Module**: 268 (1 critical, 8 high, 85 medium, 174 low)

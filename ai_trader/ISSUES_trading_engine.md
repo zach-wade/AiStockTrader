@@ -656,3 +656,290 @@ datetime.now(timezone.utc)
 - **Strengths**: Good architecture, proper patterns, clean separation
 - **Weaknesses**: Import failures, datetime inconsistency, P&L discrepancies
 - **Production Ready**: NO - Config import failure is blocking
+
+---
+
+## Batch 3: Brokers Interface Layer (2025-08-11)
+
+### Files Reviewed (2,461 lines total)
+1. **broker_interface.py** (325 lines) - Abstract broker interface
+2. **alpaca_broker.py** (461 lines) - Alpaca broker implementation  
+3. **paper_broker.py** (559 lines) - Paper trading broker
+4. **backtest_broker.py** (731 lines) - Backtesting broker
+5. **broker_factory.py** (207 lines) - Factory pattern implementation
+
+### New Critical Issues
+
+None found in Batch 3 - No datetime.utcnow() usage!
+
+### New High Priority Issues
+
+#### ISSUE-970: Missing create_task_safely Import (HIGH)
+- **File**: alpaca_broker.py
+- **Lines**: 335, 365
+- **Impact**: NameError at runtime when streaming data
+- **Details**: Uses `create_task_safely()` but never imports it
+- **Fix Required**: Import from utils or use asyncio.create_task
+
+#### ISSUE-971: Missing secure_uniform and secure_randint Imports (HIGH)
+- **File**: paper_broker.py
+- **Lines**: 256, 461, 471-475
+- **Impact**: NameError at runtime in paper trading
+- **Details**: Uses secure_uniform() and secure_randint() without importing
+- **Fix Required**: Import from main.utils.core
+
+#### ISSUE-972: Missing IBBroker and MockBroker Implementations (HIGH)
+- **File**: broker_factory.py
+- **Lines**: 15-16, 48-49
+- **Impact**: ImportError when trying to use IB or Mock brokers
+- **Details**: Imports and registers brokers that don't exist
+- **Fix Required**: Either implement or remove from registry
+
+#### ISSUE-973: Incorrect Position Side Logic (HIGH)
+- **File**: paper_broker.py
+- **Line**: 366
+- **Impact**: Position side always 'long' even for short positions  
+- **Details**: Uses string 'long'/'short' instead of PositionSide enum
+- **Business Logic**: Will cause incorrect position tracking
+
+### New Medium Priority Issues
+
+#### ISSUE-974: No Connection Timeout (MEDIUM)
+- **File**: alpaca_broker.py
+- **Lines**: 79-104
+- **Impact**: Could hang indefinitely on connection issues
+- **Details**: No timeout on API connection attempts
+- **Fix Required**: Add timeout parameter
+
+#### ISSUE-975: Hardcoded URL Manipulation (MEDIUM)
+- **File**: alpaca_broker.py
+- **Line**: 90
+- **Impact**: Fragile URL construction for WebSocket
+- **Details**: String replacement instead of proper URL parsing
+- **Fix Required**: Use urllib.parse for URL manipulation
+
+#### ISSUE-976: Missing Error Handling in Streams (MEDIUM)
+- **File**: alpaca_broker.py
+- **Lines**: 308-375
+- **Impact**: Stream errors not handled, could crash
+- **Details**: No try/catch in streaming loops
+- **Fix Required**: Add error handling and reconnection logic
+
+#### ISSUE-977: Race Condition in Order Processing (MEDIUM)
+- **File**: backtest_broker.py
+- **Lines**: 264-281
+- **Impact**: Orders could be processed multiple times
+- **Details**: No locking when processing pending orders
+- **Fix Required**: Add thread-safe queue or lock
+
+#### ISSUE-978: Config Access Without Validation (MEDIUM)
+- **File**: paper_broker.py
+- **Lines**: 35, 278
+- **Impact**: Could crash if config structure changes
+- **Details**: Deep dict access without .get() safety
+- **Fix Required**: Use safe config access patterns
+
+#### ISSUE-979: Asyncio Task Not Awaited (MEDIUM)
+- **File**: backtest_broker.py
+- **Line**: 124
+- **Impact**: Task runs but result never checked
+- **Details**: Creates task without awaiting or storing
+- **Fix Required**: Store task reference or await
+
+#### ISSUE-980: Missing Validation in Factory (MEDIUM)
+- **File**: broker_factory.py
+- **Lines**: 53-92
+- **Impact**: Could create broker with invalid config
+- **Details**: No validation of required config fields
+- **Fix Required**: Validate config before broker creation
+
+#### ISSUE-981: Incomplete Order Type Mapping (MEDIUM)
+- **File**: alpaca_broker.py
+- **Lines**: 424-429
+- **Impact**: Some order types not mapped correctly
+- **Details**: Missing trailing_stop and other types
+- **Fix Required**: Complete order type mapping
+
+#### ISSUE-982: No Partial Fill Handling (MEDIUM)
+- **File**: paper_broker.py
+- **Lines**: 126-200
+- **Impact**: Always fills orders completely
+- **Details**: No simulation of partial fills
+- **Business Logic**: Unrealistic for limit orders
+
+#### ISSUE-983: Memory Leak in Order History (MEDIUM)
+- **File**: paper_broker.py
+- **Line**: 39, 196, 218
+- **Impact**: Unbounded growth of order_history list
+- **Details**: Never cleans up old orders
+- **Fix Required**: Implement circular buffer or cleanup
+
+### New Low Priority Issues
+
+#### ISSUE-984: Missing Docstrings (LOW)
+- **Files**: All broker files
+- **Impact**: Poor documentation
+- **Details**: Many methods missing docstrings
+
+#### ISSUE-985: Inconsistent Logging (LOW)
+- **Files**: All broker files
+- **Impact**: Difficult debugging
+- **Details**: Mixed log levels for similar operations
+
+#### ISSUE-986: Magic Numbers (LOW)
+- **File**: backtest_broker.py
+- **Lines**: 171, 176, 356
+- **Impact**: Hard to maintain
+- **Details**: Hardcoded values without constants
+
+#### ISSUE-987: Unused Imports (LOW)
+- **File**: backtest_broker.py
+- **Line**: 10
+- **Impact**: Code cleanliness
+- **Details**: Imports Callable but never uses it
+
+#### ISSUE-988: Type Hints Missing (LOW)
+- **File**: paper_broker.py
+- **Lines**: Throughout
+- **Impact**: Type safety
+- **Details**: Many methods without proper type hints
+
+### Positive Findings - Batch 3
+
+#### broker_interface.py
+1. **Clean Abstract Interface**: Well-designed ABC with all necessary methods
+2. **Good Default Implementations**: modify_order and close_position have sensible defaults
+3. **Proper Exception Hierarchy**: Custom exceptions for different error types
+4. **Event Tracking**: Built-in event tracking for monitoring
+
+#### alpaca_broker.py
+1. **Comprehensive API Integration**: Full Alpaca API coverage
+2. **Proper Async/Await**: Good use of async patterns throughout
+3. **Retry Logic**: Uses @async_retry decorator for resilience
+4. **Streaming Support**: WebSocket integration for real-time data
+5. **Good Error Messages**: Informative error handling
+
+#### paper_broker.py
+1. **Realistic Simulation**: Tracks positions, P&L, buying power
+2. **Order Management**: Supports market and limit orders
+3. **Performance Tracking**: Built-in performance metrics
+4. **Backward Compatibility**: Handles both Config objects and dicts
+
+#### backtest_broker.py
+1. **Sophisticated Backtesting**: Slippage models, commission, market impact
+2. **FIFO Position Tracking**: Proper cost basis with lot tracking
+3. **Performance Metrics**: Sharpe ratio, drawdown, win rate calculations
+4. **Historical Data Management**: Efficient time-series data handling
+5. **Realistic Fill Logic**: Proper limit/stop order execution
+
+#### broker_factory.py
+1. **Clean Factory Pattern**: Proper implementation with registry
+2. **Extensible Design**: Can register custom brokers
+3. **Configuration-Based**: Creates brokers from config
+4. **Convenience Functions**: Helper functions for common brokers
+
+### Batch 3 Summary
+
+**Quality Assessment**:
+- broker_interface.py: EXCELLENT (9/10) - Clean abstract interface
+- alpaca_broker.py: GOOD (7/10) - Missing import, needs error handling
+- paper_broker.py: GOOD (7/10) - Missing imports, unbounded growth
+- backtest_broker.py: EXCELLENT (8.5/10) - Sophisticated but has race condition
+- broker_factory.py: GOOD (7.5/10) - Clean but references missing brokers
+
+**Key Issues**:
+1. Missing imports in multiple files (create_task_safely, secure_uniform)
+2. Referenced but unimplemented brokers (IBBroker, MockBroker)
+3. No streaming error handling in Alpaca broker
+4. Race conditions in backtest order processing
+5. Memory leaks from unbounded collections
+
+**Architecture Highlights**:
+- Well-designed abstract interface
+- Comprehensive broker implementations
+- Good separation of concerns
+- Proper factory pattern
+- Strong async/await patterns
+
+---
+
+## Batch 3 Cross-File Integration Analysis
+
+### Integration Success ✅
+1. **Interface Compliance**: All brokers properly implement BrokerInterface
+2. **Factory Pattern**: Factory correctly instantiates all implemented brokers
+3. **Config Handling**: All brokers handle configuration consistently
+4. **Order Flow**: Order submission → execution → position update flows work
+5. **Async Patterns**: Consistent async/await usage across all implementations
+
+### Integration Failures ❌
+
+#### I-INTEGRATION-008: Missing Function Imports (HIGH)
+- **Files Affected**: alpaca_broker.py, paper_broker.py
+- **Issue**: Functions used but never imported
+  - alpaca_broker.py: create_task_safely (lines 335, 365)
+  - paper_broker.py: secure_uniform, secure_randint (lines 256, 461, 471-475)
+- **Impact**: NameError at runtime preventing broker operations
+- **Cross-Module**: Depends on main.utils.core functions not imported
+
+#### I-INTEGRATION-009: Non-Existent Broker References (HIGH)
+- **Files Affected**: broker_factory.py
+- **Issue**: Factory imports and registers brokers that don't exist
+  - IBBroker (line 15)
+  - MockBroker (line 16)
+- **Impact**: ImportError when factory module loads
+- **Cross-Module**: References files that don't exist in codebase
+
+#### I-CONTRACT-004: Position Side Type Mismatch (HIGH)
+- **Files Affected**: paper_broker.py
+- **Issue**: Returns string 'long'/'short' instead of PositionSide enum (line 366)
+- **Impact**: Type mismatch when position passed to other modules
+- **Contract Violation**: BrokerInterface expects PositionSide enum
+
+#### I-DATAFLOW-006: Order Status Inconsistency (MEDIUM)
+- **Pattern**: Different status mappings across brokers
+  - alpaca_broker.py: Maps 20+ Alpaca statuses (lines 404-421)
+  - paper_broker.py: Uses simplified status (line 382)
+  - backtest_broker.py: Uses standard statuses
+- **Impact**: Order status inconsistent between broker implementations
+
+### Architecture Patterns Assessment
+
+#### ✅ Correct Patterns
+1. **Abstract Base Class**: All brokers inherit from BrokerInterface
+2. **Factory Pattern**: Clean factory with registry and convenience functions
+3. **Async/Await**: Consistent async patterns throughout
+4. **Error Handling**: Custom exception hierarchy properly used
+
+#### ❌ Anti-Patterns Detected  
+1. **Missing Implementations**: Factory references non-existent brokers
+2. **Unbounded Collections**: Order history grows without limits
+3. **Race Conditions**: Concurrent order processing without locks
+4. **String URL Manipulation**: Should use proper URL parsing
+
+### Data Flow Verification
+
+#### Working Flows ✅
+- Order submission → broker processing → position update
+- Account info queries across all brokers
+- Market data retrieval (where implemented)
+
+#### Broken Flows ❌
+- Streaming market data fails due to missing imports
+- Paper trading fails due to missing secure_uniform
+- IB/Mock broker instantiation fails completely
+
+### Recommendations
+
+1. **IMMEDIATE**: Add missing imports in alpaca_broker.py and paper_broker.py
+2. **IMMEDIATE**: Remove or implement IBBroker and MockBroker
+3. **HIGH**: Fix Position side to use enum in paper_broker.py
+4. **MEDIUM**: Add error handling to streaming functions
+5. **MEDIUM**: Implement bounded collections for order history
+
+### Integration Score: 7/10
+- **Strengths**: Good interface design, proper factory pattern, consistent async
+- **Weaknesses**: Missing imports, non-existent brokers, type mismatches
+- **Production Ready**: NO - Missing imports prevent basic operations
+
+*Batch 3 Review and Integration Analysis COMPLETE - 15/33 files reviewed total*
