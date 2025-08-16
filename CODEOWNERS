@@ -1,0 +1,47 @@
+# CODEOWNERS for AI Trading System
+# This file defines code ownership for automatic review requests
+
+# Global owners for all files
+* @zachwade
+
+# Critical trading infrastructure requiring additional review
+/src/main/risk_management/ @zachwade
+/src/main/trading_engine/ @zachwade
+/src/main/data_pipeline/security/ @zachwade
+/src/main/utils/security/ @zachwade
+/exec/ @zachwade
+/risk/ @zachwade
+/adapters/ @zachwade
+/core/ @zachwade
+/strategy/ @zachwade
+
+# Configuration and infrastructure
+/.github/ @zachwade
+/deployment/ @zachwade
+/scripts/ @zachwade
+*.yml @zachwade
+*.yaml @zachwade
+
+# Documentation
+/docs/ @zachwade
+*.md @zachwade
+/ADR/ @zachwade
+
+# Security-sensitive files
+**/auth* @zachwade
+**/credentials* @zachwade
+**/secrets* @zachwade
+requirements*.txt @zachwade
+Dockerfile @zachwade
+docker-compose.yml @zachwade
+
+# Database and migrations
+/migrations/ @zachwade
+/sql/ @zachwade
+**/database* @zachwade
+
+# Testing
+/tests/ @zachwade
+/test_* @zachwade
+*_test.py @zachwade
+conftest.py @zachwade

@@ -1,0 +1,3 @@
+order_router_v2: false
+strategy_baseline: true
+risk_strict_mode: true

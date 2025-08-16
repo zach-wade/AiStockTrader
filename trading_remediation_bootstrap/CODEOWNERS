@@ -1,0 +1,7 @@
+# Code owners for critical areas
+/exec/                 @your-handle
+/risk/                 @your-handle
+/adapters/             @your-handle
+/core/                 @your-handle
+/strategy/             @your-handle
+/.github/              @your-handle
