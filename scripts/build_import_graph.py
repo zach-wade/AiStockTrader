@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-import argparse, ast, os, json, networkx as nx
+# Standard library imports
+import argparse
+import ast
+import json
 from pathlib import Path
+
+# Third-party imports
+import networkx as nx
+
 
 def find_py_files(root: Path):
     for p in root.rglob("*.py"):
@@ -8,9 +15,11 @@ def find_py_files(root: Path):
             continue
         yield p
 
+
 def module_name(root: Path, file: Path) -> str:
     rel = file.relative_to(root).with_suffix("")
     return ".".join(rel.parts)
+
 
 def build_graph(root: Path) -> nx.DiGraph:
     g = nx.DiGraph()
@@ -33,6 +42,7 @@ def build_graph(root: Path) -> nx.DiGraph:
                     g.add_edge(mod, node.module.split(".")[0])
     return g
 
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", type=str, default=".")
@@ -45,7 +55,6 @@ if __name__ == "__main__":
     data = nx.readwrite.json_graph.node_link_data(g)
     (out / "import_graph.json").write_text(json.dumps(data, indent=2))
     try:
-        import graphviz
         dot = "digraph G { rankdir=LR; node [shape=box,fontsize=10];\n"
         for n in g.nodes():
             dot += f'"{n}" ;\n'

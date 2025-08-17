@@ -1,6 +1,8 @@
 .PHONY: help init hooks fmt lint type test cov sec import-graph ingest plan gates smoke
 
 PYTHON := python3
+VENV := venv
+PYTHONPATH := /Users/zachwade/StockMonitoring
 
 help:
 	@echo "Targets:"
@@ -18,39 +20,42 @@ help:
 	@echo "  plan          - produce wave_plan.md from issues.json"
 
 init:
-	python3.11 -m venv .venv
-	. .venv/bin/activate && pip install -U pip && pip install -r requirements-dev.txt
+	$(PYTHON) -m venv $(VENV)
+	. $(VENV)/bin/activate && pip install -U pip && pip install -r requirements-dev.txt
 
 hooks:
-	. .venv/bin/activate && pre-commit install || true
+	. $(VENV)/bin/activate && pre-commit install || true
 
 fmt:
-	. .venv/bin/activate && python -m ruff check . --fix && python -m black .
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m ruff check src tests --fix && python -m black src tests
 
 lint:
-	. .venv/bin/activate && python -m ruff check .
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m ruff check src tests
 
 type:
-	. .venv/bin/activate && python -m mypy .
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m mypy src tests
 
 test:
-	. .venv/bin/activate && python -m pytest
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m pytest
 
 cov:
-	. .venv/bin/activate && python -m pytest --cov
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m pytest --cov
 
 sec:
-	. .venv/bin/activate && python -m bandit -r . || true
-	. .venv/bin/activate && python -m pip_audit -r requirements-dev.txt || true
-	. .venv/bin/activate && python -m safety check -r requirements-dev.txt || true
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m bandit -r src tests || true
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m pip_audit -r requirements-dev.txt || true
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python -m safety check -r requirements-dev.txt || true
 
 gates: fmt lint type test sec
 
 import-graph:
-	. .venv/bin/activate && python scripts/build_import_graph.py --root . --out graph
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python scripts/build_import_graph.py --root . --out graph
 
 ingest:
-	. .venv/bin/activate && python scripts/ingest_issues.py reviews --out issues.json
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python scripts/ingest_issues.py reviews --out issues.json
 
 plan:
-	. .venv/bin/activate && python scripts/wave_planner.py issues.json graph/import_graph.json --out wave_plan.md
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python scripts/wave_planner.py issues.json graph/import_graph.json --out wave_plan.md
+
+smoke:
+	. $(VENV)/bin/activate && PYTHONPATH=$(PYTHONPATH) python scripts/run_smoke_paper.py

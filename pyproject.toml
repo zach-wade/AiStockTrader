@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 target-version = ["py311"]
-include = "\.pyi?$"
+include = "\\.pyi?$"
 extend-exclude = '''
 /(
     \.eggs
@@ -16,12 +16,46 @@ extend-exclude = '''
   | dist
   | data_lake
   | models
+  | ai_trader
+  | ai_trader_old
+  | trading_remediation_bootstrap
+  | scripts
 )/
 '''
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "data_lake",
+    "models",
+    "logs",
+    "ai_trader",
+    "ai_trader_old",
+    "trading_remediation_bootstrap",
+    "scripts",
+]
+
+[tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors
     "F",    # pyflakes
@@ -48,38 +82,15 @@ ignore = [
     "B905",  # `zip()` without an explicit `strict=` parameter
     "S101",  # Use of assert detected
 ]
-fix = true
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
-    "data_lake",
-    "models",
-    "logs",
-]
+fixable = ["ALL"]
+unfixable = []
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
 "tests/*" = ["S101", "ARG", "PLR2004"]
 "scripts/*" = ["S101", "T201"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["main", "src"]
 
 [tool.mypy]
@@ -104,6 +115,10 @@ exclude = [
     "tests",
     "data_lake",
     "models",
+    "ai_trader",
+    "ai_trader_old",
+    "trading_remediation_bootstrap",
+    "scripts",
 ]
 plugins = []
 
@@ -113,6 +128,8 @@ addopts = "-v --disable-warnings --maxfail=1 --cov=src --cov-report=term-missing
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
@@ -121,7 +138,7 @@ markers = [
 ]
 
 [tool.bandit]
-exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist", "ai_trader", "ai_trader_old", "trading_remediation_bootstrap", "scripts"]
 skips = ["B101", "B601"]
 severity = "medium"
 
@@ -162,7 +179,7 @@ directory = "htmlcov"
 profile = "black"
 line_length = 100
 known_first_party = ["main", "src"]
-skip_glob = ["*/venv/*", "*/.venv/*", "*/migrations/*"]
+skip_glob = ["*/venv/*", "*/.venv/*", "*/migrations/*", "*/ai_trader/*", "*/ai_trader_old/*", "*/trading_remediation_bootstrap/*", "*/scripts/*"]
 multi_line_output = 3
 include_trailing_comma = true
 force_grid_wrap = 0

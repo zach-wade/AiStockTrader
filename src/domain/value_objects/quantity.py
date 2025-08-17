@@ -1,0 +1,220 @@
+"""Quantity value object for representing trading quantities."""
+
+# Standard library imports
+from decimal import ROUND_DOWN, Decimal
+from typing import Self
+
+
+class Quantity:
+    """Immutable value object representing a trading quantity."""
+
+    def __init__(self, value: Decimal | float | int | str) -> None:
+        """Initialize Quantity with validation.
+
+        Args:
+            value: The quantity value
+
+        Raises:
+            ValueError: If quantity is invalid
+        """
+        if not isinstance(value, Decimal):
+            value = Decimal(str(value))
+
+        # Allow zero for position closing
+        # Negative values are allowed for short positions
+        self._value = value
+
+    @property
+    def value(self) -> Decimal:
+        """Get the decimal value."""
+        return self._value
+
+    def is_valid(self) -> bool:
+        """Check if quantity is valid for trading."""
+        # Zero is valid for closing positions
+        # Both positive and negative are valid
+        return True
+
+    def is_long(self) -> bool:
+        """Check if quantity represents a long position."""
+        return self._value > 0
+
+    def is_short(self) -> bool:
+        """Check if quantity represents a short position."""
+        return self._value < 0
+
+    def is_zero(self) -> bool:
+        """Check if quantity is zero."""
+        return self._value == 0
+
+    def abs(self) -> Self:
+        """Get absolute value of quantity.
+
+        Returns:
+            New Quantity with absolute value
+        """
+        return Quantity(abs(self._value))
+
+    def add(self, other: Self) -> Self:
+        """Add another quantity.
+
+        Args:
+            other: Another Quantity instance
+
+        Returns:
+            New Quantity with sum
+        """
+        if not isinstance(other, Quantity):
+            raise TypeError(f"Cannot add Quantity and {type(other)}")
+
+        return Quantity(self._value + other._value)
+
+    def subtract(self, other: Self) -> Self:
+        """Subtract another quantity.
+
+        Args:
+            other: Another Quantity instance
+
+        Returns:
+            New Quantity with difference
+        """
+        if not isinstance(other, Quantity):
+            raise TypeError(f"Cannot subtract {type(other)} from Quantity")
+
+        return Quantity(self._value - other._value)
+
+    def multiply(self, factor: Decimal | float | int) -> Self:
+        """Multiply quantity by a factor.
+
+        Args:
+            factor: Multiplication factor
+
+        Returns:
+            New Quantity with product
+        """
+        if not isinstance(factor, Decimal):
+            factor = Decimal(str(factor))
+
+        return Quantity(self._value * factor)
+
+    def divide(self, divisor: Decimal | float | int) -> Self:
+        """Divide quantity by a divisor.
+
+        Args:
+            divisor: Division factor
+
+        Returns:
+            New Quantity with quotient
+
+        Raises:
+            ValueError: If divisor is zero
+        """
+        if not isinstance(divisor, Decimal):
+            divisor = Decimal(str(divisor))
+
+        if divisor == 0:
+            raise ValueError("Cannot divide by zero")
+
+        return Quantity(self._value / divisor)
+
+    def split(self, num_parts: int) -> list[Self]:
+        """Split quantity into equal parts.
+
+        Args:
+            num_parts: Number of parts to split into
+
+        Returns:
+            List of Quantity instances
+
+        Raises:
+            ValueError: If num_parts is less than 1
+        """
+        if num_parts < 1:
+            raise ValueError("Number of parts must be at least 1")
+
+        if num_parts == 1:
+            return [self]
+
+        # Calculate base amount per part (rounded down)
+        base_amount = self._value / num_parts
+        base_amount = base_amount.quantize(Decimal("1"), rounding=ROUND_DOWN)
+
+        # Calculate remainder
+        total_base = base_amount * num_parts
+        remainder = self._value - total_base
+
+        # Create parts
+        parts = []
+        for i in range(num_parts):
+            if i == 0:
+                # First part gets the remainder
+                parts.append(Quantity(base_amount + remainder))
+            else:
+                parts.append(Quantity(base_amount))
+
+        return parts
+
+    def round(self, decimal_places: int = 0) -> Self:
+        """Round to specified decimal places.
+
+        Args:
+            decimal_places: Number of decimal places
+
+        Returns:
+            New Quantity with rounded value
+        """
+        if decimal_places < 0:
+            raise ValueError("Decimal places must be non-negative")
+
+        quantizer = Decimal(10) ** -decimal_places
+        rounded = self._value.quantize(quantizer, rounding=ROUND_DOWN)
+        return Quantity(rounded)
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality with another Quantity."""
+        if not isinstance(other, Quantity):
+            return False
+        return self._value == other._value
+
+    def __lt__(self, other: Self) -> bool:
+        """Check if less than another Quantity."""
+        if not isinstance(other, Quantity):
+            raise TypeError(f"Cannot compare Quantity and {type(other)}")
+        return self._value < other._value
+
+    def __le__(self, other: Self) -> bool:
+        """Check if less than or equal to another Quantity."""
+        return self == other or self < other
+
+    def __gt__(self, other: Self) -> bool:
+        """Check if greater than another Quantity."""
+        if not isinstance(other, Quantity):
+            raise TypeError(f"Cannot compare Quantity and {type(other)}")
+        return self._value > other._value
+
+    def __ge__(self, other: Self) -> bool:
+        """Check if greater than or equal to another Quantity."""
+        return self == other or self > other
+
+    def __neg__(self) -> Self:
+        """Negate the quantity."""
+        return Quantity(-self._value)
+
+    def __abs__(self) -> Self:
+        """Get absolute value."""
+        return Quantity(abs(self._value))
+
+    def __hash__(self) -> int:
+        """Get hash for use in sets/dicts."""
+        return hash(self._value)
+
+    def __repr__(self) -> str:
+        """Get string representation for debugging."""
+        return f"Quantity({self._value})"
+
+    def __str__(self) -> str:
+        """Get string representation."""
+        # Format without unnecessary decimal places
+        if self._value == self._value.to_integral_value():
+            return str(int(self._value))
+        return str(self._value)

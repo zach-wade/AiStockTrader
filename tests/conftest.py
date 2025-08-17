@@ -1,16 +1,27 @@
 """Global pytest configuration and fixtures."""
 
+# Standard library imports
 import asyncio
-import sys
+from datetime import UTC, datetime
 from decimal import Decimal
+import os
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, Generator, Optional
-from unittest.mock import AsyncMock, Mock, patch
+import sys
+from typing import Any
+from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
+# Third-party imports
 import pytest
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+# Local imports
+# Import domain entities for fixtures
+from src.domain.entities.order import Order, OrderSide
+from src.domain.entities.portfolio import Portfolio
+from src.domain.entities.position import Position, PositionSide
 
 
 @pytest.fixture(scope="session")
@@ -22,7 +33,7 @@ def event_loop():
 
 
 @pytest.fixture
-def mock_config() -> Dict[str, Any]:
+def mock_config() -> dict[str, Any]:
     """Provides mock configuration for tests."""
     return {
         "database": {
@@ -64,7 +75,7 @@ def mock_db_adapter() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_market_data() -> Dict[str, Any]:
+def mock_market_data() -> dict[str, Any]:
     """Provides mock market data."""
     return {
         "symbol": "AAPL",
@@ -81,7 +92,7 @@ def mock_market_data() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_order() -> Dict[str, Any]:
+def mock_order() -> dict[str, Any]:
     """Provides mock order data."""
     return {
         "id": "order_123",
@@ -96,7 +107,7 @@ def mock_order() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def mock_position() -> Dict[str, Any]:
+def mock_position() -> dict[str, Any]:
     """Provides mock position data."""
     return {
         "symbol": "AAPL",
@@ -159,7 +170,7 @@ def temp_data_dir(tmp_path) -> Path:
 
 
 @pytest.fixture
-def mock_api_response() -> Dict[str, Any]:
+def mock_api_response() -> dict[str, Any]:
     """Provides mock API response."""
     return {
         "status": "success",
@@ -190,14 +201,168 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "requires_api: Tests requiring external API")
 
 
+# Repository and database test fixtures
+
+
+@pytest.fixture
+def test_database_config():
+    """Test database configuration."""
+    return {
+        "host": "localhost",
+        "port": 5432,
+        "database": "ai_trader_test",
+        "user": "zachwade",
+        "password": "",
+        "min_pool_size": 1,
+        "max_pool_size": 5,
+    }
+
+
+@pytest.fixture
+def mock_connection_pool():
+    """Mock psycopg3 connection pool."""
+    pool = AsyncMock()
+    pool.max_size = 10
+    pool.min_size = 1
+    pool.closed = False
+    return pool
+
+
+@pytest.fixture
+def mock_repository_adapter():
+    """Mock database adapter for repository tests."""
+    adapter = AsyncMock()
+    adapter.execute_query.return_value = "EXECUTE 1"
+    adapter.fetch_one.return_value = None
+    adapter.fetch_all.return_value = []
+    adapter.fetch_values.return_value = []
+    adapter.execute_batch.return_value = None
+    adapter.begin_transaction.return_value = None
+    adapter.commit_transaction.return_value = None
+    adapter.rollback_transaction.return_value = None
+    adapter.has_active_transaction = False
+    adapter.health_check.return_value = True
+    return adapter
+
+
+@pytest.fixture
+def sample_order():
+    """Create a sample order for testing."""
+    return Order.create_limit_order(
+        symbol="AAPL",
+        quantity=Decimal("100"),
+        side=OrderSide.BUY,
+        limit_price=Decimal("150.00"),
+        reason="Test order",
+    )
+
+
+@pytest.fixture
+def sample_position():
+    """Create a sample position for testing."""
+    return Position(
+        id=uuid4(),
+        symbol="AAPL",
+        quantity=Decimal("100"),
+        side=PositionSide.LONG,
+        average_price=Decimal("145.00"),
+        current_price=Decimal("150.00"),
+        opened_at=datetime.now(UTC),
+        strategy="test_strategy",
+    )
+
+
+@pytest.fixture
+def sample_portfolio():
+    """Create a sample portfolio for testing."""
+    return Portfolio(
+        id=uuid4(),
+        name="Test Portfolio",
+        cash_balance=Decimal("100000.00"),
+        strategy="test_strategy",
+        created_at=datetime.now(UTC),
+    )
+
+
+@pytest.fixture
+def order_db_record():
+    """Sample order database record."""
+    return {
+        "id": uuid4(),
+        "symbol": "AAPL",
+        "side": "buy",
+        "order_type": "limit",
+        "status": "pending",
+        "quantity": Decimal("100"),
+        "limit_price": Decimal("150.00"),
+        "stop_price": None,
+        "time_in_force": "day",
+        "broker_order_id": None,
+        "filled_quantity": Decimal("0"),
+        "average_fill_price": None,
+        "created_at": datetime.now(UTC),
+        "submitted_at": None,
+        "filled_at": None,
+        "cancelled_at": None,
+        "reason": "Test order",
+        "tags": {},
+    }
+
+
+@pytest.fixture
+def position_db_record():
+    """Sample position database record."""
+    return {
+        "id": uuid4(),
+        "symbol": "AAPL",
+        "quantity": Decimal("100"),
+        "side": "long",
+        "average_price": Decimal("145.00"),
+        "current_price": Decimal("150.00"),
+        "unrealized_pnl": Decimal("500.00"),
+        "realized_pnl": Decimal("0.00"),
+        "opened_at": datetime.now(UTC),
+        "closed_at": None,
+        "strategy": "test_strategy",
+        "tags": {},
+    }
+
+
+@pytest.fixture
+def portfolio_db_record():
+    """Sample portfolio database record."""
+    return {
+        "id": uuid4(),
+        "name": "Test Portfolio",
+        "cash_balance": Decimal("100000.00"),
+        "total_value": Decimal("110000.00"),
+        "unrealized_pnl": Decimal("10000.00"),
+        "realized_pnl": Decimal("0.00"),
+        "strategy": "test_strategy",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+        "tags": {},
+    }
+
+
+@pytest.fixture
+def test_transaction_manager():
+    """Mock transaction manager for testing."""
+    manager = AsyncMock()
+    manager.execute_in_transaction.return_value = "success"
+    manager.execute_with_retry.return_value = "success"
+    manager.execute_batch.return_value = ["success", "success"]
+    return manager
+
+
 # Test environment setup
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """Set up test environment variables."""
-    import os
-
     os.environ["TESTING"] = "true"
     os.environ["LOG_LEVEL"] = "DEBUG"
+    os.environ["DATABASE_URL"] = "postgresql://zachwade@localhost:5432/ai_trader_test"
     yield
     # Cleanup
     os.environ.pop("TESTING", None)
+    os.environ.pop("DATABASE_URL", None)
