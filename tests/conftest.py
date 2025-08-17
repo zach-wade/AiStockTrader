@@ -2,14 +2,21 @@
 
 # Standard library imports
 import asyncio
+import os
+import sys
 from datetime import UTC, datetime
 from decimal import Decimal
-import os
 from pathlib import Path
-import sys
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
+
+# Load test environment variables
+from dotenv import load_dotenv
+
+test_env_path = Path(__file__).parent.parent / ".env.test"
+if test_env_path.exists():
+    load_dotenv(test_env_path, override=True)
 
 # Third-party imports
 import pytest

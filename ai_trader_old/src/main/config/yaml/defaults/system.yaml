@@ -1,0 +1,188 @@
+# Base Configuration
+# Common settings shared across all environments
+# Environment-specific configs will override these values
+
+# Application metadata
+app:
+  name: AI Trader
+  version: 1.0.0
+  description: Algorithmic Trading System
+
+# Default system settings
+system:
+  timezone: US/Eastern
+  currency: USD
+  date_format: "%Y-%m-%d"
+  datetime_format: "%Y-%m-%d %H:%M:%S"
+
+# Default paths (relative to project root)
+paths:
+  project_root: .
+  src: ./src
+  tests: ./tests
+  docs: ./docs
+  data: ./data
+  logs: ./logs
+
+# Logging configuration
+logging:
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  log_to_file: true
+  log_to_console: true
+  max_file_size_mb: 100
+  backup_count: 5
+
+# Default feature flags
+features:
+  enable_ml_models: false
+  enable_backtesting: false
+  enable_live_trading: false
+  enable_options_trading: false
+  enable_crypto_trading: false
+  enable_advanced_analytics: false
+  enable_experimental_features: false
+
+# Default monitoring settings
+monitoring:
+  metrics_enabled: false
+  health_check_enabled: true
+  health_check_port: 8080
+
+# Default notification settings
+notifications:
+  enabled: false
+  channels:
+    email:
+      enabled: false
+      recipients: []
+    slack:
+      enabled: false
+      webhook_url: ""
+
+# Data source priorities
+data_sources:
+  priority:
+    - polygon
+    - alpaca
+    - yahoo
+  fallback_enabled: true
+
+# Market settings
+market:
+  exchanges:
+    - NYSE
+    - NASDAQ
+  market_open: "09:30"
+  market_close: "16:00"
+  pre_market_open: "04:00"
+  after_hours_close: "20:00"
+  trading_days: ["MON", "TUE", "WED", "THU", "FRI"]
+
+# Default rate limiting
+rate_limiting:
+  requests_per_second: 10
+  burst_size: 20
+  backoff_factor: 2
+
+# Retry configuration (legacy - use resilience section for new code)
+retry:
+  max_attempts: 3
+  initial_delay_seconds: 1
+  max_delay_seconds: 60
+  exponential_base: 2
+
+# Comprehensive resilience configuration
+resilience:
+  # Default retry settings
+  retry:
+    max_retries: 3
+    initial_delay: 1.0
+    backoff_factor: 2.0
+    max_delay: 60.0
+    jitter: true
+
+  # Circuit breaker settings
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60.0
+    critical_latency_ms: 5000.0
+
+  # Rate limiting settings
+  rate_limiting:
+    enabled: false
+    calls_per_period: null
+    period_seconds: 60
+
+  # Service-specific resilience profiles
+  profiles:
+    api_client:
+      retry:
+        max_retries: 5
+        initial_delay: 2.0
+        backoff_factor: 1.5
+        max_delay: 30.0
+      circuit_breaker:
+        failure_threshold: 3
+        recovery_timeout: 120.0
+        critical_latency_ms: 10000.0
+      rate_limiting:
+        enabled: true
+        calls_per_period: 100
+        period_seconds: 60
+
+    database:
+      retry:
+        max_retries: 3
+        initial_delay: 0.5
+        backoff_factor: 2.0
+        max_delay: 10.0
+      circuit_breaker:
+        failure_threshold: 5
+        recovery_timeout: 60.0
+        critical_latency_ms: 3000.0
+      rate_limiting:
+        enabled: false
+
+    feature_calculation:
+      retry:
+        max_retries: 2
+        initial_delay: 1.0
+        backoff_factor: 1.8
+        max_delay: 15.0
+      circuit_breaker:
+        failure_threshold: 3
+        recovery_timeout: 30.0
+        critical_latency_ms: 2000.0
+      rate_limiting:
+        enabled: false
+
+# Cache settings
+cache:
+  backend: memory  # memory, redis, or disk
+  default_ttl: 3600
+  max_size_mb: 1024
+
+# Validation settings
+validation:
+  strict_mode: false
+  data_quality_threshold: 0.95
+  outlier_detection: true
+
+# Performance defaults
+performance:
+  max_workers: 4
+  queue_size: 1000
+  timeout_seconds: 30
+
+# Security defaults
+security:
+  encrypt_sensitive_data: false
+  secure_cookies: true
+  csrf_protection: true
+
+# Session management
+session:
+  timeout_minutes: 60
+  refresh_enabled: true
+  max_sessions_per_user: 3

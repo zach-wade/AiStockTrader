@@ -1,0 +1,515 @@
+# AI Trading System - Job Definitions
+# Comprehensive scheduling configuration for automated trading operations
+
+# Global Settings
+global:
+  timezone: "US/Eastern"
+  base_directory: "/Users/zachwade/Library/Mobile Documents/com~apple~CloudDocs/Personal Investing/Stock Monitoring/ai_trader"
+  python_path: "python"  # Assumes python is in PATH, update if using venv
+  log_directory: "logs/scheduled_jobs"
+  max_job_runtime_minutes: 120
+  email_notifications: true
+  slack_notifications: false
+
+# Market Schedule
+market_schedule:
+  premarket_start: "04:00"
+  market_open: "09:30"
+  market_close: "16:00"
+  postmarket_end: "20:00"
+  trading_days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+
+# Holiday Calendar (Override trading days)
+holidays:
+  - "2025-01-01"  # New Year's Day
+  - "2025-01-20"  # MLK Day
+  - "2025-02-17"  # Presidents Day
+  - "2025-05-26"  # Memorial Day
+  - "2025-07-04"  # Independence Day
+  - "2025-09-01"  # Labor Day
+  - "2025-11-27"  # Thanksgiving
+  - "2025-12-25"  # Christmas
+
+# Job Categories
+jobs:
+
+  # =============================================================================
+  # PRE-MARKET JOBS (4:00 - 9:30 AM ET)
+  # =============================================================================
+
+  premarket_data_collection:
+    schedule: "0 4 * * 1-5"  # 4:00 AM, Monday-Friday
+    script: "src/main/app/run_data_pipeline.py"
+    args: ["--mode=premarket", "--sources=alpaca,polygon,yahoo"]
+    timeout_minutes: 30
+    priority: "high"
+    description: "Collect overnight data and news"
+    dependencies: []
+    retry_attempts: 3
+    alerts:
+      on_failure: true
+      on_timeout: true
+
+  economic_calendar_update:
+    schedule: "15 4 * * 1-5"  # 4:15 AM, Monday-Friday
+    script: "src/main/data_pipeline/historical/data_fetcher.py"
+    args: ["--data-type=economic_calendar", "--lookforward=7"]
+    timeout_minutes: 15
+    priority: "medium"
+    description: "Update economic calendar for next 7 days"
+    dependencies: []
+
+  overnight_news_analysis:
+    schedule: "30 4 * * 1-5"  # 4:30 AM, Monday-Friday
+    script: "src/main/feature_pipeline/calculators/news_features.py"
+    args: ["--timeframe=overnight", "--sentiment-analysis=true"]
+    timeout_minutes: 20
+    priority: "medium"
+    description: "Analyze overnight news sentiment"
+    dependencies: ["premarket_data_collection"]
+
+  model_inference_premarket:
+    schedule: "0 5 * * 1-5"   # 5:00 AM, Monday-Friday
+    script: "src/main/models/inference/prediction_engine.py"
+    args: ["--mode=premarket", "--generate-signals=true"]
+    timeout_minutes: 45
+    priority: "high"
+    description: "Generate trading signals for market open"
+    dependencies: ["premarket_data_collection", "overnight_news_analysis"]
+
+  risk_assessment_daily:
+    schedule: "0 6 * * 1-5"   # 6:00 AM, Monday-Friday
+    script: "src/main/risk_management/pre_trade/unified_limit_checker.py"
+    args: ["--assessment=daily", "--update-limits=true"]
+    timeout_minutes: 15
+    priority: "high"
+    description: "Daily portfolio risk assessment and limit updates"
+    dependencies: ["model_inference_premarket"]
+
+  system_health_premarket:
+    schedule: "15 6 * * 1-5"  # 6:15 AM, Monday-Friday
+    script: "deployment/scripts/health_check.sh"
+    timeout_minutes: 10
+    priority: "high"
+    description: "Pre-market system health validation"
+    dependencies: []
+    alerts:
+      on_failure: true
+
+  # =============================================================================
+  # MARKET HOURS JOBS (9:30 AM - 4:00 PM ET)
+  # =============================================================================
+
+  market_hours_monitoring:
+    schedule: "*/5 9-16 * * 1-5"  # Every 5 minutes during market hours
+    script: "src/main/monitoring/health_reporter.py"
+    args: ["--mode=realtime", "--capture-snapshot=true"]
+    timeout_minutes: 2
+    priority: "critical"
+    description: "Real-time system monitoring during market hours"
+    dependencies: []
+    run_during_market_hours: true
+
+  real_time_data_ingestion:
+    schedule: "*/1 9-16 * * 1-5"   # Every minute during market hours
+    script: "src/main/data_pipeline/stream_processor.py"
+    args: ["--mode=realtime", "--symbols=universe"]
+    timeout_minutes: 1
+    priority: "critical"
+    description: "Real-time market data streaming"
+    dependencies: []
+    run_during_market_hours: true
+
+  feature_calculation_realtime:
+    schedule: "*/5 9-16 * * 1-5"   # Every 5 minutes during market hours
+    script: "src/main/feature_pipeline/unified_feature_engine.py"
+    args: ["--mode=realtime", "--incremental=true"]
+    timeout_minutes: 3
+    priority: "high"
+    description: "Real-time feature calculation updates"
+    dependencies: ["real_time_data_ingestion"]
+    run_during_market_hours: true
+
+  trading_signal_updates:
+    schedule: "*/10 9-16 * * 1-5"  # Every 10 minutes during market hours
+    script: "src/main/models/inference/prediction_engine.py"
+    args: ["--mode=realtime", "--update-signals=true"]
+    timeout_minutes: 5
+    priority: "high"
+    description: "Update trading signals based on latest data"
+    dependencies: ["feature_calculation_realtime"]
+    run_during_market_hours: true
+
+  risk_monitoring_realtime:
+    schedule: "*/2 9-16 * * 1-5"   # Every 2 minutes during market hours
+    script: "src/main/risk_management/real_time/live_risk_monitor.py"
+    args: ["--continuous=true", "--alert-threshold=0.8"]
+    timeout_minutes: 1
+    priority: "critical"
+    description: "Continuous portfolio risk monitoring"
+    dependencies: []
+    run_during_market_hours: true
+    alerts:
+      on_failure: true
+      on_timeout: true
+
+  # =============================================================================
+  # ETL JOBS
+  # =============================================================================
+
+  etl_processing_daily:
+    schedule: "30 5 * * 1-5"  # 5:30 AM, Monday-Friday (after premarket data collection)
+    script: "src/main/app/run_etl.py"
+    args: ["run", "--data-type=all", "--limit=1000"]
+    timeout_minutes: 45
+    priority: "high"
+    description: "Process raw data from Data Lake into PostgreSQL"
+    dependencies: ["premarket_data_collection"]
+    alerts:
+      on_failure: true
+      on_timeout: true
+
+  etl_processing_hourly:
+    schedule: "5 10-15 * * 1-5"  # 5 minutes past each hour, 10 AM - 3 PM
+    script: "src/main/app/run_etl.py"
+    args: ["run", "--data-type=market_data", "--limit=500"]
+    timeout_minutes: 20
+    priority: "medium"
+    description: "Process recent market data updates during market hours"
+    dependencies: []
+    run_during_market_hours: true
+
+  etl_processing_eod:
+    schedule: "30 17 * * 1-5"  # 5:30 PM, Monday-Friday (after market close)
+    script: "src/main/app/run_etl.py"
+    args: ["run", "--data-type=all", "--limit=2000"]
+    timeout_minutes: 60
+    priority: "high"
+    description: "Process all end-of-day data"
+    dependencies: ["data_archival_daily"]
+
+  # =============================================================================
+  # POST-MARKET JOBS (4:00 - 8:00 PM ET)
+  # =============================================================================
+
+  end_of_day_reconciliation:
+    schedule: "15 16 * * 1-5"  # 4:15 PM, Monday-Friday
+    script: "src/main/trading_engine/core/portfolio_manager.py"
+    args: ["--reconcile=eod", "--generate-report=true"]
+    timeout_minutes: 30
+    priority: "high"
+    description: "End-of-day position and trade reconciliation"
+    dependencies: []
+
+  daily_performance_analysis:
+    schedule: "30 16 * * 1-5"  # 4:30 PM, Monday-Friday
+    script: "src/main/backtesting/analysis/performance_metrics.py"
+    args: ["--analysis=daily", "--include-attribution=true"]
+    timeout_minutes: 20
+    priority: "medium"
+    description: "Daily performance and attribution analysis"
+    dependencies: ["end_of_day_reconciliation"]
+
+  data_archival_daily:
+    schedule: "0 17 * * 1-5"    # 5:00 PM, Monday-Friday
+    script: "src/main/data_pipeline/storage/archive.py"
+    args: ["--archive=daily", "--compress=true", "--cleanup=true"]
+    timeout_minutes: 45
+    priority: "medium"
+    description: "Archive daily market data and cleanup"
+    dependencies: ["daily_performance_analysis"]
+
+  daily_health_report:
+    schedule: "0 18 * * 1-5"    # 6:00 PM, Monday-Friday
+    script: "src/main/monitoring/health_reporter.py"
+    args: ["--report=daily", "--email=true"]
+    timeout_minutes: 15
+    priority: "medium"
+    description: "Generate and send daily health report"
+    dependencies: ["data_archival_daily"]
+
+  portfolio_rebalancing:
+    schedule: "30 18 * * 1-5"   # 6:30 PM, Monday-Friday
+    script: "src/main/trading_engine/core/portfolio_manager.py"
+    args: ["--rebalance=daily", "--dry-run=false"]
+    timeout_minutes: 20
+    priority: "medium"
+    description: "Daily portfolio rebalancing (if enabled)"
+    dependencies: ["daily_performance_analysis"]
+    enabled: false  # Disabled by default
+
+  # =============================================================================
+  # OVERNIGHT JOBS (8:00 PM - 4:00 AM ET)
+  # =============================================================================
+
+  scanner_qualification_refresh:
+    schedule: "45 2 * * 1-5"    # 2:45 AM, Monday-Friday
+    script: "src/main/scripts/refresh_scanner_qualifications.py"
+    args: []
+    timeout_minutes: 30
+    priority: "high"
+    description: "Update symbol qualifications for data retention based on Layer 1 scanner results"
+    dependencies: []
+    retry_attempts: 2
+    alerts:
+      on_failure: true
+
+  database_maintenance:
+    schedule: "0 20 * * 1-5"    # 8:00 PM, Monday-Friday
+    script: "src/main/data_pipeline/storage/database_adapter.py"
+    args: ["--maintenance=full", "--optimize=true", "--vacuum=true"]
+    timeout_minutes: 60
+    priority: "low"
+    description: "Database optimization and maintenance"
+    dependencies: []
+
+  log_rotation_cleanup:
+    schedule: "30 20 * * 1-5"   # 8:30 PM, Monday-Friday
+    script: "scripts/maintenance/compress_cache.py"
+    args: ["--rotate-logs=true", "--cleanup-old=true", "--days=30"]
+    timeout_minutes: 20
+    priority: "low"
+    description: "Log rotation and cleanup"
+    dependencies: []
+
+  model_retraining_check:
+    schedule: "0 21 * * 1-5"    # 9:00 PM, Monday-Friday
+    script: "src/main/models/training/training_orchestrator.py"
+    args: ["--check-retraining=true", "--auto-retrain=false"]
+    timeout_minutes: 30
+    priority: "medium"
+    description: "Check if models need retraining"
+    dependencies: ["database_maintenance"]
+
+  system_backup:
+    schedule: "0 22 * * 1-5"    # 10:00 PM, Monday-Friday
+    script: "deployment/scripts/deploy.sh"
+    args: ["--backup-only=true", "--incremental=true"]
+    timeout_minutes: 45
+    priority: "medium"
+    description: "Incremental system backup"
+    dependencies: ["log_rotation_cleanup"]
+
+  overnight_health_monitoring:
+    schedule: "0 23 * * *"      # 11:00 PM, Every day
+    script: "src/main/monitoring/health_reporter.py"
+    args: ["--report=overnight", "--capture-metrics=true"]
+    timeout_minutes: 10
+    priority: "low"
+    description: "Overnight system health capture"
+    dependencies: []
+
+  # =============================================================================
+  # WEEKLY JOBS
+  # =============================================================================
+
+  weekly_performance_report:
+    schedule: "0 7 * * 1"       # 7:00 AM Monday
+    script: "src/main/monitoring/health_reporter.py"
+    args: ["--report=weekly", "--email=true", "--detailed=true"]
+    timeout_minutes: 30
+    priority: "medium"
+    description: "Weekly performance and health report"
+    dependencies: []
+
+  model_performance_evaluation:
+    schedule: "0 19 * * 0"      # 7:00 PM Sunday
+    script: "src/main/models/monitoring/model_monitor.py"
+    args: ["--evaluation=weekly", "--generate-report=true"]
+    timeout_minutes: 60
+    priority: "medium"
+    description: "Weekly model performance evaluation"
+    dependencies: []
+
+  strategy_affinity_update:
+    schedule: "30 19 * * 0"     # 7:30 PM Sunday
+    script: "src/main/scanners/layers/layer1_5_strategy_affinity.py"
+    args: ["--update=weekly", "--recalculate=true"]
+    timeout_minutes: 90
+    priority: "medium"
+    description: "Weekly strategy affinity score updates"
+    dependencies: ["model_performance_evaluation"]
+
+  database_full_backup:
+    schedule: "0 23 * * 0"      # 11:00 PM Sunday
+    script: "deployment/scripts/deploy.sh"
+    args: ["--backup-only=true", "--full-backup=true"]
+    timeout_minutes: 120
+    priority: "high"
+    description: "Full weekly system backup"
+    dependencies: []
+
+  # =============================================================================
+  # MONTHLY JOBS
+  # =============================================================================
+
+  monthly_performance_analysis:
+    schedule: "0 8 1 * *"       # 8:00 AM on 1st of month
+    script: "src/main/monitoring/health_reporter.py"
+    args: ["--report=monthly", "--comprehensive=true", "--email=true"]
+    timeout_minutes: 60
+    priority: "medium"
+    description: "Comprehensive monthly performance analysis"
+    dependencies: []
+
+  model_retraining_full:
+    schedule: "0 20 1 * *"      # 8:00 PM on 1st of month
+    script: "src/main/models/training/training_orchestrator.py"
+    args: ["--retrain=full", "--validate=true", "--deploy=auto"]
+    timeout_minutes: 180
+    priority: "high"
+    description: "Monthly full model retraining"
+    dependencies: ["monthly_performance_analysis"]
+    enabled: false  # Disabled by default - enable for automated retraining
+
+  system_optimization:
+    schedule: "0 21 1 * *"      # 9:00 PM on 1st of month
+    script: "scripts/maintenance/compress_cache.py"
+    args: ["--optimize=full", "--defragment=true", "--cleanup=aggressive"]
+    timeout_minutes: 120
+    priority: "low"
+    description: "Monthly system optimization and cleanup"
+    dependencies: []
+
+  # =============================================================================
+  # BACKFILL & TRADING JOBS
+  # =============================================================================
+
+  initial_historical_backfill:
+    schedule: "manual"  # Run manually or on weekends for setup
+    script: "src/main/app/run_backfill.py"
+    args: ["--lookback-days=30", "--stages=all", "--force=false"]
+    timeout_minutes: 180
+    priority: "high"
+    description: "Initial historical data backfill for system startup"
+    dependencies: []
+    manual_trigger: true
+
+  etl_processing_manual:
+    schedule: "manual"  # Run manually after backfill
+    script: "src/main/app/run_etl.py"
+    args: ["run", "--data-type=all", "--limit=10000"]
+    timeout_minutes: 120
+    priority: "high"
+    description: "Manual ETL processing for backfilled data"
+    dependencies: []
+    manual_trigger: true
+
+  trading_engine_startup:
+    schedule: "25 9 * * 1-5"  # 9:25 AM, Monday-Friday (5 min before market open)
+    script: "src/main/app/run_trading.py"
+    args: ["--mode=paper", "--initialize=true"]
+    timeout_minutes: 5
+    priority: "critical"
+    description: "Start trading engine before market open"
+    dependencies: ["risk_assessment_daily", "model_inference_premarket"]
+    run_during_market_hours: false
+    alerts:
+      on_failure: true
+      on_timeout: true
+
+  trading_monitoring:
+    schedule: "*/15 9-16 * * 1-5"  # Every 15 minutes during market hours
+    script: "src/main/trading_engine/core/trading_system.py"
+    args: ["--monitor=true", "--execute-signals=true"]
+    timeout_minutes: 10
+    priority: "critical"
+    description: "Monitor and execute trading signals"
+    dependencies: []
+    run_during_market_hours: true
+    alerts:
+      on_failure: true
+      on_timeout: true
+
+  screening_funnel_daily:
+    schedule: "0 7 * * 1-5"   # 7:00 AM, Monday-Friday
+    script: "src/main/app/run_screening.py"
+    args: ["--full-funnel=true", "--save-results=true"]
+    timeout_minutes: 60
+    priority: "high"
+    description: "Run daily stock screening funnel (Layer 0-3)"
+    dependencies: ["risk_assessment_daily"]
+
+  model_training_weekly:
+    schedule: "0 20 * * 6"     # 8:00 PM Saturday
+    script: "src/main/app/run_training.py"
+    args: ["--mode=incremental", "--validate=true"]
+    timeout_minutes: 120
+    priority: "high"
+    description: "Weekly incremental model training"
+    dependencies: []
+    enabled: true
+
+  # =============================================================================
+  # EMERGENCY & MAINTENANCE JOBS
+  # =============================================================================
+
+  emergency_health_check:
+    schedule: "manual"  # Triggered manually or by alerts
+    script: "deployment/scripts/health_check.sh"
+    args: ["--comprehensive=true", "--emergency=true"]
+    timeout_minutes: 20
+    priority: "critical"
+    description: "Emergency comprehensive health check"
+    dependencies: []
+    manual_trigger: true
+
+  system_shutdown_graceful:
+    schedule: "manual"  # Emergency shutdown
+    script: "src/main/app/emergency_shutdown.py"
+    args: ["--save-state=true", "--notify=true"]
+    timeout_minutes: 10
+    priority: "critical"
+    description: "Graceful emergency system shutdown"
+    dependencies: []
+    manual_trigger: true
+
+  cache_cleanup_emergency:
+    schedule: "manual"  # When system is running low on space
+    script: "scripts/maintenance/compress_cache.py"
+    args: ["--emergency-cleanup=true", "--free-space-gb=10"]
+    timeout_minutes: 30
+    priority: "high"
+    description: "Emergency cache cleanup to free space"
+    dependencies: []
+    manual_trigger: true
+
+# Notification Settings
+notifications:
+  email:
+    enabled: true
+    smtp_host: "localhost"
+    smtp_port: 587
+    from_address: "ai-trader@localhost"
+    to_addresses: ["admin@localhost"]
+
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#ai-trader-alerts"
+
+  critical_job_failures:
+    - "market_hours_monitoring"
+    - "risk_monitoring_realtime"
+    - "real_time_data_ingestion"
+    - "system_health_premarket"
+
+  high_priority_failures:
+    - "model_inference_premarket"
+    - "risk_assessment_daily"
+    - "end_of_day_reconciliation"
+    - "database_full_backup"
+
+# Resource Limits
+resources:
+  max_concurrent_jobs: 5
+  max_memory_per_job_gb: 8
+  max_cpu_per_job_percent: 50
+  priority_override: true  # Allow critical jobs to override limits
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  separate_job_logs: true
+  retention_days: 30

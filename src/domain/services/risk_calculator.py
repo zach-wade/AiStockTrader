@@ -147,15 +147,15 @@ class RiskCalculator:
         avg_return = sum(returns) / len(returns)
 
         # Calculate standard deviation
-        variance = sum((r - avg_return) ** 2 for r in returns) / len(returns)
-        std_dev = variance.sqrt()
+        variance = sum((Decimal(str(r)) - avg_return) ** 2 for r in returns) / len(returns)
+        std_dev = variance.sqrt() if hasattr(variance, 'sqrt') else Decimal(str(variance ** Decimal('0.5')))
 
         if std_dev == 0:
             return None
 
         # Annualize (assuming daily returns)
         annual_return = avg_return * Decimal("252")
-        annual_std = std_dev * Decimal("252").sqrt()
+        annual_std = std_dev * (Decimal("252") ** Decimal('0.5'))
 
         # Calculate Sharpe ratio
         sharpe = (annual_return - risk_free_rate) / annual_std

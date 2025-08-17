@@ -1,0 +1,318 @@
+# Strategies Configuration
+# Defines trading strategies and their parameters
+
+strategies:
+  # Global strategy settings
+  global:
+    enabled: true
+    max_concurrent_strategies: 5
+    rebalance_frequency: "daily"
+
+  # Strategy allocation
+  allocation:
+    method: "equal_weight"  # equal_weight, risk_parity, kelly, custom
+
+    # Custom allocations (if method is 'custom')
+    custom_weights:
+      momentum: 0.3
+      mean_reversion: 0.25
+      breakout: 0.2
+      sentiment: 0.15
+      pairs_trading: 0.1
+
+# Individual Strategy Configurations
+momentum:
+  enabled: true
+  description: "Momentum-based strategy following price and volume trends"
+
+  parameters:
+    lookback_period: 20
+    momentum_threshold: 0.02  # 2% momentum threshold
+    volume_confirmation: true
+    min_volume_ratio: 1.5
+
+  filters:
+    min_price: 10.0
+    min_market_cap: 1000000000
+    max_volatility: 0.05
+
+  position_sizing:
+    method: "volatility_parity"
+    max_position_size: 0.05  # 5% of portfolio
+    target_volatility: 0.15
+
+  exit_rules:
+    stop_loss: 0.08      # 8% stop loss
+    take_profit: 0.20    # 20% take profit
+    trailing_stop: 0.05  # 5% trailing stop
+    max_hold_days: 30
+
+mean_reversion:
+  enabled: true
+  description: "Mean reversion strategy for oversold/overbought conditions"
+
+  parameters:
+    lookback_period: 14
+    rsi_oversold: 30
+    rsi_overbought: 70
+    bollinger_std: 2.0
+
+  filters:
+    min_price: 5.0
+    min_avg_volume: 500000
+    max_beta: 1.5
+
+  position_sizing:
+    method: "equal_weight"
+    max_position_size: 0.03  # 3% of portfolio
+
+  exit_rules:
+    profit_target: 0.10     # 10% profit target
+    stop_loss: 0.05         # 5% stop loss
+    rsi_exit_level: 50      # Exit when RSI returns to neutral
+    max_hold_days: 14
+
+breakout:
+  enabled: true
+  description: "Breakout strategy for stocks breaking key resistance levels"
+
+  parameters:
+    lookback_period: 20
+    breakout_threshold: 0.03  # 3% breakout above resistance
+    volume_spike_threshold: 2.0
+    consolidation_days: 10
+
+  filters:
+    min_price: 15.0
+    min_market_cap: 2000000000
+    max_daily_range: 0.08
+
+  position_sizing:
+    method: "volatility_adjusted"
+    max_position_size: 0.04  # 4% of portfolio
+    volatility_target: 0.12
+
+  exit_rules:
+    stop_loss: 0.06         # 6% stop loss
+    take_profit: 0.25       # 25% take profit
+    trailing_stop: 0.04     # 4% trailing stop
+    volume_exit_threshold: 0.5  # Exit if volume drops below average
+
+sentiment:
+  enabled: true
+  description: "Sentiment-based strategy using news and social media"
+
+  parameters:
+    sentiment_threshold: 0.6
+    news_weight: 0.7
+    social_weight: 0.3
+    lookback_days: 7
+
+  filters:
+    min_sentiment_score: 0.5
+    min_news_mentions: 5
+    min_social_mentions: 20
+
+  position_sizing:
+    method: "sentiment_weighted"
+    max_position_size: 0.03  # 3% of portfolio
+    sentiment_multiplier: 1.5
+
+  exit_rules:
+    sentiment_exit_threshold: 0.3
+    stop_loss: 0.07         # 7% stop loss
+    take_profit: 0.15       # 15% take profit
+    max_hold_days: 7
+
+pairs_trading:
+  enabled: true
+  description: "Statistical arbitrage using correlated pairs"
+
+  parameters:
+    correlation_threshold: 0.8
+    lookback_period: 60
+    zscore_entry: 2.0
+    zscore_exit: 0.5
+
+  filters:
+    min_correlation_period: 30
+    max_correlation_breakdown: 0.6
+    sector_neutral: true
+
+  position_sizing:
+    method: "dollar_neutral"
+    max_pair_exposure: 0.02  # 2% per pair
+
+  exit_rules:
+    correlation_breakdown: 0.5
+    max_hold_days: 20
+    stop_loss: 0.04         # 4% stop loss per leg
+
+statistical_arbitrage:
+  enabled: false  # Disabled by default - requires significant capital
+  description: "Statistical arbitrage using multiple factors"
+
+  parameters:
+    factor_model: "pca"
+    num_factors: 10
+    lookback_period: 120
+    entry_threshold: 2.5
+
+  filters:
+    min_liquidity: 10000000
+    sector_diversification: true
+
+  position_sizing:
+    method: "risk_parity"
+    max_total_exposure: 0.50
+
+  exit_rules:
+    reversion_threshold: 0.5
+    max_hold_days: 5
+
+# Strategy Ensembles
+ensembles:
+  adaptive_momentum:
+    enabled: true
+    description: "Adaptive momentum combining multiple momentum signals"
+
+    components:
+      - strategy: "momentum"
+        weight: 0.4
+      - strategy: "breakout"
+        weight: 0.3
+      - strategy: "sentiment"
+        weight: 0.3
+
+    adaptation:
+      lookback_period: 30
+      performance_threshold: 0.05
+      rebalance_frequency: "weekly"
+
+  market_neutral:
+    enabled: false
+    description: "Market neutral strategy combining long/short positions"
+
+    components:
+      - strategy: "pairs_trading"
+        weight: 0.6
+      - strategy: "statistical_arbitrage"
+        weight: 0.4
+
+    constraints:
+      max_net_exposure: 0.10
+      max_gross_exposure: 1.00
+
+# Risk Management per Strategy
+risk_management:
+  global:
+    max_portfolio_risk: 0.02  # 2% daily VaR
+    max_drawdown: 0.15        # 15% max drawdown
+    correlation_limit: 0.3    # Max correlation between strategies
+
+  per_strategy:
+    max_positions: 20
+    max_sector_exposure: 0.30
+    max_single_stock: 0.05
+
+  stop_conditions:
+    consecutive_losses: 5
+    daily_loss_limit: 0.03
+    weekly_loss_limit: 0.10
+
+# Performance Monitoring
+performance:
+  benchmarks:
+    - "SPY"
+    - "QQQ"
+    - "IWM"
+
+  metrics:
+    - "total_return"
+    - "sharpe_ratio"
+    - "sortino_ratio"
+    - "max_drawdown"
+    - "win_rate"
+    - "profit_factor"
+    - "beta"
+    - "alpha"
+
+  reporting:
+    frequency: "daily"
+    attribution: true
+    risk_metrics: true
+
+  alerts:
+    underperformance_threshold: -0.05
+    drawdown_threshold: 0.10
+    sharpe_threshold: 0.5
+
+# Backtesting Configuration
+backtesting:
+  enabled: true
+
+  parameters:
+    start_date: "2020-01-01"
+    end_date: "2023-12-31"
+    initial_capital: 100000
+    commission: 0.001         # 0.1% commission
+    slippage: 0.0005         # 0.05% slippage
+
+  validation:
+    walk_forward: true
+    out_of_sample_pct: 0.20
+    rolling_window: 252      # 1 year
+
+  output:
+    generate_reports: true
+    save_trades: true
+    plot_performance: true
+
+# Paper Trading
+paper_trading:
+  enabled: true
+
+  parameters:
+    initial_capital: 100000
+    real_time_execution: true
+    market_impact: true
+
+  validation:
+    compare_to_backtest: true
+    performance_tracking: true
+
+# Live Trading
+live_trading:
+  enabled: false  # Disabled by default
+
+  parameters:
+    initial_capital: 50000
+    max_daily_trades: 20
+    pre_market_trading: false
+    after_hours_trading: false
+
+  safety:
+    confirmation_required: true
+    daily_loss_limit: 1000
+    position_size_limit: 0.05
+
+  brokers:
+    primary: "alpaca"
+    backup: "interactive_brokers"
+
+# Strategy Development
+development:
+  research:
+    enabled: true
+    jupyter_notebooks: true
+    research_data_path: "/research/data"
+
+  optimization:
+    enabled: true
+    optimization_engine: "optuna"
+    max_trials: 100
+
+  validation:
+    cross_validation: true
+    monte_carlo_simulation: true
+    stress_testing: true

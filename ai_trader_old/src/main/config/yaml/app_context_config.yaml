@@ -1,0 +1,221 @@
+# Application Context Configuration
+# Standardized configuration for different application contexts
+
+app_contexts:
+  # Default components for all contexts
+  default_components:
+    - database
+    - data_sources
+    - monitoring
+    - logging
+
+  # Context-specific configurations
+  backfill:
+    description: "Historical data backfill operations"
+    components:
+      - database
+      - data_sources
+      - ingestion
+      - dual_storage
+      - archive
+      - event_bus
+    initialization:
+      timeout_seconds: 60
+      retry_attempts: 3
+      parallel_init: true
+    resource_limits:
+      max_memory_mb: 4096
+      max_connections: 50
+      max_concurrent_operations: 10
+    cleanup:
+      close_connections: true
+      clear_caches: true
+      gc_on_exit: true
+
+  scanner:
+    description: "Market scanning and analysis"
+    components:
+      - database
+      - data_sources
+      - processing
+      - event_bus
+      - cache
+    initialization:
+      timeout_seconds: 30
+      retry_attempts: 2
+      parallel_init: true
+    resource_limits:
+      max_memory_mb: 2048
+      max_connections: 30
+      max_concurrent_scans: 5
+    features:
+      enable_caching: true
+      cache_ttl_seconds: 300
+      enable_metrics: true
+
+  trading:
+    description: "Live trading operations"
+    components:
+      - database
+      - data_sources
+      - risk_management
+      - order_management
+      - position_tracking
+      - event_bus
+    initialization:
+      timeout_seconds: 45
+      retry_attempts: 5
+      parallel_init: false  # Sequential for safety
+    resource_limits:
+      max_memory_mb: 3072
+      max_connections: 40
+      max_concurrent_orders: 20
+    features:
+      enable_paper_trading: true
+      enable_risk_checks: true
+      enable_audit_logging: true
+
+  feature_engineering:
+    description: "Feature calculation and processing"
+    components:
+      - database
+      - data_sources
+      - processing
+      - feature_store
+      - cache
+    initialization:
+      timeout_seconds: 60
+      retry_attempts: 3
+      parallel_init: true
+    resource_limits:
+      max_memory_mb: 8192
+      max_connections: 20
+      max_concurrent_calculations: 4
+    features:
+      enable_streaming: true
+      enable_caching: true
+      cache_ttl_seconds: 3600
+
+  monitoring:
+    description: "System monitoring and dashboards"
+    components:
+      - database
+      - monitoring
+      - alerting
+      - metrics_store
+    initialization:
+      timeout_seconds: 30
+      retry_attempts: 2
+      parallel_init: true
+    resource_limits:
+      max_memory_mb: 1024
+      max_connections: 10
+    features:
+      enable_real_time: true
+      metric_retention_days: 30
+
+  testing:
+    description: "Testing and development"
+    components:
+      - database
+      - mock_data_sources
+      - logging
+    initialization:
+      timeout_seconds: 10
+      retry_attempts: 1
+      parallel_init: true
+    resource_limits:
+      max_memory_mb: 512
+      max_connections: 5
+    features:
+      use_test_database: true
+      enable_debug_logging: true
+      clear_data_on_start: true
+
+# Component definitions
+components:
+  database:
+    class: "main.utils.database.DatabaseComponent"
+    config_key: "database"
+    required: true
+    health_check: true
+
+  data_sources:
+    class: "main.data_pipeline.sources.DataSourceManager"
+    config_key: "data_sources"
+    required: true
+    health_check: true
+
+  ingestion:
+    class: "main.data_pipeline.ingestion.IngestionManager"
+    config_key: "ingestion"
+    required: false
+    health_check: false
+
+  dual_storage:
+    class: "main.data_pipeline.storage.DualStorageManager"
+    config_key: "storage"
+    required: false
+    health_check: true
+
+  archive:
+    class: "main.data_pipeline.storage.ArchiveManager"
+    config_key: "archive"
+    required: false
+    health_check: false
+
+  event_bus:
+    class: "main.events.core.EventBus"
+    config_key: "events"
+    required: false
+    health_check: true
+
+  cache:
+    class: "main.utils.cache.CacheManager"
+    config_key: "cache"
+    required: false
+    health_check: true
+
+  monitoring:
+    class: "main.utils.monitoring.MonitoringService"
+    config_key: "monitoring"
+    required: false
+    health_check: true
+
+  risk_management:
+    class: "main.trading.risk.RiskManager"
+    config_key: "risk"
+    required: true
+    health_check: true
+
+  order_management:
+    class: "main.trading.orders.OrderManager"
+    config_key: "orders"
+    required: true
+    health_check: true
+
+# Global settings
+global:
+  # Initialization behavior
+  initialization:
+    fail_fast: true  # Stop on first component failure
+    log_level: "INFO"
+    show_progress: true
+
+  # Resource management
+  resources:
+    enable_resource_monitoring: true
+    warn_on_high_usage: true
+    auto_gc_threshold: 0.8  # GC when 80% memory used
+
+  # Error handling
+  error_handling:
+    capture_exceptions: true
+    send_error_alerts: true
+    include_stack_traces: true
+
+  # Shutdown behavior
+  shutdown:
+    graceful_timeout_seconds: 30
+    force_kill_after_seconds: 60
+    save_state_on_shutdown: true

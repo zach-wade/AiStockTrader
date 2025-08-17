@@ -1,0 +1,53 @@
+[
+  {
+    "symbol": "AAPL",
+    "alert_type": "BREAKOUT",
+    "timestamp": "2024-01-02T10:15:00Z",
+    "price": 195.75,
+    "volume": 2847293,
+    "metadata": {
+      "pattern": "ascending_triangle",
+      "breakout_level": 195.50,
+      "volume_ratio": 1.8,
+      "confidence": 0.85
+    },
+    "source": "layer1_pattern_scanner",
+    "priority": "HIGH",
+    "catalyst_type": "TECHNICAL",
+    "catalyst_score": 0.82
+  },
+  {
+    "symbol": "MSFT",
+    "alert_type": "MOMENTUM",
+    "timestamp": "2024-01-02T10:30:00Z",
+    "price": 375.25,
+    "volume": 1829384,
+    "metadata": {
+      "rsi": 68.5,
+      "macd_signal": "bullish",
+      "momentum_score": 0.75,
+      "trend_strength": 0.88
+    },
+    "source": "layer1_momentum_scanner",
+    "priority": "MEDIUM",
+    "catalyst_type": "TECHNICAL",
+    "catalyst_score": 0.75
+  },
+  {
+    "symbol": "TSLA",
+    "alert_type": "NEWS_CATALYST",
+    "timestamp": "2024-01-02T11:00:00Z",
+    "price": 248.50,
+    "volume": 5829102,
+    "metadata": {
+      "news_title": "Tesla Reports Record Q4 Deliveries",
+      "sentiment_score": 0.92,
+      "relevance_score": 0.95,
+      "impact_estimate": "HIGH"
+    },
+    "source": "layer2_catalyst_scanner",
+    "priority": "HIGH",
+    "catalyst_type": "FUNDAMENTAL",
+    "catalyst_score": 0.91
+  }
+]

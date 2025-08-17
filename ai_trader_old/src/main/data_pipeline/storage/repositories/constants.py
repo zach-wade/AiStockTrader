@@ -1,0 +1,45 @@
+"""
+Repository Constants
+
+Centralized constants for repository configuration defaults.
+"""
+
+# Default batch processing settings
+DEFAULT_BATCH_SIZE = 1000
+DEFAULT_MAX_PARALLEL_WORKERS = 4
+DEFAULT_SMALL_BATCH_SIZE = 100
+DEFAULT_LARGE_BATCH_SIZE = 5000
+
+# Default retry settings
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_RETRY_DELAY = 1.0
+DEFAULT_RETRY_BACKOFF_FACTOR = 2.0
+
+# Default cache settings
+DEFAULT_CACHE_TTL_SECONDS = 300
+DEFAULT_CACHE_SIZE_LIMIT = 1000
+
+# Default timeout settings
+DEFAULT_TRANSACTION_TIMEOUT = 60.0
+DEFAULT_BATCH_TIMEOUT = 30.0
+
+# Default data retention settings
+DEFAULT_HOT_STORAGE_DAYS = 30
+DEFAULT_FEATURE_RETENTION_DAYS = 90
+DEFAULT_FINANCIAL_RETENTION_YEARS = 10
+
+# Default query limits
+DEFAULT_QUERY_LIMIT = 100
+DEFAULT_MAX_QUERY_LIMIT = 10000
+
+# Default validation settings
+DEFAULT_VALIDATION_ENABLED = True
+DEFAULT_METRICS_ENABLED = True
+DEFAULT_LOGGING_ENABLED = False
+
+# Circuit breaker settings
+DEFAULT_CIRCUIT_BREAKER_FAILURE_THRESHOLD = 5
+DEFAULT_CIRCUIT_BREAKER_RECOVERY_TIMEOUT = 30
+
+# Progress reporting settings
+DEFAULT_PROGRESS_REPORT_THRESHOLD = 100  # Report progress for batches > 100 items

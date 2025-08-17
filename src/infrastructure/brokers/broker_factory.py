@@ -3,9 +3,9 @@ Broker Factory - Creates appropriate broker instances based on configuration
 """
 
 # Standard library imports
-from decimal import Decimal
 import logging
 import os
+from decimal import Decimal
 from typing import Literal
 
 # Local imports

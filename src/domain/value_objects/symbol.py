@@ -9,7 +9,7 @@ class Symbol:
     """Immutable value object representing a trading symbol."""
 
     # Valid symbol patterns
-    _PATTERNS: ClassVar[dict[str, re.Pattern]] = {
+    _PATTERNS: ClassVar[dict[str, re.Pattern[str]]] = {
         "stock": re.compile(r"^[A-Z]{1,5}$"),  # AAPL, MSFT, etc.
         "stock_exchange": re.compile(r"^[A-Z]{1,5}\.[A-Z]{2,10}$"),  # AAPL.US
         "stock_venue": re.compile(r"^[A-Z]{1,5}:[A-Z]{2,10}$"),  # AAPL:NASDAQ

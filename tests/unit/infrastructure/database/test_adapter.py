@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, Mock
 
 # Third-party imports
 import psycopg
-from psycopg_pool import AsyncConnectionPool
 import pytest
+from psycopg_pool import AsyncConnectionPool
 
 # Local imports
 from src.application.interfaces.exceptions import (

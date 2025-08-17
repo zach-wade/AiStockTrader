@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
 
 # Local imports
 from src.domain.value_objects.price import Price
@@ -280,7 +280,7 @@ class IMarketDataProvider(Protocol):
         ...
 
     @abstractmethod
-    async def get_symbol_info(self, symbol: str) -> dict:
+    async def get_symbol_info(self, symbol: str) -> dict[str, Any]:
         """
         Get detailed information about a trading symbol.
 

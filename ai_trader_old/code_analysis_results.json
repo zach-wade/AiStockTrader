@@ -1,0 +1,1318 @@
+{
+  "large_files": [
+    {
+      "file": "main/monitoring/dashboards/v2/system_dashboard_v2.py",
+      "lines": 1153,
+      "size_kb": 45.9033203125
+    },
+    {
+      "file": "main/feature_pipeline/dataloader.py",
+      "lines": 1069,
+      "size_kb": 46.552734375
+    },
+    {
+      "file": "main/models/common.py",
+      "lines": 1044,
+      "size_kb": 38.365234375
+    },
+    {
+      "file": "main/monitoring/dashboards/v2/trading_dashboard_v2.py",
+      "lines": 1038,
+      "size_kb": 39.4638671875
+    },
+    {
+      "file": "main/models/inference/model_registry_helpers/version_controller.py",
+      "lines": 980,
+      "size_kb": 31.70703125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/statistical/nonlinear_calculator.py",
+      "lines": 956,
+      "size_kb": 36.7373046875
+    },
+    {
+      "file": "main/risk_management/real_time/live_risk_monitor.py",
+      "lines": 951,
+      "size_kb": 39.1240234375
+    },
+    {
+      "file": "main/feature_pipeline/feature_orchestrator.py",
+      "lines": 940,
+      "size_kb": 38.9814453125
+    },
+    {
+      "file": "main/utils/logging/performance_logger.py",
+      "lines": 939,
+      "size_kb": 31.8359375
+    },
+    {
+      "file": "main/risk_management/real_time/position_liquidator.py",
+      "lines": 918,
+      "size_kb": 36.71875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/sentiment_features.py",
+      "lines": 917,
+      "size_kb": 39.99609375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/microstructure.py",
+      "lines": 881,
+      "size_kb": 32.85546875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/cross_asset.py",
+      "lines": 862,
+      "size_kb": 38.9970703125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/market_regime.py",
+      "lines": 861,
+      "size_kb": 34.72265625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/statistical/timeseries_calculator.py",
+      "lines": 860,
+      "size_kb": 30.623046875
+    },
+    {
+      "file": "main/scanners/scanner_pipeline.py",
+      "lines": 851,
+      "size_kb": 32.1484375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/enhanced_cross_sectional.py",
+      "lines": 851,
+      "size_kb": 32.763671875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/sector_analytics.py",
+      "lines": 841,
+      "size_kb": 34.3369140625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/news/credibility_calculator.py",
+      "lines": 837,
+      "size_kb": 35.7177734375
+    },
+    {
+      "file": "main/risk_management/position_sizing/var_position_sizer.py",
+      "lines": 823,
+      "size_kb": 33.3837890625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/insider_analytics.py",
+      "lines": 822,
+      "size_kb": 34.9423828125
+    },
+    {
+      "file": "main/models/monitoring/monitor_helpers/monitor_reporter.py",
+      "lines": 817,
+      "size_kb": 28.3974609375
+    },
+    {
+      "file": "main/utils/monitoring/enhanced.py",
+      "lines": 815,
+      "size_kb": 29.1591796875
+    },
+    {
+      "file": "main/risk_management/dashboards/live_risk_dashboard.py",
+      "lines": 801,
+      "size_kb": 30.658203125
+    },
+    {
+      "file": "main/trading_engine/core/execution_engine.py",
+      "lines": 795,
+      "size_kb": 31.4189453125
+    },
+    {
+      "file": "main/trading_engine/algorithms/base_algorithm.py",
+      "lines": 790,
+      "size_kb": 29.2666015625
+    },
+    {
+      "file": "main/data_pipeline/storage/repositories/company_repository.py",
+      "lines": 783,
+      "size_kb": 27.095703125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/technical/trend_indicators.py",
+      "lines": 782,
+      "size_kb": 26.71484375
+    },
+    {
+      "file": "main/app/historical_backfill.py",
+      "lines": 774,
+      "size_kb": 37.4033203125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/statistical/entropy_calculator.py",
+      "lines": 772,
+      "size_kb": 27.1318359375
+    },
+    {
+      "file": "main/scanners/scanner_orchestrator.py",
+      "lines": 770,
+      "size_kb": 27.4638671875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/options/sentiment_calculator.py",
+      "lines": 762,
+      "size_kb": 28.4921875
+    },
+    {
+      "file": "main/monitoring/metrics/unified_metrics.py",
+      "lines": 749,
+      "size_kb": 25.8994140625
+    },
+    {
+      "file": "main/utils/logging/trade_logger.py",
+      "lines": 736,
+      "size_kb": 23.9453125
+    },
+    {
+      "file": "main/trading_engine/brokers/backtest_broker.py",
+      "lines": 731,
+      "size_kb": 26.4853515625
+    },
+    {
+      "file": "main/features/precompute_engine.py",
+      "lines": 730,
+      "size_kb": 28.05078125
+    },
+    {
+      "file": "main/trading_engine/core/tca.py",
+      "lines": 730,
+      "size_kb": 26.462890625
+    },
+    {
+      "file": "main/monitoring/metrics/archive_metrics_collector.py",
+      "lines": 729,
+      "size_kb": 27.69921875
+    },
+    {
+      "file": "main/models/outcome_classifier_helpers/entry_price_determiner.py",
+      "lines": 724,
+      "size_kb": 25.208984375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/news/volume_calculator.py",
+      "lines": 722,
+      "size_kb": 26.45703125
+    },
+    {
+      "file": "main/risk_management/pre_trade/exposure_limits.py",
+      "lines": 714,
+      "size_kb": 30.078125
+    },
+    {
+      "file": "main/models/inference/model_registry_helpers/registry_storage_manager.py",
+      "lines": 709,
+      "size_kb": 23.8671875
+    },
+    {
+      "file": "main/trading_engine/brokers/ib_broker.py",
+      "lines": 705,
+      "size_kb": 25.9853515625
+    },
+    {
+      "file": "main/models/outcome_classifier_helpers/outcome_metrics_calculator.py",
+      "lines": 702,
+      "size_kb": 24.8349609375
+    },
+    {
+      "file": "main/scanners/catalysts/intermarket_scanner.py",
+      "lines": 694,
+      "size_kb": 27.533203125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/performance_calculator.py",
+      "lines": 694,
+      "size_kb": 29.2861328125
+    },
+    {
+      "file": "main/risk_management/live_risk_monitor.py",
+      "lines": 691,
+      "size_kb": 25.4072265625
+    },
+    {
+      "file": "main/models/inference/model_registry_enhancements.py",
+      "lines": 689,
+      "size_kb": 22.8740234375
+    },
+    {
+      "file": "main/events/core/event_bus.py",
+      "lines": 668,
+      "size_kb": 23.8369140625
+    },
+    {
+      "file": "main/utils/resilience/error_recovery.py",
+      "lines": 662,
+      "size_kb": 22.6953125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/news/sentiment_calculator.py",
+      "lines": 662,
+      "size_kb": 24.1279296875
+    },
+    {
+      "file": "main/utils/database/helpers/query_tracker.py",
+      "lines": 661,
+      "size_kb": 24.2490234375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/options/blackscholes_calculator.py",
+      "lines": 661,
+      "size_kb": 23.021484375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/news/event_calculator.py",
+      "lines": 660,
+      "size_kb": 27.578125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/tail_risk_calculator.py",
+      "lines": 659,
+      "size_kb": 28.5986328125
+    },
+    {
+      "file": "main/models/inference/model_registry_helpers/deployment_manager.py",
+      "lines": 658,
+      "size_kb": 21.4296875
+    },
+    {
+      "file": "main/monitoring/alerts/archive_alert_rules.py",
+      "lines": 657,
+      "size_kb": 24.310546875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/cross_sectional.py",
+      "lines": 657,
+      "size_kb": 23.4677734375
+    },
+    {
+      "file": "main/scanners/catalysts/social_scanner.py",
+      "lines": 656,
+      "size_kb": 24.0126953125
+    },
+    {
+      "file": "main/scanners/layers/layer2_catalyst_orchestrator.py",
+      "lines": 649,
+      "size_kb": 29.087890625
+    },
+    {
+      "file": "main/feature_pipeline/feature_adapter.py",
+      "lines": 644,
+      "size_kb": 19.5078125
+    },
+    {
+      "file": "main/models/inference/model_registry_helpers/traffic_router.py",
+      "lines": 635,
+      "size_kb": 20.625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/var_calculator.py",
+      "lines": 634,
+      "size_kb": 24.1806640625
+    },
+    {
+      "file": "main/scanners/layers/layer3_premarket_scanner.py",
+      "lines": 632,
+      "size_kb": 26.00390625
+    },
+    {
+      "file": "main/trading_engine/core/order_manager.py",
+      "lines": 632,
+      "size_kb": 22.287109375
+    },
+    {
+      "file": "main/risk_management/var_position_sizing.py",
+      "lines": 626,
+      "size_kb": 24.0888671875
+    },
+    {
+      "file": "main/config/config_manager.py",
+      "lines": 625,
+      "size_kb": 22.267578125
+    },
+    {
+      "file": "main/data_pipeline/historical/gap_detection_service.py",
+      "lines": 621,
+      "size_kb": 20.296875
+    },
+    {
+      "file": "main/monitoring/dashboards/widgets/archive_widget.py",
+      "lines": 619,
+      "size_kb": 23.6416015625
+    },
+    {
+      "file": "main/backtesting/engine/cost_model.py",
+      "lines": 617,
+      "size_kb": 22.232421875
+    },
+    {
+      "file": "main/app/process_raw_data.py",
+      "lines": 616,
+      "size_kb": 24.9892578125
+    },
+    {
+      "file": "main/trading_engine/core/risk_integrated_order_manager.py",
+      "lines": 616,
+      "size_kb": 24.8291015625
+    },
+    {
+      "file": "main/utils/logging/error_logger.py",
+      "lines": 612,
+      "size_kb": 21.58203125
+    },
+    {
+      "file": "main/monitoring/metrics/collector.py",
+      "lines": 610,
+      "size_kb": 21.2607421875
+    },
+    {
+      "file": "main/utils/app/validation.py",
+      "lines": 608,
+      "size_kb": 22.8759765625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/helpers/validation.py",
+      "lines": 607,
+      "size_kb": 18.6298828125
+    },
+    {
+      "file": "main/app/commands/utility_commands.py",
+      "lines": 602,
+      "size_kb": 20.3828125
+    },
+    {
+      "file": "main/utils/resilience/strategies.py",
+      "lines": 601,
+      "size_kb": 24.2900390625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/technical_indicators.py",
+      "lines": 601,
+      "size_kb": 23.3486328125
+    },
+    {
+      "file": "main/risk_management/integration/trading_engine_integration.py",
+      "lines": 596,
+      "size_kb": 22.765625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/news/monetary_calculator.py",
+      "lines": 595,
+      "size_kb": 21.958984375
+    },
+    {
+      "file": "main/trading_engine/risk/risk_manager.py",
+      "lines": 594,
+      "size_kb": 20.2041015625
+    },
+    {
+      "file": "main/data_pipeline/storage/repositories/base_repository_original.py",
+      "lines": 594,
+      "size_kb": 20.6884765625
+    },
+    {
+      "file": "main/data_pipeline/ingestion/loaders/news.py",
+      "lines": 593,
+      "size_kb": 22.4228515625
+    },
+    {
+      "file": "main/scanners/scanner_adapter.py",
+      "lines": 590,
+      "size_kb": 21.5556640625
+    },
+    {
+      "file": "main/utils/processing/streaming.py",
+      "lines": 590,
+      "size_kb": 22.373046875
+    },
+    {
+      "file": "main/utils/app/context.py",
+      "lines": 589,
+      "size_kb": 24.361328125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/technical/momentum_indicators.py",
+      "lines": 588,
+      "size_kb": 20.248046875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/correlation/stability_calculator.py",
+      "lines": 581,
+      "size_kb": 21.0048828125
+    },
+    {
+      "file": "main/data_pipeline/ingestion/loaders/market_data_split.py",
+      "lines": 580,
+      "size_kb": 22.4580078125
+    },
+    {
+      "file": "main/risk_management/pre_trade/unified_limit_checker/registry.py",
+      "lines": 579,
+      "size_kb": 20.31640625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/news/topic_calculator.py",
+      "lines": 579,
+      "size_kb": 24.375
+    },
+    {
+      "file": "main/models/strategies/ensemble/allocation.py",
+      "lines": 578,
+      "size_kb": 20.01953125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/volatility_calculator.py",
+      "lines": 575,
+      "size_kb": 24.8349609375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/drawdown_calculator.py",
+      "lines": 575,
+      "size_kb": 24.7236328125
+    },
+    {
+      "file": "main/models/outcome_classifier_helpers/outcome_data_fetcher.py",
+      "lines": 574,
+      "size_kb": 18.2734375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/strategy_affinity_calculator.py",
+      "lines": 572,
+      "size_kb": 23.8837890625
+    },
+    {
+      "file": "main/scanners/scanner_pipeline_utils.py",
+      "lines": 570,
+      "size_kb": 20.5458984375
+    },
+    {
+      "file": "main/monitoring/alerts/unified_alerts.py",
+      "lines": 569,
+      "size_kb": 18.5009765625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/options/greeks_calculator.py",
+      "lines": 567,
+      "size_kb": 25.9775390625
+    },
+    {
+      "file": "main/utils/__init__.py",
+      "lines": 561,
+      "size_kb": 15.5791015625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/risk_metrics_facade.py",
+      "lines": 561,
+      "size_kb": 20.7841796875
+    },
+    {
+      "file": "main/utils/exceptions.py",
+      "lines": 560,
+      "size_kb": 14.3642578125
+    },
+    {
+      "file": "main/data_pipeline/orchestration/event_coordinator.py",
+      "lines": 560,
+      "size_kb": 22.6201171875
+    },
+    {
+      "file": "main/trading_engine/brokers/paper_broker.py",
+      "lines": 559,
+      "size_kb": 22.890625
+    },
+    {
+      "file": "main/monitoring/health/unified_health_reporter.py",
+      "lines": 557,
+      "size_kb": 21.119140625
+    },
+    {
+      "file": "main/utils/monitoring/__init__.py",
+      "lines": 556,
+      "size_kb": 20.08203125
+    },
+    {
+      "file": "main/monitoring/database_performance_dashboard.py",
+      "lines": 555,
+      "size_kb": 22.7177734375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/correlation/regime_calculator.py",
+      "lines": 555,
+      "size_kb": 23.7666015625
+    },
+    {
+      "file": "main/scanners/layers/layer3_realtime_scanner.py",
+      "lines": 553,
+      "size_kb": 21.0703125
+    },
+    {
+      "file": "main/backtesting/engine/backtest_engine.py",
+      "lines": 553,
+      "size_kb": 18.6025390625
+    },
+    {
+      "file": "main/utils/data/processor.py",
+      "lines": 552,
+      "size_kb": 20.2939453125
+    },
+    {
+      "file": "main/events/handlers/event_driven_engine.py",
+      "lines": 551,
+      "size_kb": 21.193359375
+    },
+    {
+      "file": "main/interfaces/data_pipeline/validation.py",
+      "lines": 550,
+      "size_kb": 13.0888671875
+    },
+    {
+      "file": "main/data_pipeline/storage/repositories/specialized_repositories.py",
+      "lines": 550,
+      "size_kb": 19.3583984375
+    },
+    {
+      "file": "main/scanners/layers/layer1_5_strategy_affinity.py",
+      "lines": 546,
+      "size_kb": 23.544921875
+    },
+    {
+      "file": "main/data_pipeline/validation/validators/record_validator.py",
+      "lines": 546,
+      "size_kb": 19.826171875
+    },
+    {
+      "file": "main/events/core/event_bus_helpers/dead_letter_queue_manager.py",
+      "lines": 545,
+      "size_kb": 17.1044921875
+    },
+    {
+      "file": "main/trading_engine/core/position_risk_validator.py",
+      "lines": 545,
+      "size_kb": 20.837890625
+    },
+    {
+      "file": "main/models/strategies/regime_adaptive.py",
+      "lines": 542,
+      "size_kb": 20.517578125
+    },
+    {
+      "file": "main/orchestration/job_scheduler.py",
+      "lines": 540,
+      "size_kb": 20.3271484375
+    },
+    {
+      "file": "main/backtesting/engine/market_simulator.py",
+      "lines": 538,
+      "size_kb": 18.5361328125
+    },
+    {
+      "file": "main/models/training/cross_validation.py",
+      "lines": 537,
+      "size_kb": 19.6572265625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/helpers/feature_utils.py",
+      "lines": 534,
+      "size_kb": 16.478515625
+    },
+    {
+      "file": "main/trading_engine/algorithms/twap.py",
+      "lines": 533,
+      "size_kb": 22.2353515625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/statistical/base_statistical.py",
+      "lines": 532,
+      "size_kb": 17.439453125
+    },
+    {
+      "file": "main/data_pipeline/storage/repositories/financials_repository.py",
+      "lines": 530,
+      "size_kb": 18.814453125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/options/unusual_activity_calculator.py",
+      "lines": 528,
+      "size_kb": 25.1240234375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/correlation/base_correlation.py",
+      "lines": 526,
+      "size_kb": 17.4384765625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/options/putcall_calculator.py",
+      "lines": 525,
+      "size_kb": 22.7802734375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/risk/stress_test_calculator.py",
+      "lines": 525,
+      "size_kb": 18.3115234375
+    },
+    {
+      "file": "main/feature_pipeline/calculators/correlation/leadlag_calculator.py",
+      "lines": 524,
+      "size_kb": 22.169921875
+    },
+    {
+      "file": "main/feature_pipeline/calculators/helpers/time_utils.py",
+      "lines": 523,
+      "size_kb": 16.626953125
+    },
+    {
+      "file": "main/data_pipeline/storage/repositories/feature_repository.py",
+      "lines": 523,
+      "size_kb": 18.328125
+    },
+    {
+      "file": "main/feature_pipeline/calculators/options/iv_calculator.py",
+      "lines": 522,
+      "size_kb": 21.916015625
+    },
+    {
+      "file": "main/trading_engine/core/trading_system.py",
+      "lines": 519,
+      "size_kb": 19.28125
+    },
+    {
+      "file": "main/app/commands/scanner_commands.py",
+      "lines": 515,
+      "size_kb": 18.9755859375
+    },
+    {
+      "file": "main/data_pipeline/historical/etl_service.py",
+      "lines": 515,
+      "size_kb": 17.7578125
+    },
+    {
+      "file": "main/data_pipeline/storage/repositories/market_data_repository.py",
+      "lines": 515,
+      "size_kb": 17.9423828125
+    },
+    {
+      "file": "main/app/commands/universe_commands.py",
+      "lines": 513,
+      "size_kb": 19.2294921875
+    },
+    {
+      "file": "main/risk_management/pre_trade/unified_limit_checker/utils.py",
+      "lines": 510,
+      "size_kb": 16.826171875
+    },
+    {
+      "file": "main/utils/networking/connection.py",
+      "lines": 509,
+      "size_kb": 18.33984375
+    },
+    {
+      "file": "main/feature_pipeline/data_preprocessor.py",
+      "lines": 503,
+      "size_kb": 21.181640625
+    },
+    {
+      "file": "main/feature_pipeline/calculators/statistical/fractal_calculator.py",
+      "lines": 503,
+      "size_kb": 19.0380859375
+    },
+    {
+      "file": "main/models/strategies/ml_regression_strategy.py",
+      "lines": 502,
+      "size_kb": 20.681640625
+    },
+    {
+      "file": "main/backtesting/analysis/risk_analysis.py",
+      "lines": 502,
+      "size_kb": 19.091796875
+    }
+  ],
+  "circular_imports": [],
+  "duplicate_code": [
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 20
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 8
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 9
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 10
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 14
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 8
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 19
+        },
+        {
+          "file": "main/scanners/catalysts/advanced_sentiment_scanner.py",
+          "line": 24
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 15
+        },
+        {
+          "file": "main/scanners/catalysts/coordinated_activity_scanner.py",
+          "line": 27
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 15
+        }
+      ],
+      "count": 11
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 21
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 9
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 10
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 11
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 15
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 9
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 20
+        },
+        {
+          "file": "main/scanners/catalysts/advanced_sentiment_scanner.py",
+          "line": 25
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 16
+        },
+        {
+          "file": "main/scanners/catalysts/coordinated_activity_scanner.py",
+          "line": 28
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 16
+        }
+      ],
+      "count": 11
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 236
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 203
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 212
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 202
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 211
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 177
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 240
+        },
+        {
+          "file": "main/scanners/catalysts/advanced_sentiment_scanner.py",
+          "line": 243
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 193
+        },
+        {
+          "file": "main/scanners/catalysts/coordinated_activity_scanner.py",
+          "line": 248
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 204
+        }
+      ],
+      "count": 11
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 237
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 204
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 213
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 203
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 212
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 178
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 241
+        },
+        {
+          "file": "main/scanners/catalysts/advanced_sentiment_scanner.py",
+          "line": 244
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 194
+        },
+        {
+          "file": "main/scanners/catalysts/coordinated_activity_scanner.py",
+          "line": 249
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 205
+        }
+      ],
+      "count": 11
+    },
+    {
+      "locations": [
+        {
+          "file": "main/feature_pipeline/calculators/options/unusual_activity_calculator.py",
+          "line": 103
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/iv_calculator.py",
+          "line": 103
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/moneyness_calculator.py",
+          "line": 103
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/putcall_calculator.py",
+          "line": 95
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/volume_flow_calculator.py",
+          "line": 94
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/greeks_calculator.py",
+          "line": 109
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/pca_calculator.py",
+          "line": 98
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/rolling_calculator.py",
+          "line": 88
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/regime_calculator.py",
+          "line": 85
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/leadlag_calculator.py",
+          "line": 96
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/beta_calculator.py",
+          "line": 94
+        }
+      ],
+      "count": 11
+    },
+    {
+      "locations": [
+        {
+          "file": "main/feature_pipeline/calculators/options/unusual_activity_calculator.py",
+          "line": 104
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/iv_calculator.py",
+          "line": 104
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/moneyness_calculator.py",
+          "line": 104
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/putcall_calculator.py",
+          "line": 96
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/volume_flow_calculator.py",
+          "line": 95
+        },
+        {
+          "file": "main/feature_pipeline/calculators/options/greeks_calculator.py",
+          "line": 110
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/pca_calculator.py",
+          "line": 99
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/rolling_calculator.py",
+          "line": 89
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/regime_calculator.py",
+          "line": 86
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/leadlag_calculator.py",
+          "line": 97
+        },
+        {
+          "file": "main/feature_pipeline/calculators/correlation/beta_calculator.py",
+          "line": 95
+        }
+      ],
+      "count": 11
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 87
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 72
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 96
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 76
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 98
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 68
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 119
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 80
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 80
+        }
+      ],
+      "count": 9
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 88
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 73
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 97
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 77
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 99
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 69
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 120
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 81
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 81
+        }
+      ],
+      "count": 9
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/market_validation_scanner.py",
+          "line": 89
+        },
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 74
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 78
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 100
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 70
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 121
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 82
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 82
+        }
+      ],
+      "count": 8
+    },
+    {
+      "locations": [
+        {
+          "file": "main/scanners/catalysts/earnings_scanner.py",
+          "line": 205
+        },
+        {
+          "file": "main/scanners/catalysts/news_scanner.py",
+          "line": 214
+        },
+        {
+          "file": "main/scanners/catalysts/technical_scanner.py",
+          "line": 204
+        },
+        {
+          "file": "main/scanners/catalysts/social_scanner.py",
+          "line": 213
+        },
+        {
+          "file": "main/scanners/catalysts/insider_scanner.py",
+          "line": 179
+        },
+        {
+          "file": "main/scanners/catalysts/intermarket_scanner.py",
+          "line": 242
+        },
+        {
+          "file": "main/scanners/catalysts/options_scanner.py",
+          "line": 195
+        },
+        {
+          "file": "main/scanners/catalysts/sector_scanner.py",
+          "line": 206
+        }
+      ],
+      "count": 8
+    }
+  ],
+  "missing_docstrings": [
+    {
+      "file": "main/feature_pipeline/feature_config.py",
+      "type": "function",
+      "name": "visit",
+      "line": 327
+    },
+    {
+      "file": "main/feature_pipeline/feature_adapter.py",
+      "type": "function",
+      "name": "add_deps",
+      "line": 313
+    },
+    {
+      "file": "main/features/precompute_engine.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 371
+    },
+    {
+      "file": "main/features/precompute_engine.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 659
+    },
+    {
+      "file": "main/scanners/scanner_pipeline_utils.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 178
+    },
+    {
+      "file": "main/scanners/scanner_pipeline_utils.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 297
+    },
+    {
+      "file": "main/events/handlers/feature_pipeline_helpers/feature_types.py",
+      "type": "function",
+      "name": "add_deps",
+      "line": 90
+    },
+    {
+      "file": "main/events/core/event_bus_helpers/event_bus_stats_tracker.py",
+      "type": "function",
+      "name": "get_metric_value",
+      "line": 73
+    },
+    {
+      "file": "main/monitoring/dashboards/v2/trading_dashboard_v2.py",
+      "type": "function",
+      "name": "update_content",
+      "line": 108
+    },
+    {
+      "file": "main/monitoring/dashboards/v2/trading_dashboard_v2.py",
+      "type": "function",
+      "name": "run_in_thread",
+      "line": 1020
+    },
+    {
+      "file": "main/monitoring/dashboards/v2/system_dashboard_v2.py",
+      "type": "function",
+      "name": "update_content",
+      "line": 109
+    },
+    {
+      "file": "main/scanners/layers/layer3_realtime_scanner.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 215
+    },
+    {
+      "file": "main/scanners/layers/layer3_realtime_scanner.py",
+      "type": "function",
+      "name": "execute_updates",
+      "line": 477
+    },
+    {
+      "file": "main/scanners/layers/layer3_premarket_scanner.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 168
+    },
+    {
+      "file": "main/scanners/layers/layer3_premarket_scanner.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 202
+    },
+    {
+      "file": "main/scanners/layers/layer3_premarket_scanner.py",
+      "type": "function",
+      "name": "execute_query",
+      "line": 334
+    },
+    {
+      "file": "main/scanners/layers/layer3_premarket_scanner.py",
+      "type": "function",
+      "name": "execute_updates",
+      "line": 532
+    },
+    {
+      "file": "main/models/strategies/correlation_strategy.py",
+      "type": "function",
+      "name": "get_required_feature_sets",
+      "line": 39
+    },
+    {
+      "file": "main/models/training/training_orchestrator.py",
+      "type": "class",
+      "name": "ModelStrategy",
+      "line": 217
+    },
+    {
+      "file": "main/models/training/pipeline_results.py",
+      "type": "function",
+      "name": "json_serializer",
+      "line": 274
+    }
+  ],
+  "empty_modules": [],
+  "statistics": {
+    "total_files": 787,
+    "total_lines": 233439,
+    "large_files_count": 146,
+    "circular_imports_count": 0,
+    "duplicate_blocks_count": 10,
+    "empty_modules_count": 0
+  }
+}

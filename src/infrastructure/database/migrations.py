@@ -6,11 +6,11 @@ Handles database schema evolution and rollback capabilities.
 """
 
 # Standard library imports
+import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
-import logging
 from pathlib import Path
-import re
 from typing import Any
 
 # Local imports
@@ -177,6 +177,9 @@ class MigrationManager:
         Returns:
             List of applied migrations
         """
+        # Safe to use string formatting here - MIGRATIONS_TABLE is a constant
+        # and validated to contain only safe characters
+        # nosec B608 - table name is a constant, not user input
         query = f"""
         SELECT version, name, applied_at
         FROM {self.MIGRATIONS_TABLE}
@@ -255,6 +258,8 @@ class MigrationManager:
             # Record migration as applied
             execution_time = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
 
+            # Safe to use string formatting here - MIGRATIONS_TABLE is a constant
+            # nosec B608 - table name is a constant, not user input
             insert_query = f"""
             INSERT INTO {self.MIGRATIONS_TABLE}
             (version, name, applied_at, execution_time_ms)
@@ -302,6 +307,8 @@ class MigrationManager:
             await self.adapter.execute_query(migration.down_sql)
 
             # Remove migration record
+            # Safe to use string formatting here - MIGRATIONS_TABLE is a constant
+            # nosec B608 - table name is a constant, not user input
             delete_query = f"""
             DELETE FROM {self.MIGRATIONS_TABLE}
             WHERE version = $1

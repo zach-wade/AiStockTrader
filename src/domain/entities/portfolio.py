@@ -6,9 +6,21 @@ Portfolio Entity - Manages multiple positions and overall portfolio metrics
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID, uuid4
 
 from .position import Position
+
+
+@dataclass
+class PositionRequest:
+    """Request parameters for opening a position."""
+
+    symbol: str
+    quantity: Decimal
+    entry_price: Decimal
+    commission: Decimal = Decimal("0")
+    strategy: str | None = None
 
 
 @dataclass
@@ -50,7 +62,7 @@ class Portfolio:
 
     # Metadata
     strategy: str | None = None
-    tags: dict = field(default_factory=dict)
+    tags: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate portfolio after initialization"""
@@ -125,31 +137,37 @@ class Portfolio:
 
     def open_position(
         self,
-        symbol: str,
-        quantity: Decimal,
-        entry_price: Decimal,
-        commission: Decimal = Decimal("0"),
-        strategy: str | None = None,
+        request: PositionRequest,
     ) -> Position:
-        """Open a new position in the portfolio"""
+        """Open a new position in the portfolio.
+
+        Args:
+            request: Position request with parameters
+
+        Returns:
+            Newly opened position
+
+        Raises:
+            ValueError: If position cannot be opened
+        """
         # Validate ability to open
-        can_open, reason = self.can_open_position(symbol, quantity, entry_price)
+        can_open, reason = self.can_open_position(request.symbol, request.quantity, request.entry_price)
         if not can_open:
             raise ValueError(f"Cannot open position: {reason}")
 
         # Create position
         position = Position.open_position(
-            symbol=symbol,
-            quantity=quantity,
-            entry_price=entry_price,
-            commission=commission,
-            strategy=strategy or self.strategy,
+            symbol=request.symbol,
+            quantity=request.quantity,
+            entry_price=request.entry_price,
+            commission=request.commission,
+            strategy=request.strategy or self.strategy,
         )
 
         # Update portfolio
-        self.positions[symbol] = position
-        self.cash_balance -= abs(quantity) * entry_price + commission
-        self.total_commission_paid += commission
+        self.positions[request.symbol] = position
+        self.cash_balance -= abs(request.quantity) * request.entry_price + request.commission
+        self.total_commission_paid += request.commission
         self.trades_count += 1
         self.last_updated = datetime.now(UTC)
 
@@ -331,7 +349,7 @@ class Portfolio:
         # Placeholder - would need historical tracking
         return Decimal("0")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert portfolio to dictionary for serialization"""
         return {
             "id": str(self.id),

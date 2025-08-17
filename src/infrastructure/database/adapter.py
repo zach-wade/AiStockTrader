@@ -7,15 +7,15 @@ Handles connection management, query execution, and error handling.
 
 # Standard library imports
 import builtins
+import logging
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-import logging
 from typing import Any
 
 # Third-party imports
 import psycopg
 from psycopg import AsyncConnection
-from psycopg.rows import Row
+from psycopg.rows import Row, dict_row
 from psycopg_pool import AsyncConnectionPool
 
 # Local imports
@@ -107,7 +107,7 @@ class PostgreSQLAdapter:
             TimeoutError: If query times out
         """
         try:
-            async with self.acquire_connection() as conn, conn.cursor() as cur:
+            async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, args)
                 result = f"EXECUTE {cur.rowcount}"
                 logger.debug(f"Query executed: {query[:100]}... | Result: {result}")
@@ -144,7 +144,7 @@ class PostgreSQLAdapter:
             TimeoutError: If query times out
         """
         try:
-            async with self.acquire_connection() as conn, conn.cursor() as cur:
+            async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, args)
                 result = await cur.fetchone()
                 logger.debug(f"Fetch one query: {query[:100]}... | Found: {result is not None}")
@@ -178,7 +178,7 @@ class PostgreSQLAdapter:
             TimeoutError: If query times out
         """
         try:
-            async with self.acquire_connection() as conn, conn.cursor() as cur:
+            async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, args)
                 result = await cur.fetchall()
                 logger.debug(f"Fetch all query: {query[:100]}... | Count: {len(result)}")
@@ -212,10 +212,15 @@ class PostgreSQLAdapter:
             TimeoutError: If query times out
         """
         try:
-            async with self.acquire_connection() as conn, conn.cursor() as cur:
+            async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(query, args)
                 result = await cur.fetchall()
-                values = [record[0] for record in result]
+                # Get the first column name from the result
+                if result:
+                    first_key = list(result[0].keys())[0]
+                    values = [record[first_key] for record in result]
+                else:
+                    values = []
                 logger.debug(f"Fetch values query: {query[:100]}... | Count: {len(values)}")
                 return values
         except (psycopg.OperationalError, IndexError) as e:
@@ -244,7 +249,7 @@ class PostgreSQLAdapter:
             TimeoutError: If batch execution times out
         """
         try:
-            async with self.acquire_connection() as conn, conn.cursor() as cur:
+            async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
                 await cur.executemany(query, args_list)
                 logger.debug(
                     f"Batch query executed: {query[:100]}... | Batch size: {len(args_list)}"
@@ -341,7 +346,7 @@ class PostgreSQLAdapter:
             True if database is healthy, False otherwise
         """
         try:
-            async with self.acquire_connection() as conn, conn.cursor() as cur:
+            async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute("SELECT 1")
                 await cur.fetchone()
                 return True

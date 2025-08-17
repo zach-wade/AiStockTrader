@@ -1,8 +1,0 @@
-{
-  "symbol": "GOOGL",
-  "model_type": "RandomForest",
-  "accuracy": 0.5401069518716578,
-  "auc": 0.4995386389850058,
-  "trained_at": "20250629_110023",
-  "model_path": "models/trained/GOOGL_RandomForest_20250629_110023.pkl"
-}

@@ -9,8 +9,8 @@ Supports different test categories and provides detailed reporting.
 # Standard library imports
 import argparse
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))

@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aitrader-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ai_trader}
+      POSTGRES_USER: ${DB_USER:-ai_trader}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployment/sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ai_trader}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aitrader-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aitrader-cache
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aitrader-network
+
+  # AI Trader Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_ENV=${AI_TRADER_ENV:-prod}
+    image: aitrader:latest
+    container_name: aitrader-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-ai_trader}
+      DB_USER: ${DB_USER:-ai_trader}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Environment
+      AI_TRADER_ENV: ${AI_TRADER_ENV:-prod}
+      # API Keys (from .env)
+      ALPACA_API_KEY: ${ALPACA_API_KEY}
+      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY}
+      POLYGON_API_KEY: ${POLYGON_API_KEY}
+      # Monitoring
+      PROMETHEUS_ENABLED: "true"
+      METRICS_PORT: 9090
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    ports:
+      - "8080:8080"  # API/Health endpoint
+      - "9090:9090"  # Metrics endpoint
+    networks:
+      - aitrader-network
+    command: ["python", "src/main/app/run_trading.py"]
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aitrader-prometheus
+    restart: unless-stopped
+    depends_on:
+      - app
+    volumes:
+      - ./deployment/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9091:9090"
+    networks:
+      - aitrader-network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aitrader-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deployment/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - aitrader-network
+
+  # Development database UI (optional)
+  adminer:
+    image: adminer:latest
+    container_name: aitrader-adminer
+    restart: unless-stopped
+    profiles:
+      - dev
+    depends_on:
+      - postgres
+    ports:
+      - "8081:8080"
+    networks:
+      - aitrader-network
+
+# Networks
+networks:
+  aitrader-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

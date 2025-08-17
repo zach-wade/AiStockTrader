@@ -6,8 +6,8 @@ Handles position persistence, retrieval, and mapping between domain entities and
 """
 
 # Standard library imports
-from datetime import datetime
 import logging
+from datetime import datetime
 from uuid import UUID
 
 # Third-party imports

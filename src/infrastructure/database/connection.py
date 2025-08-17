@@ -7,11 +7,11 @@ Implements connection pooling, configuration, and health monitoring.
 
 # Standard library imports
 import asyncio
+import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-import logging
-import os
 from typing import Any, Optional
 from urllib.parse import urlparse
 

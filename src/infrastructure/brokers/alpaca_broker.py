@@ -3,22 +3,28 @@ Alpaca Broker Implementation - Integration with Alpaca Trading API
 """
 
 # Standard library imports
-from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 import logging
 import os
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 # Third-party imports
 from alpaca.common.exceptions import APIError
-from alpaca.trading import GetOrdersRequest, LimitOrderRequest, MarketOrderRequest
+from alpaca.trading import (
+    GetOrdersRequest,
+    LimitOrderRequest,
+    MarketOrderRequest,
+    PositionSide,
+    StopLimitOrderRequest,
+    StopOrderRequest,
+    TradingClient,
+)
 from alpaca.trading import OrderSide as AlpacaOrderSide
 from alpaca.trading import OrderStatus as AlpacaOrderStatus
 from alpaca.trading import OrderType as AlpacaOrderType
-from alpaca.trading import PositionSide, StopLimitOrderRequest, StopOrderRequest
 from alpaca.trading import TimeInForce as AlpacaTimeInForce
-from alpaca.trading import TradingClient
 from alpaca.trading.models import Order as AlpacaOrder
 
 # Local imports

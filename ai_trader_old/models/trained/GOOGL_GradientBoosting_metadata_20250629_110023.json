@@ -1,0 +1,8 @@
+{
+  "symbol": "GOOGL",
+  "model_type": "GradientBoosting",
+  "accuracy": 0.49732620320855614,
+  "auc": 0.502883506343714,
+  "trained_at": "20250629_110023",
+  "model_path": "models/trained/GOOGL_GradientBoosting_20250629_110023.pkl"
+}

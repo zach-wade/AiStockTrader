@@ -1,0 +1,267 @@
+# Storage Configuration
+# Unified storage configuration for hot/cold/archive tiers
+
+storage:
+  # Dual storage architecture
+  dual_storage:
+    enabled: true
+    mode: async  # sync, async, event_only
+    parallel_writes: true
+    write_timeout_seconds: 30
+
+  # Hot storage (PostgreSQL)
+  hot:
+    type: postgresql
+    batch_size: 1000
+    max_batch_size: 5000
+    timeout: 30.0
+    connection_pool:
+      min_size: 5
+      max_size: 20
+      timeout: 10.0
+      max_queries: 50000
+      max_inactive_time: 300
+    retry:
+      max_attempts: 3
+      initial_delay: 1.0
+      max_delay: 10.0
+      exponential_base: 2.0
+    optimization:
+      use_copy_command: true
+      disable_indexes_on_bulk: false
+      vacuum_after_bulk: true
+      analyze_after_bulk: true
+
+  # Cold storage (Data Lake)
+  cold:
+    type: parquet
+    base_path: ./data_lake
+    batch_size: 5000
+    max_batch_size: 20000
+    timeout: 60.0
+    compression: snappy  # snappy, gzip, lz4, zstd
+    compression_level: 6  # For gzip/zstd
+    partitioning:
+      by: ["date", "symbol", "interval"]
+      format: "source={source}/data_type={data_type}/symbol={symbol}/interval={interval}/date={date}"
+    file_format:
+      row_group_size: 50000
+      data_page_size: 1048576  # 1MB
+      dictionary_encoding: true
+      statistics: true
+    optimization:
+      enable_bloom_filters: true
+      enable_column_indexes: true
+
+  # Archive settings
+  archive:
+    storage_type: local  # local, s3, gcs, azure
+    local_path: ./data_lake/archive
+    compression:
+      enabled: true
+      algorithm: gzip
+      level: 9  # Maximum compression for archive
+    retention:
+      keep_metadata: true
+      create_manifest: true
+      verify_on_archive: true
+    s3_config:  # For future S3 support
+      bucket: null
+      prefix: "archive/"
+      storage_class: "GLACIER"
+
+  # Storage routing rules
+  routing:
+    # Hot data retention
+    hot_data_days: 30  # Default, overridden by layer config
+
+    # Fallback behavior
+    cold_fallback_enabled: true
+    hot_fallback_enabled: true
+    prefer_hot_for_recent: true  # Use hot storage for data < 7 days old
+
+    # Query routing
+    max_concurrent_cold_queries: 5
+    cold_query_timeout_seconds: 60
+    hot_query_timeout_seconds: 30
+
+    # Query type routing
+    query_type_overrides:
+      real_time: hot          # Always use hot
+      analysis: hot           # Prefer hot for speed
+      feature_calc: hot       # Feature calculations need speed
+      bulk_export: cold       # Large exports from cold
+      backfill: both         # Write to both
+      scanner: hot           # Scanner needs speed
+      admin: both            # Admin can query both
+
+    # Repository-specific routing overrides
+    repository_overrides:
+      market_data:
+        force_tier: null      # Use standard routing
+        hot_retention_days: null  # Use layer default
+      news:
+        force_tier: hot       # Always hot (schema differences)
+        hot_retention_days: 90
+        reason: "News schema with sentiment only in hot storage"
+      corporate_actions:
+        force_tier: both      # Always write to both
+        hot_retention_days: 365
+        reason: "Corporate actions need long-term hot access"
+      financials:
+        force_tier: cold      # Mostly cold (quarterly data)
+        hot_retention_days: 7
+        reason: "Financials are quarterly, minimal hot storage needed"
+      ratings:
+        force_tier: hot
+        hot_retention_days: 180
+        reason: "Ratings changes need quick access"
+
+  # Data lifecycle management
+  lifecycle:
+    # Automatic transitions
+    auto_transition:
+      enabled: true
+      check_interval_hours: 24
+      batch_size: 10000
+
+    # Hot to cold transition
+    hot_to_cold:
+      enabled: true
+      method: move  # move, copy
+      verify_after_move: true
+      delete_after_days: 7  # Keep in hot for 7 days after cold write
+
+    # Cold to archive transition
+    cold_to_archive:
+      enabled: true
+      method: move
+      verify_after_move: true
+      create_archive_manifest: true
+
+    # Cleanup policies
+    cleanup:
+      enabled: true
+      delete_archived_from_cold: true
+      vacuum_after_cleanup: true
+      min_age_days: 30  # Don't cleanup data < 30 days old
+
+  # Performance optimization
+  optimization:
+    # Bulk operations
+    bulk_operations:
+      use_bulk_loader: true
+      accumulation_size: 10000
+      accumulation_timeout_seconds: 30.0
+      max_memory_mb: 500
+      parallel_loaders: 3
+
+      # Layer-based configurations
+      layer_configs:
+        layer1:  # Most liquid ~2000 stocks (highest priority)
+          market_data_buffer: 20000
+          news_buffer: 1000
+          fundamentals_buffer: 5000
+          corporate_actions_buffer: 10000
+          priority: 1
+          use_copy_command: true
+          parallel_loaders: 4
+
+        layer2:  # Mid-tier liquidity stocks
+          market_data_buffer: 10000
+          news_buffer: 500
+          fundamentals_buffer: 2500
+          corporate_actions_buffer: 5000
+          priority: 2
+          use_copy_command: true
+          parallel_loaders: 3
+
+        layer3:  # Lower liquidity stocks
+          market_data_buffer: 5000
+          news_buffer: 250
+          fundamentals_buffer: 1000
+          corporate_actions_buffer: 2500
+          priority: 3
+          use_copy_command: true
+          parallel_loaders: 2
+
+      # Type-specific configurations
+      market_data:
+        intervals_per_table:
+          1minute: "market_data_1m"
+          5minute: "market_data_5m"
+          1hour: "market_data_1h"
+          1day: "market_data_1d"
+        enable_scanner_qualification: true
+
+      news:
+        text_max_length: 10000
+        enable_deduplication: true
+        dedup_cache_ttl: 3600
+        enable_sentiment: true
+
+      fundamentals:
+        max_eps_value: 999999.0
+        warn_eps_threshold: 10000.0
+        enable_validation: true
+
+      corporate_actions:
+        default_currency: "USD"
+        default_dividend_type: "CD"
+        process_dividends: true
+        process_splits: true
+
+    # Caching
+    caching:
+      metadata_cache_ttl: 3600  # 1 hour
+      partition_cache_ttl: 86400  # 24 hours
+      enable_query_cache: true
+      query_cache_size_mb: 512
+
+    # Memory management
+    memory:
+      max_buffer_size_mb: 1000
+      gc_after_batch: true
+      optimize_dataframe_memory: true
+
+# Storage monitoring
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    collection_interval: 60  # seconds
+    retention_days: 30
+
+  # Health checks
+  health_checks:
+    enabled: true
+    check_interval: 300  # 5 minutes
+    checks:
+      - disk_space
+      - connection_pool
+      - write_latency
+      - read_latency
+
+  # Alerts
+  alerts:
+    disk_usage_threshold: 0.9  # 90%
+    connection_pool_threshold: 0.8  # 80%
+    latency_threshold_ms: 1000
+    error_rate_threshold: 0.05  # 5%
+
+# Cache configuration
+cache:
+  backend: memory  # or redis
+  memory:
+    max_size_mb: 512
+    eviction_policy: lru
+
+  redis:
+    url: ${REDIS_URL:-redis://localhost:6379}
+    key_prefix: ai_trader
+    ttl_seconds: 3600
+
+  security:
+    serialization: secure  # Never use pickle
+    compression: true
+    encryption: false  # Enable for sensitive data

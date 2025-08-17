@@ -7,10 +7,10 @@ end-to-end workflows, and performance characteristics.
 
 # Standard library imports
 import asyncio
+import os
 from contextlib import suppress
 from datetime import UTC, datetime
 from decimal import Decimal
-import os
 from uuid import uuid4
 
 # Third-party imports

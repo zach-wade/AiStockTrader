@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 from uuid import UUID, uuid4
 
 
@@ -48,6 +49,19 @@ class TimeInForce(Enum):
 
 
 @dataclass
+class OrderRequest:
+    """Request parameters for creating an order."""
+
+    symbol: str
+    quantity: Decimal
+    side: OrderSide
+    limit_price: Decimal | None = None
+    stop_price: Decimal | None = None
+    time_in_force: TimeInForce = TimeInForce.DAY
+    reason: str | None = None
+
+
+@dataclass
 class Order:
     """
     Order entity representing a trading order.
@@ -86,7 +100,7 @@ class Order:
 
     # Metadata
     reason: str | None = None
-    tags: dict = field(default_factory=dict)
+    tags: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate order after initialization"""
@@ -97,8 +111,10 @@ class Order:
         if not self.symbol:
             raise ValueError("Order symbol cannot be empty")
 
-        if self.quantity <= 0:
-            raise ValueError(f"Order quantity must be positive, got {self.quantity}")
+        # Check if quantity is positive (handle both Decimal and Quantity types)
+        qty_value = self.quantity.value if hasattr(self.quantity, 'value') else self.quantity
+        if qty_value <= 0:
+            raise ValueError(f"Order quantity must be positive, got {qty_value}")
 
         if self.order_type == OrderType.LIMIT and self.limit_price is None:
             raise ValueError("Limit order requires limit price")
@@ -114,56 +130,109 @@ class Order:
         if self.filled_quantity < 0:
             raise ValueError("Filled quantity cannot be negative")
 
-        if self.filled_quantity > self.quantity:
+        # Compare filled_quantity with quantity (handle both Decimal and Quantity types)
+        qty_value = self.quantity.value if hasattr(self.quantity, 'value') else self.quantity
+        if self.filled_quantity > qty_value:
             raise ValueError("Filled quantity cannot exceed order quantity")
 
     @classmethod
     def create_market_order(
-        cls, symbol: str, quantity: Decimal, side: OrderSide, reason: str | None = None
+        cls, request: OrderRequest
     ) -> "Order":
         """Factory method to create a market order"""
         return cls(
-            symbol=symbol, quantity=quantity, side=side, order_type=OrderType.MARKET, reason=reason
+            symbol=request.symbol, 
+            quantity=request.quantity, 
+            side=request.side, 
+            order_type=OrderType.MARKET, 
+            reason=request.reason
         )
 
     @classmethod
     def create_limit_order(
         cls,
-        symbol: str,
-        quantity: Decimal,
-        side: OrderSide,
-        limit_price: Decimal,
-        time_in_force: TimeInForce = TimeInForce.DAY,
-        reason: str | None = None,
+        request: OrderRequest,
     ) -> "Order":
-        """Factory method to create a limit order"""
+        """Factory method to create a limit order.
+
+        Args:
+            request: Order request with parameters
+
+        Returns:
+            New limit order
+
+        Raises:
+            ValueError: If limit_price is not provided
+        """
+        if request.limit_price is None:
+            raise ValueError("Limit price is required for limit orders")
+
         return cls(
-            symbol=symbol,
-            quantity=quantity,
-            side=side,
+            symbol=request.symbol,
+            quantity=request.quantity,
+            side=request.side,
             order_type=OrderType.LIMIT,
-            limit_price=limit_price,
-            time_in_force=time_in_force,
-            reason=reason,
+            limit_price=request.limit_price,
+            time_in_force=request.time_in_force,
+            reason=request.reason,
         )
 
     @classmethod
     def create_stop_order(
         cls,
-        symbol: str,
-        quantity: Decimal,
-        side: OrderSide,
-        stop_price: Decimal,
-        reason: str | None = None,
+        request: OrderRequest,
     ) -> "Order":
-        """Factory method to create a stop order"""
+        """Factory method to create a stop order.
+
+        Args:
+            request: Order request with parameters
+
+        Returns:
+            New stop order
+
+        Raises:
+            ValueError: If stop_price is not provided
+        """
+        if request.stop_price is None:
+            raise ValueError("Stop price is required for stop orders")
+
         return cls(
-            symbol=symbol,
-            quantity=quantity,
-            side=side,
+            symbol=request.symbol,
+            quantity=request.quantity,
+            side=request.side,
             order_type=OrderType.STOP,
-            stop_price=stop_price,
-            reason=reason,
+            stop_price=request.stop_price,
+            reason=request.reason,
+        )
+
+    @classmethod
+    def create_stop_limit_order(
+        cls,
+        request: OrderRequest,
+    ) -> "Order":
+        """Factory method to create a stop-limit order.
+
+        Args:
+            request: Order request with parameters
+
+        Returns:
+            New stop-limit order
+
+        Raises:
+            ValueError: If stop_price or limit_price is not provided
+        """
+        if request.stop_price is None or request.limit_price is None:
+            raise ValueError("Both stop price and limit price are required for stop-limit orders")
+
+        return cls(
+            symbol=request.symbol,
+            quantity=request.quantity,
+            side=request.side,
+            order_type=OrderType.STOP_LIMIT,
+            stop_price=request.stop_price,
+            limit_price=request.limit_price,
+            time_in_force=request.time_in_force,
+            reason=request.reason,
         )
 
     def submit(self, broker_order_id: str) -> None:

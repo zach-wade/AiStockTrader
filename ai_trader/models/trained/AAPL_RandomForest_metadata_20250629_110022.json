@@ -1,8 +1,0 @@
-{
-  "symbol": "AAPL",
-  "model_type": "RandomForest",
-  "accuracy": 0.45989304812834225,
-  "auc": 0.45666666666666667,
-  "trained_at": "20250629_110022",
-  "model_path": "models/trained/AAPL_RandomForest_20250629_110022.pkl"
-}

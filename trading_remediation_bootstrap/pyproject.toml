@@ -1,12 +1,12 @@
 [tool.black]
 line-length = 100
 target-version = ["py311"]
-include = "\.pyi?$"
+include = "\\.pyi?$"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-select = ["E", "F", "W", "I", "B", "UP", "RUF", "PL", "NP"]
+select = ["E", "F", "W", "I", "B", "UP", "RUF", "PL", "NPY"]
 ignore = ["E203","E501"]
 fix = true
 exclude = ["build", "dist", ".venv", "venv"]

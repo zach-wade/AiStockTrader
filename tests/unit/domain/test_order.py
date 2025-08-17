@@ -18,12 +18,19 @@ class TestOrderCreation:
 
     def test_create_market_order(self):
         """Test creating a market order"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY, reason="Test order"
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
+            reason="Test order",
         )
+        order = Order.create_market_order(request)
 
         assert order.symbol == "AAPL"
-        assert order.quantity == Decimal("100")
+        assert order.quantity.value == Decimal("100")
         assert order.side == OrderSide.BUY
         assert order.order_type == OrderType.MARKET
         assert order.status == OrderStatus.PENDING
@@ -33,38 +40,48 @@ class TestOrderCreation:
 
     def test_create_limit_order(self):
         """Test creating a limit order"""
-        order = Order.create_limit_order(
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        from src.domain.value_objects.price import Price
+        
+        request = OrderRequest(
             symbol="GOOGL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.SELL,
-            limit_price=Decimal("150.50"),
+            limit_price=Price(Decimal("150.50")),
             time_in_force=TimeInForce.GTC,
             reason="Take profit",
         )
+        order = Order.create_limit_order(request)
 
         assert order.symbol == "GOOGL"
-        assert order.quantity == Decimal("50")
+        assert order.quantity.value == Decimal("50")
         assert order.side == OrderSide.SELL
         assert order.order_type == OrderType.LIMIT
-        assert order.limit_price == Decimal("150.50")
+        assert order.limit_price.value == Decimal("150.50")
         assert order.time_in_force == TimeInForce.GTC
         assert order.reason == "Take profit"
 
     def test_create_stop_order(self):
         """Test creating a stop order"""
-        order = Order.create_stop_order(
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        from src.domain.value_objects.price import Price
+        
+        request = OrderRequest(
             symbol="MSFT",
-            quantity=Decimal("75"),
+            quantity=Quantity(Decimal("75")),
             side=OrderSide.SELL,
-            stop_price=Decimal("300.00"),
+            stop_price=Price(Decimal("300.00")),
             reason="Stop loss",
         )
+        order = Order.create_stop_order(request)
 
         assert order.symbol == "MSFT"
-        assert order.quantity == Decimal("75")
+        assert order.quantity.value == Decimal("75")
         assert order.side == OrderSide.SELL
         assert order.order_type == OrderType.STOP
-        assert order.stop_price == Decimal("300.00")
+        assert order.stop_price.value == Decimal("300.00")
         assert order.reason == "Stop loss"
 
 
@@ -73,57 +90,72 @@ class TestOrderValidation:
 
     def test_empty_symbol_raises_error(self):
         """Test that empty symbol raises ValueError"""
+        from src.domain.value_objects.quantity import Quantity
+        
         with pytest.raises(ValueError, match="symbol cannot be empty"):
-            Order(symbol="", quantity=Decimal("100"), side=OrderSide.BUY)
+            Order(symbol="", quantity=Quantity(Decimal("100")), side=OrderSide.BUY)
 
     def test_negative_quantity_raises_error(self):
         """Test that negative quantity raises ValueError"""
+        from src.domain.value_objects.quantity import Quantity
+        
         with pytest.raises(ValueError, match="quantity must be positive"):
-            Order(symbol="AAPL", quantity=Decimal("-10"), side=OrderSide.BUY)
+            Order(symbol="AAPL", quantity=Quantity(Decimal("-10")), side=OrderSide.BUY)
 
     def test_zero_quantity_raises_error(self):
         """Test that zero quantity raises ValueError"""
+        from src.domain.value_objects.quantity import Quantity
+        
         with pytest.raises(ValueError, match="quantity must be positive"):
-            Order(symbol="AAPL", quantity=Decimal("0"), side=OrderSide.BUY)
+            Order(symbol="AAPL", quantity=Quantity(Decimal("0")), side=OrderSide.BUY)
 
     def test_limit_order_without_price_raises_error(self):
         """Test that limit order without price raises ValueError"""
+        from src.domain.value_objects.quantity import Quantity
+        
         with pytest.raises(ValueError, match="Limit order requires limit price"):
             Order(
                 symbol="AAPL",
-                quantity=Decimal("100"),
+                quantity=Quantity(Decimal("100")),
                 side=OrderSide.BUY,
                 order_type=OrderType.LIMIT,
             )
 
     def test_stop_order_without_price_raises_error(self):
         """Test that stop order without stop price raises ValueError"""
+        from src.domain.value_objects.quantity import Quantity
+        
         with pytest.raises(ValueError, match="Stop order requires stop price"):
             Order(
                 symbol="AAPL",
-                quantity=Decimal("100"),
+                quantity=Quantity(Decimal("100")),
                 side=OrderSide.BUY,
                 order_type=OrderType.STOP,
             )
 
     def test_stop_limit_without_prices_raises_error(self):
         """Test that stop-limit order without both prices raises ValueError"""
+        from src.domain.value_objects.quantity import Quantity
+        from src.domain.value_objects.price import Price
+        
         with pytest.raises(ValueError, match="Stop-limit order requires both"):
             Order(
                 symbol="AAPL",
-                quantity=Decimal("100"),
+                quantity=Quantity(Decimal("100")),
                 side=OrderSide.BUY,
                 order_type=OrderType.STOP_LIMIT,
-                stop_price=Decimal("150.00"),
+                stop_price=Price(Decimal("150.00")),
                 # Missing limit_price
             )
 
     def test_filled_quantity_exceeds_order_quantity(self):
         """Test that filled quantity cannot exceed order quantity"""
+        from src.domain.value_objects.quantity import Quantity
+        
         with pytest.raises(ValueError, match="Filled quantity cannot exceed"):
             Order(
                 symbol="AAPL",
-                quantity=Decimal("100"),
+                quantity=Quantity(Decimal("100")),
                 side=OrderSide.BUY,
                 filled_quantity=Decimal("150"),
             )
@@ -134,9 +166,15 @@ class TestOrderStateTransitions:
 
     def test_submit_order(self):
         """Test submitting an order"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
 
         assert order.status == OrderStatus.PENDING
         assert order.broker_order_id is None
@@ -150,9 +188,15 @@ class TestOrderStateTransitions:
 
     def test_cannot_submit_non_pending_order(self):
         """Test that non-pending orders cannot be submitted"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
 
         with pytest.raises(ValueError, match="Cannot submit order in OrderStatus.SUBMITTED status"):
@@ -160,9 +204,15 @@ class TestOrderStateTransitions:
 
     def test_fill_order_completely(self):
         """Test filling an order completely"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
 
         order.fill(filled_quantity=Decimal("100"), fill_price=Decimal("150.50"))
@@ -174,9 +224,15 @@ class TestOrderStateTransitions:
 
     def test_fill_order_partially(self):
         """Test partial fill of an order"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
 
         # First partial fill
@@ -205,9 +261,15 @@ class TestOrderStateTransitions:
 
     def test_cannot_fill_cancelled_order(self):
         """Test that cancelled orders cannot be filled"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
         order.cancel("User requested")
 
@@ -216,9 +278,15 @@ class TestOrderStateTransitions:
 
     def test_cancel_order(self):
         """Test cancelling an order"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
 
         order.cancel("Market closed")
@@ -229,9 +297,15 @@ class TestOrderStateTransitions:
 
     def test_cannot_cancel_filled_order(self):
         """Test that filled orders cannot be cancelled"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
         order.fill(Decimal("100"), Decimal("150.00"))
 
@@ -240,9 +314,15 @@ class TestOrderStateTransitions:
 
     def test_reject_order(self):
         """Test rejecting an order"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
 
         order.reject("Insufficient funds")
 
@@ -251,9 +331,15 @@ class TestOrderStateTransitions:
 
     def test_cannot_reject_submitted_order(self):
         """Test that submitted orders cannot be rejected"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
         order.submit("BROKER_123")
 
         with pytest.raises(ValueError, match="Cannot reject order in OrderStatus.SUBMITTED status"):
@@ -265,9 +351,15 @@ class TestOrderQueries:
 
     def test_is_active(self):
         """Test is_active method"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
 
         assert order.is_active()  # PENDING
 
@@ -282,9 +374,15 @@ class TestOrderQueries:
 
     def test_is_complete(self):
         """Test is_complete method"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
 
         assert not order.is_complete()  # PENDING
 
@@ -296,9 +394,15 @@ class TestOrderQueries:
 
     def test_get_remaining_quantity(self):
         """Test get_remaining_quantity method"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
 
         assert order.get_remaining_quantity() == Decimal("100")
 
@@ -313,9 +417,15 @@ class TestOrderQueries:
 
     def test_get_fill_ratio(self):
         """Test get_fill_ratio method"""
-        order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        order = Order.create_market_order(request)
 
         assert order.get_fill_ratio() == Decimal("0")
 
@@ -330,10 +440,17 @@ class TestOrderQueries:
 
     def test_get_notional_value(self):
         """Test get_notional_value method"""
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        from src.domain.value_objects.price import Price
+        
         # Market order before fill
-        market_order = Order.create_market_order(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
         )
+        market_order = Order.create_market_order(request)
         assert market_order.get_notional_value() is None
 
         # Market order after fill
@@ -342,22 +459,28 @@ class TestOrderQueries:
         assert market_order.get_notional_value() == Decimal("15000")
 
         # Limit order
-        limit_order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
-            limit_price=Decimal("149.99"),
+            limit_price=Price(Decimal("149.99")),
         )
+        limit_order = Order.create_limit_order(request)
         assert limit_order.get_notional_value() == Decimal("14999")
 
     def test_string_representation(self):
         """Test string representation"""
-        order = Order.create_limit_order(
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.quantity import Quantity
+        from src.domain.value_objects.price import Price
+        
+        request = OrderRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
+        order = Order.create_limit_order(request)
 
         str_repr = str(order)
         assert "BUY 100 AAPL" in str_repr

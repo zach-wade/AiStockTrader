@@ -1,8 +1,0 @@
-{
-  "symbol": "AMZN",
-  "model_type": "RandomForest",
-  "accuracy": 0.5454545454545454,
-  "auc": 0.5613489595790481,
-  "trained_at": "20250629_110026",
-  "model_path": "models/trained/AMZN_RandomForest_20250629_110026.pkl"
-}

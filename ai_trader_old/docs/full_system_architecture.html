@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Trader - Full System Architecture</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3 {
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
+
+        .diagram-section {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+        }
+
+        .mermaid {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            min-height: 600px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+            border-color: #555;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #4a9eff;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .tab-container {
+            margin: 20px 0;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+            position: relative;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            color: #fff;
+        }
+
+        .tab.active {
+            color: #4a9eff;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #4a9eff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .component-card {
+            background: #252525;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .component-card h4 {
+            color: #4a9eff;
+            margin-top: 0;
+        }
+
+        .component-card ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .component-card li {
+            margin: 5px 0;
+            color: #ccc;
+        }
+
+        .flow-description {
+            background: #1a2a3a;
+            border: 1px solid #4a9eff;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .flow-description h3 {
+            color: #4a9eff;
+            margin-top: 0;
+        }
+
+        code {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #4a9eff;
+        }
+
+        .warning-box {
+            background: #3a2a1a;
+            border: 2px solid #ff9944;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .warning-box h4 {
+            color: #ff9944;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AI Trader - Full System Architecture</h1>
+
+        <!-- System Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">8</div>
+                <div class="stat-label">Major Components</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">6</div>
+                <div class="stat-label">Data Sources</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">3</div>
+                <div class="stat-label">ML Models</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">15+</div>
+                <div class="stat-label">Database Tables</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">Real-time</div>
+                <div class="stat-label">Data Processing</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">Web</div>
+                <div class="stat-label">Dashboard UI</div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-container">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('overview', event)">System Overview</button>
+                <button class="tab" onclick="showTab('data-flow', event)">Data Flow</button>
+                <button class="tab" onclick="showTab('components', event)">Components Detail</button>
+                <button class="tab" onclick="showTab('ml-pipeline', event)">ML Pipeline</button>
+                <button class="tab" onclick="showTab('trading-flow', event)">Trading Flow</button>
+                <button class="tab" onclick="showTab('deployment', event)">Deployment</button>
+            </div>
+
+            <!-- System Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <div class="diagram-section">
+                    <h2>Complete System Architecture</h2>
+                    <pre class="mermaid">
+graph TB
+    subgraph "External Data Sources"
+        ALPACA[Alpaca Trading API]
+        POLYGON[Polygon Market Data]
+        YAHOO[Yahoo Finance]
+        BENZINGA[Benzinga News]
+        REDDIT[Reddit Social]
+        TWITTER[Twitter Sentiment]
+    end
+
+    subgraph "Data Pipeline Layer"
+        DCO[Data Collection Orchestrator]
+        HM[Historical Manager]
+        SP[Stream Processor]
+        UM[Universe Manager]
+        DS[Data Standardizer]
+    end
+
+    subgraph "Storage Layer"
+        DB[(PostgreSQL Database)]
+        CACHE[Redis Cache]
+        S3[S3 Data Lake]
+    end
+
+    subgraph "Feature Engineering"
+        FEO[Feature Engineering Orchestrator]
+        FC[Feature Calculator]
+        FS[Feature Store]
+        SC[Sentiment Calculator]
+    end
+
+    subgraph "Machine Learning"
+        MLO[ML Orchestrator]
+        MT[Model Trainer]
+        MP[Model Predictor]
+        MR[Model Registry]
+        BT[Backtesting Engine]
+    end
+
+    subgraph "Trading Engine"
+        TE[Trading Engine]
+        RM[Risk Manager]
+        PM[Position Manager]
+        OE[Order Executor]
+        CB[Circuit Breaker]
+    end
+
+    subgraph "Monitoring & UI"
+        DASH[Web Dashboard]
+        MON[Monitoring Service]
+        ALERT[Alert Manager]
+        LOG[Logging System]
+    end
+
+    subgraph "Infrastructure"
+        CONFIG[Config Manager]
+        POOL[Database Pool]
+        SCHED[Scheduler]
+        API[REST API]
+    end
+
+    %% Data flow connections
+    ALPACA --> DCO
+    POLYGON --> DCO
+    YAHOO --> DCO
+    BENZINGA --> DCO
+    REDDIT --> DCO
+    TWITTER --> DCO
+
+    DCO --> HM
+    DCO --> SP
+    DCO --> UM
+    HM --> DS
+    SP --> DS
+    DS --> DB
+
+    DB --> FEO
+    FEO --> FC
+    FC --> FS
+    SC --> FS
+    FS --> DB
+
+    FS --> MLO
+    MLO --> MT
+    MT --> MR
+    MR --> MP
+    MLO --> BT
+
+    MP --> TE
+    TE --> RM
+    RM --> PM
+    PM --> OE
+    OE --> ALPACA
+    CB --> TE
+
+    DB --> DASH
+    TE --> MON
+    MON --> ALERT
+    MON --> LOG
+
+    CONFIG -.-> DCO
+    CONFIG -.-> FEO
+    CONFIG -.-> MLO
+    CONFIG -.-> TE
+    POOL -.-> DB
+    SCHED -.-> DCO
+    SCHED -.-> FEO
+    API -.-> DASH
+
+    classDef dataSource fill:#4a9eff,stroke:#333,stroke-width:2px,color:#fff
+    classDef pipeline fill:#44ff44,stroke:#333,stroke-width:2px,color:#000
+    classDef storage fill:#ff9944,stroke:#333,stroke-width:2px,color:#000
+    classDef ml fill:#ff44ff,stroke:#333,stroke-width:2px,color:#fff
+    classDef trading fill:#ff4444,stroke:#333,stroke-width:2px,color:#fff
+    classDef ui fill:#44ffff,stroke:#333,stroke-width:2px,color:#000
+    classDef infra fill:#999999,stroke:#333,stroke-width:2px,color:#fff
+
+    class ALPACA,POLYGON,YAHOO,BENZINGA,REDDIT,TWITTER dataSource
+    class DCO,HM,SP,UM,DS pipeline
+    class DB,CACHE,S3 storage
+    class FEO,FC,FS,SC,MLO,MT,MP,MR,BT ml
+    class TE,RM,PM,OE,CB trading
+    class DASH,MON,ALERT,LOG ui
+    class CONFIG,POOL,SCHED,API infra
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Data Flow Tab -->
+            <div id="data-flow" class="tab-content">
+                <div class="diagram-section">
+                    <h2>End-to-End Data Flow</h2>
+                    <pre class="mermaid">
+sequenceDiagram
+    participant Market as Market Data
+    participant Pipeline as Data Pipeline
+    participant DB as Database
+    participant FE as Feature Engineering
+    participant ML as ML Models
+    participant Trading as Trading Engine
+    participant Broker as Broker (Alpaca)
+    participant User as Dashboard
+
+    Market->>Pipeline: Real-time prices, news, social
+    Pipeline->>Pipeline: Validate & standardize
+    Pipeline->>DB: Store raw data
+
+    DB->>FE: Fetch historical data
+    FE->>FE: Calculate technical indicators
+    FE->>FE: Process sentiment scores
+    FE->>DB: Store features
+
+    DB->>ML: Load features
+    ML->>ML: Generate predictions
+    ML->>ML: Calculate confidence scores
+    ML->>Trading: Send signals
+
+    Trading->>Trading: Apply risk rules
+    Trading->>Trading: Position sizing
+    Trading->>Broker: Execute orders
+    Broker-->>Trading: Order confirmations
+
+    Trading->>DB: Update positions
+    DB->>User: Display performance
+    User->>Trading: Manual overrides
+                    </pre>
+                </div>
+
+                <div class="flow-description">
+                    <h3>Data Flow Steps</h3>
+                    <ol>
+                        <li><strong>Data Collection</strong>: Multiple sources feed real-time and historical data</li>
+                        <li><strong>Processing</strong>: Data is validated, standardized, and stored</li>
+                        <li><strong>Feature Engineering</strong>: Technical indicators and sentiment scores calculated</li>
+                        <li><strong>ML Predictions</strong>: Models generate trading signals with confidence scores</li>
+                        <li><strong>Risk Management</strong>: Positions sized according to risk rules</li>
+                        <li><strong>Order Execution</strong>: Orders sent to broker and tracked</li>
+                        <li><strong>Monitoring</strong>: Real-time dashboard shows performance</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Components Detail Tab -->
+            <div id="components" class="tab-content">
+                <div class="component-grid">
+                    <div class="component-card">
+                        <h4>📊 Data Pipeline</h4>
+                        <ul>
+                            <li><code>data_pipeline/</code></li>
+                            <li>Orchestrates all data collection</li>
+                            <li>Historical gap detection</li>
+                            <li>Multi-source fallbacks</li>
+                            <li>Real-time streaming</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>🧮 Feature Engineering</h4>
+                        <ul>
+                            <li><code>feature_engineering/</code></li>
+                            <li>200+ technical indicators</li>
+                            <li>Market microstructure features</li>
+                            <li>Sentiment analysis</li>
+                            <li>Feature versioning</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>🤖 Machine Learning</h4>
+                        <ul>
+                            <li><code>ml_models/</code></li>
+                            <li>LSTM for price prediction</li>
+                            <li>Random Forest for signals</li>
+                            <li>XGBoost for ranking</li>
+                            <li>Ensemble predictions</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>📈 Trading Engine</h4>
+                        <ul>
+                            <li><code>trading/</code></li>
+                            <li>Real-time order management</li>
+                            <li>Position tracking</li>
+                            <li>Risk limits enforcement</li>
+                            <li>Circuit breakers</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>🔧 Backtesting</h4>
+                        <ul>
+                            <li><code>backtesting/</code></li>
+                            <li>Historical simulation</li>
+                            <li>Walk-forward analysis</li>
+                            <li>Performance metrics</li>
+                            <li>Strategy optimization</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>🌐 Web Dashboard</h4>
+                        <ul>
+                            <li><code>app/</code></li>
+                            <li>Real-time P&L tracking</li>
+                            <li>Position monitoring</li>
+                            <li>Performance analytics</li>
+                            <li>Risk metrics display</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>🗄️ Database</h4>
+                        <ul>
+                            <li>PostgreSQL with TimescaleDB</li>
+                            <li>15+ tables</li>
+                            <li>Optimized indexes</li>
+                            <li>Partitioned time-series data</li>
+                        </ul>
+                    </div>
+
+                    <div class="component-card">
+                        <h4>⚙️ Infrastructure</h4>
+                        <ul>
+                            <li><code>utils/</code> & <code>config/</code></li>
+                            <li>Connection pooling</li>
+                            <li>Configuration management</li>
+                            <li>Logging & monitoring</li>
+                            <li>Error handling</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ML Pipeline Tab -->
+            <div id="ml-pipeline" class="tab-content">
+                <div class="diagram-section">
+                    <h2>Machine Learning Pipeline</h2>
+                    <pre class="mermaid">
+graph LR
+    subgraph "Data Preparation"
+        RAW[Raw Market Data]
+        FE1[Technical Features]
+        FE2[Market Features]
+        FE3[Sentiment Features]
+        FS[Feature Store]
+    end
+
+    subgraph "Model Training"
+        SPLIT[Train/Val/Test Split]
+        LSTM[LSTM Model]
+        RF[Random Forest]
+        XGB[XGBoost]
+        ENS[Ensemble]
+    end
+
+    subgraph "Model Evaluation"
+        BT[Backtesting]
+        METRICS[Performance Metrics]
+        VAL[Validation]
+    end
+
+    subgraph "Production"
+        PRED[Live Predictions]
+        CONF[Confidence Scores]
+        SIG[Trading Signals]
+    end
+
+    RAW --> FE1
+    RAW --> FE2
+    RAW --> FE3
+    FE1 --> FS
+    FE2 --> FS
+    FE3 --> FS
+
+    FS --> SPLIT
+    SPLIT --> LSTM
+    SPLIT --> RF
+    SPLIT --> XGB
+    LSTM --> ENS
+    RF --> ENS
+    XGB --> ENS
+
+    ENS --> BT
+    BT --> METRICS
+    METRICS --> VAL
+
+    VAL -->|Deploy| PRED
+    PRED --> CONF
+    CONF --> SIG
+
+    style RAW fill:#4a9eff
+    style FS fill:#44ff44
+    style ENS fill:#ff44ff
+    style SIG fill:#ff4444
+                    </pre>
+                </div>
+
+                <div class="component-card">
+                    <h4>Features Used</h4>
+                    <ul>
+                        <li><strong>Price Features</strong>: OHLCV, returns, volatility</li>
+                        <li><strong>Technical Indicators</strong>: Moving averages, RSI, MACD, Bollinger Bands</li>
+                        <li><strong>Market Structure</strong>: Order flow, bid-ask spread, volume profile</li>
+                        <li><strong>Sentiment</strong>: News sentiment, social media buzz</li>
+                        <li><strong>Temporal</strong>: Time of day, day of week, seasonality</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Trading Flow Tab -->
+            <div id="trading-flow" class="tab-content">
+                <div class="diagram-section">
+                    <h2>Trading Execution Flow</h2>
+                    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> SignalGeneration
+    SignalGeneration --> RiskCheck
+    RiskCheck --> Approved: Pass
+    RiskCheck --> Rejected: Fail
+
+    Approved --> PositionSizing
+    PositionSizing --> OrderCreation
+    OrderCreation --> OrderValidation
+    OrderValidation --> OrderSubmission
+    OrderSubmission --> PendingOrder
+
+    PendingOrder --> Filled: Execution
+    PendingOrder --> PartialFill: Partial
+    PendingOrder --> Cancelled: Cancel
+
+    Filled --> PositionTracking
+    PartialFill --> PositionTracking
+    PositionTracking --> PnLCalculation
+    PnLCalculation --> RiskMonitoring
+
+    RiskMonitoring --> StopLoss: Risk Exceeded
+    RiskMonitoring --> TakeProfit: Target Hit
+    RiskMonitoring --> Hold: Continue
+
+    StopLoss --> ClosePosition
+    TakeProfit --> ClosePosition
+    Hold --> RiskMonitoring
+
+    ClosePosition --> [*]
+    Rejected --> [*]
+    Cancelled --> [*]
+                    </pre>
+                </div>
+
+                <div class="warning-box">
+                    <h4>⚠️ Risk Controls</h4>
+                    <ul>
+                        <li>Maximum position size: 10% of portfolio</li>
+                        <li>Daily loss limit: 2% of capital</li>
+                        <li>Maximum open positions: 20</li>
+                        <li>Circuit breaker on 5% drawdown</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Deployment Tab -->
+            <div id="deployment" class="tab-content">
+                <div class="diagram-section">
+                    <h2>Production Deployment</h2>
+                    <pre class="mermaid">
+graph TB
+    subgraph "Development"
+        DEV[Local Development]
+        TEST[Unit Tests]
+        INT[Integration Tests]
+        BT[Backtesting]
+    end
+
+    subgraph "Staging"
+        PAPER[Paper Trading]
+        VAL[Validation]
+        PERF[Performance Testing]
+    end
+
+    subgraph "Production"
+        LIVE[Live Trading]
+        MON[Monitoring]
+        ALERT[Alerting]
+        BACKUP[Backup Systems]
+    end
+
+    subgraph "Infrastructure"
+        SERVER[Ubuntu Server]
+        DOCKER[Docker Containers]
+        CRON[Cron Schedulers]
+        NGINX[Nginx Proxy]
+    end
+
+    DEV --> TEST
+    TEST --> INT
+    INT --> BT
+    BT --> PAPER
+    PAPER --> VAL
+    VAL --> PERF
+    PERF --> LIVE
+
+    LIVE --> MON
+    MON --> ALERT
+    LIVE --> BACKUP
+
+    SERVER --> DOCKER
+    DOCKER --> CRON
+    DOCKER --> NGINX
+
+    style DEV fill:#4a9eff
+    style PAPER fill:#ff9944
+    style LIVE fill:#44ff44
+    style SERVER fill:#999999
+                    </pre>
+                </div>
+
+                <div class="component-card">
+                    <h4>Deployment Checklist</h4>
+                    <ul>
+                        <li>✅ All tests passing</li>
+                        <li>✅ Backtesting profitable</li>
+                        <li>✅ Paper trading validated</li>
+                        <li>✅ Risk limits configured</li>
+                        <li>✅ Monitoring active</li>
+                        <li>✅ Backup systems ready</li>
+                        <li>✅ Circuit breakers enabled</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Directory Structure -->
+        <div class="diagram-section">
+            <h2>Project Structure</h2>
+            <pre style="background: #1a1a1a; padding: 20px; border-radius: 8px; color: #e0e0e0;">
+ai_trader/
+├── app/                      # Web dashboard & API
+│   ├── static/              # Frontend assets
+│   ├── templates/           # HTML templates
+│   ├── routes.py           # API endpoints
+│   └── dashboard.py        # Main dashboard app
+├── backtesting/             # Backtesting framework
+│   ├── backtest_engine.py  # Core backtesting logic
+│   ├── market_simulator.py # Market simulation
+│   └── performance_analyzer.py
+├── config/                  # Configuration management
+│   ├── trading_config.yaml # Main config file
+│   └── config_manager.py   # Config loader
+├── data_pipeline/           # Data collection & processing
+│   ├── orchestrator.py     # Main coordinator
+│   ├── sources/            # API clients
+│   ├── storage/            # Database layer
+│   └── transformers/       # Data processing
+├── feature_engineering/     # Feature generation
+│   ├── orchestrator.py     # Feature coordinator
+│   ├── calculators/        # Feature calculators
+│   └── feature_store.py    # Feature storage
+├── ml_models/              # Machine learning models
+│   ├── lstm_model.py       # LSTM implementation
+│   ├── ensemble_model.py   # Ensemble predictor
+│   └── model_trainer.py    # Training pipeline
+├── scripts/                # Utility scripts
+│   ├── setup_database.py   # DB initialization
+│   ├── run_backfill.py     # Historical data
+│   └── load_all_yahoo_symbols.py
+├── trading/                # Trading engine
+│   ├── trading_engine.py   # Main engine
+│   ├── risk_manager.py     # Risk controls
+│   └── order_executor.py   # Order management
+├── utils/                  # Shared utilities
+│   ├── db_pool.py         # Database pooling
+│   ├── logging_config.py  # Logging setup
+│   └── exception_types.py # Custom exceptions
+└── tests/                  # Test suite
+    ├── unit/              # Unit tests
+    └── integration/       # Integration tests
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#4a9eff',
+                primaryTextColor: '#000',
+                primaryBorderColor: '#333',
+                lineColor: '#333',
+                secondaryColor: '#44ff44',
+                tertiaryColor: '#ff9944',
+                background: '#ffffff',
+                mainBkg: '#ffffff',
+                secondBkg: '#f0f0f0',
+                tertiaryBkg: '#e0e0e0'
+            },
+            flowchart: {
+                htmlLabels: true,
+                curve: 'linear'
+            },
+            sequence: {
+                diagramMarginX: 50,
+                diagramMarginY: 50,
+                actorMargin: 50,
+                width: 150,
+                height: 65,
+                boxMargin: 10,
+                boxTextMargin: 5,
+                noteMargin: 10,
+                messageMargin: 35
+            }
+        });
+
+        // Tab functionality
+        function showTab(tabName, event) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+
+            // Re-render mermaid diagrams in the new tab
+            mermaid.init();
+        }
+
+        // Ensure diagrams render after page load
+        window.addEventListener('load', function() {
+            mermaid.init();
+        });
+    </script>
+</body>
+</html>

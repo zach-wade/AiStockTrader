@@ -1,8 +1,0 @@
-{
-  "symbol": "TSLA",
-  "model_type": "GradientBoosting",
-  "accuracy": 0.489247311827957,
-  "auc": 0.4650562851782364,
-  "trained_at": "20250629_110025",
-  "model_path": "models/trained/TSLA_GradientBoosting_20250629_110025.pkl"
-}

@@ -3,8 +3,8 @@ Example usage of the broker implementations
 """
 
 # Standard library imports
-from decimal import Decimal
 import logging
+from decimal import Decimal
 
 # Local imports
 from src.domain.entities.order import Order, OrderSide

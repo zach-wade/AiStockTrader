@@ -7,7 +7,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 # Local imports
@@ -47,7 +47,7 @@ class AccountInfo:
     # Timestamps
     last_updated: datetime | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
             "account_id": self.account_id,

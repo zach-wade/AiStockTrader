@@ -1,8 +1,0 @@
-{
-  "symbol": "MSFT",
-  "model_type": "GradientBoosting",
-  "accuracy": 0.47058823529411764,
-  "auc": 0.5080091533180778,
-  "trained_at": "20250629_110024",
-  "model_path": "models/trained/MSFT_GradientBoosting_20250629_110024.pkl"
-}

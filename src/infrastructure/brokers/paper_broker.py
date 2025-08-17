@@ -3,11 +3,11 @@ Paper Trading Broker - Simulated broker for testing without real money
 """
 
 # Standard library imports
+import logging
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
-import logging
-import secrets
 from uuid import UUID
 
 # Local imports
@@ -21,7 +21,7 @@ from src.application.interfaces.broker import (
     OrderNotFoundError,
 )
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
-from src.domain.entities.portfolio import Portfolio
+from src.domain.entities.portfolio import Portfolio, PositionRequest
 from src.domain.entities.position import Position
 
 from .constants import (
@@ -33,6 +33,18 @@ from .constants import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PaperBrokerConfig:
+    """Configuration for paper trading broker."""
+
+    initial_capital: Decimal = Decimal("100000")
+    slippage_pct: Decimal = Decimal("0.001")  # 0.1% default slippage
+    fill_delay_seconds: int = 1
+    commission_per_share: Decimal = Decimal("0.01")
+    min_commission: Decimal = Decimal("1.0")
+    simulate_partial_fills: bool = False
 
 
 @dataclass
@@ -56,36 +68,29 @@ class PaperBroker:
 
     def __init__(
         self,
-        initial_capital: Decimal = Decimal("100000"),
-        slippage_pct: Decimal = Decimal("0.001"),  # 0.1% default slippage
-        fill_delay_seconds: int = 1,
-        commission_per_share: Decimal = Decimal("0.01"),
-        min_commission: Decimal = Decimal("1.0"),
-        simulate_partial_fills: bool = False,
+        config: PaperBrokerConfig | None = None,
     ):
         """
         Initialize paper broker.
 
         Args:
-            initial_capital: Starting capital for the account
-            slippage_pct: Percentage slippage to apply to market orders
-            fill_delay_seconds: Simulated delay for order fills
-            commission_per_share: Commission per share traded
-            min_commission: Minimum commission per trade
-            simulate_partial_fills: Whether to simulate partial fills
+            config: Configuration for the paper broker
         """
-        self.initial_capital = initial_capital
-        self.slippage_pct = slippage_pct
-        self.fill_delay_seconds = fill_delay_seconds
-        self.commission_per_share = commission_per_share
-        self.min_commission = min_commission
-        self.simulate_partial_fills = simulate_partial_fills
+        if config is None:
+            config = PaperBrokerConfig()
+
+        self.initial_capital = config.initial_capital
+        self.slippage_pct = config.slippage_pct
+        self.fill_delay_seconds = config.fill_delay_seconds
+        self.commission_per_share = config.commission_per_share
+        self.min_commission = config.min_commission
+        self.simulate_partial_fills = config.simulate_partial_fills
 
         # Initialize portfolio
         self.portfolio = Portfolio(
             name="Paper Trading Portfolio",
-            initial_capital=initial_capital,
-            cash_balance=initial_capital,
+            initial_capital=self.initial_capital,
+            cash_balance=self.initial_capital,
         )
 
         # Order tracking
@@ -103,8 +108,8 @@ class PaperBroker:
         self._connected = False
 
         logger.info(
-            f"Initialized paper broker with ${initial_capital} capital, "
-            f"{slippage_pct}% slippage"
+            f"Initialized paper broker with ${self.initial_capital} capital, "
+            f"{self.slippage_pct}% slippage"
         )
 
     def connect(self) -> None:
@@ -227,19 +232,21 @@ class PaperBroker:
                     position.add_to_position(fill_quantity, fill_price, commission)
                 else:
                     # Reopen position
-                    self.portfolio.open_position(
+                    request = PositionRequest(
                         symbol=order.symbol,
                         quantity=fill_quantity,
                         entry_price=fill_price,
                         commission=commission,
                     )
+                    self.portfolio.open_position(request)
             else:
-                self.portfolio.open_position(
+                request = PositionRequest(
                     symbol=order.symbol,
                     quantity=fill_quantity,
                     entry_price=fill_price,
                     commission=commission,
                 )
+                self.portfolio.open_position(request)
         elif order.symbol in self.portfolio.positions:
             position = self.portfolio.positions[order.symbol]
             if position.is_long():
@@ -250,12 +257,13 @@ class PaperBroker:
                 position.add_to_position(-fill_quantity, fill_price, commission)
         else:
             # Opening short position
-            self.portfolio.open_position(
+            request = PositionRequest(
                 symbol=order.symbol,
                 quantity=-fill_quantity,
                 entry_price=fill_price,
                 commission=commission,
             )
+            self.portfolio.open_position(request)
 
         logger.info(
             f"Filled order {order.id}: {order.side.value} {fill_quantity} {order.symbol} "

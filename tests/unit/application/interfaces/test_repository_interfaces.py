@@ -48,7 +48,7 @@ class MockOrderRepository:
 
     async def get_orders_by_symbol(self, symbol: str) -> list[Order]:
         self.call_log.append(("get_orders_by_symbol", symbol))
-        return [order for order in self.orders.values() if order.symbol == symbol]
+        return [order for order in self.orders.values() if order.symbol.value == symbol]
 
     async def get_orders_by_status(self, status: OrderStatus) -> list[Order]:
         self.call_log.append(("get_orders_by_status", status))
@@ -232,13 +232,19 @@ class TestOrderRepositoryInterface:
 
     @pytest.fixture
     def sample_order(self):
-        return Order.create_limit_order(
-            symbol="AAPL",
-            quantity=Decimal("100"),
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.symbol import Symbol
+        from src.domain.value_objects.quantity import Quantity
+        from src.domain.value_objects.price import Price
+        
+        request = OrderRequest(
+            symbol=Symbol("AAPL"),
+            quantity=Quantity("100"),
             side=OrderSide.BUY,
-            limit_price=Decimal("150.00"),
+            limit_price=Price("150.00"),
             reason="Test order",
         )
+        return Order.create_limit_order(request)
 
     async def test_save_order_success(self, repository, sample_order):
         """Test successful order save."""
@@ -271,9 +277,16 @@ class TestOrderRepositoryInterface:
         await repository.save_order(sample_order)
 
         # Create another order with different symbol
-        other_order = Order.create_market_order(
-            symbol="GOOGL", quantity=Decimal("50"), side=OrderSide.SELL
+        from src.domain.entities.order import OrderRequest
+        from src.domain.value_objects.symbol import Symbol
+        from src.domain.value_objects.quantity import Quantity
+        
+        other_request = OrderRequest(
+            symbol=Symbol("GOOGL"),
+            quantity=Quantity("50"),
+            side=OrderSide.SELL,
         )
+        other_order = Order.create_market_order(other_request)
         await repository.save_order(other_order)
 
         result = await repository.get_orders_by_symbol("AAPL")
@@ -362,9 +375,8 @@ class TestPositionRepositoryInterface:
         return Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            side=PositionSide.LONG,
-            average_price=Decimal("145.00"),
+            quantity=Decimal("100"),  # Positive for long
+            average_entry_price=Decimal("145.00"),
             current_price=Decimal("150.00"),
             opened_at=datetime.now(UTC),
             strategy="test_strategy",

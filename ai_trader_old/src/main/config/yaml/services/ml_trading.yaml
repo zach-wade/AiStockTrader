@@ -1,0 +1,148 @@
+# ML Trading Configuration
+# This file configures the ML-based trading system
+
+ml_trading:
+  enabled: true  # Master switch for ML trading
+
+  # ML Trading Service Configuration
+  service:
+    market_data_source: "polygon"  # Options: polygon, alpaca, yahoo
+    prediction_interval_seconds: 60  # How often to generate predictions
+    max_concurrent_predictions: 10  # Limit concurrent model predictions
+
+  # Model Configurations
+  # Each model needs to be registered in the ModelRegistry first
+  models:
+    - model_id: "aapl_xgboost"
+      symbol: "AAPL"
+      strategy: "ml_regression"
+      min_confidence: 0.6  # Minimum confidence for signal generation
+      position_size: 0.02  # 2% of portfolio per position
+      max_position_size: 0.05  # 5% max (from ml_trading.yaml)
+      enabled: true
+
+      # Risk management (from ml_trading.yaml)
+      stop_loss_pct: 0.02  # 2% stop loss
+      take_profit_pct: 0.05  # 5% take profit
+
+      # Model-specific settings (from ml_trading.yaml)
+      use_dynamic_sizing: true  # Scale position with confidence
+      prediction_horizon: "1day"
+
+    # Add more models here as they are trained and registered
+    # - model_id: "spy_ensemble"
+    #   symbol: "SPY"
+    #   strategy: "ml_regression"
+    #   min_confidence: 0.7
+    #   position_size: 0.03
+    #   enabled: false
+
+  # Feature Pipeline Configuration
+  feature_pipeline:
+    buffer_size: 500  # Number of data points to keep in memory
+    cache_ttl_seconds: 5  # Feature cache time-to-live
+
+    # Lookback periods for technical indicators (merged from both files)
+    lookback_periods:
+      rsi: 14
+      macd_fast: 12
+      macd_slow: 26
+      macd_signal: 9
+      bb: 20  # Bollinger Bands
+      bbands: 20  # Alternative name from ml_trading.yaml
+      atr: 14
+      adx: 14  # From ml_trading.yaml
+      volume_ma: 20
+      sma_20: 20
+      sma_50: 50
+      ema_12: 12
+      ema_26: 26
+
+  # Signal Routing Configuration (from ml_trading_config.yaml)
+  signal_routing:
+    source: "STRATEGY"  # Signal source type
+    priority: "NORMAL"  # Default priority: CRITICAL, HIGH, NORMAL, LOW
+    correlation_group: "ml_predictions"  # Group for deduplication
+
+    # Priority overrides based on confidence
+    priority_thresholds:
+      high_confidence: 0.8  # Signals > 0.8 confidence get HIGH priority
+      normal_confidence: 0.6  # Signals 0.6-0.8 get NORMAL priority
+      # Signals < 0.6 get LOW priority
+
+  # Signal generation (from ml_trading.yaml)
+  signal_generation:
+    min_return_threshold: 0.001  # 0.1% minimum predicted return
+    signal_priority: "medium"  # low, medium, high
+    dedupe_window_seconds: 300  # Don't repeat signals within 5 min
+
+  # Risk Management for ML Trading
+  risk_limits:
+    max_ml_position_size: 0.05  # Max 5% per ML position
+    max_ml_positions: 5  # Maximum concurrent ML positions
+    daily_ml_loss_limit: 0.02  # 2% daily loss limit for ML strategies
+
+    # Position-specific limits (from ml_trading_config.yaml)
+    position_limits:
+      AAPL:
+        max_shares: 1000
+        max_value: 50000
+      default:
+        max_shares: 500
+        max_value: 25000
+
+  # Model Monitoring Configuration (merged from both files)
+  monitoring:
+    # From ml_trading_config.yaml
+    performance_window_hours: 24  # Hours to look back for performance
+    drift_threshold: 0.05  # KS statistic threshold for drift detection
+    degradation_threshold: 0.2  # 20% MAE degradation triggers alert
+    min_predictions_for_analysis: 100  # Minimum predictions before analysis
+
+    # From ml_trading.yaml
+    track_predictions: true
+    log_feature_importance: true
+    performance_window_days: 30
+    drift_detection_enabled: true
+
+    # Retraining triggers
+    retraining:
+      performance_trigger: true  # Retrain on performance degradation
+      drift_trigger: true  # Retrain on distribution drift
+      scheduled: false  # Scheduled retraining (handled separately)
+
+  # Integration Settings (from ml_trading_config.yaml)
+  integration:
+    # Market data integration
+    market_data:
+      subscribe_symbols: ["AAPL"]  # Symbols to subscribe for real-time data
+      data_frequency: "1min"  # Data frequency for features
+
+    # Position tracking
+    position_tracking:
+      update_frequency_seconds: 30  # How often to update position info
+
+    # Order execution
+    execution:
+      order_type: "MARKET"  # Default order type
+      time_in_force: "DAY"  # Default time in force
+      slippage_buffer: 0.001  # 0.1% slippage buffer
+
+    # Performance tracking
+    performance:
+      track_predictions: true  # Store all predictions for analysis
+      track_outcomes: true  # Track actual vs predicted outcomes
+      outcome_window_minutes: 60  # Window to measure outcome
+
+  # Backtesting settings (from ml_trading.yaml)
+  backtest:
+    lookback_days: 90
+    initial_capital: 100000
+    commission: 0.001  # 0.1% commission
+    slippage: 0.0005  # 0.05% slippage
+
+# Model registry paths (from ml_trading.yaml)
+model_registry:
+  base_path: "models/registry"
+  trained_models_path: "models/trained"
+  model_metadata_file: "model_metadata.json"

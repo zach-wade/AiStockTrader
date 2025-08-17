@@ -1,8 +1,11 @@
 """Quantity value object for representing trading quantities."""
 
 # Standard library imports
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, Decimal, getcontext
 from typing import Self
+
+# Set high precision for Decimal operations to maintain precision in calculations
+getcontext().prec = 50
 
 
 class Quantity:
@@ -94,6 +97,10 @@ class Quantity:
         """
         if not isinstance(factor, Decimal):
             factor = Decimal(str(factor))
+
+        # Special case: multiplying by 1 should return the exact same value
+        if factor == 1:
+            return Quantity(self._value)
 
         return Quantity(self._value * factor)
 

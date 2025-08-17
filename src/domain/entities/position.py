@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 from uuid import UUID, uuid4
 
 
@@ -53,7 +54,7 @@ class Position:
 
     # Metadata
     strategy: str | None = None
-    tags: dict = field(default_factory=dict)
+    tags: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate position after initialization"""
@@ -79,7 +80,11 @@ class Position:
         commission: Decimal = Decimal("0"),
         strategy: str | None = None,
     ) -> "Position":
-        """Factory method to open a new position"""
+        """Factory method to open a new position.
+
+        Note: Kept original signature for backward compatibility.
+        Use PositionRequest in Portfolio.open_position for cleaner API.
+        """
         if quantity == 0:
             raise ValueError("Cannot open position with zero quantity")
         if entry_price <= 0:

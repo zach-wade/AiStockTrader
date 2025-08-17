@@ -11,7 +11,7 @@ from uuid import UUID
 import pytest
 
 # Local imports
-from src.domain.entities import Portfolio, Position
+from src.domain.entities import Portfolio, Position, PositionRequest
 
 
 @pytest.fixture
@@ -179,7 +179,7 @@ class TestPositionOpening:
         """Test cannot open position for symbol with existing open position"""
         # Open initial position
         default_portfolio.open_position(
-            symbol="AAPL", quantity=Decimal("10"), entry_price=Decimal("150.00")
+            PositionRequest(symbol="AAPL", quantity=Decimal("10"), entry_price=Decimal("150.00"))
         )
 
         # Try to open another position for same symbol
@@ -195,8 +195,8 @@ class TestPositionOpening:
         default_portfolio.max_positions = 2
 
         # Open two positions
-        default_portfolio.open_position("AAPL", Decimal("10"), Decimal("150.00"))
-        default_portfolio.open_position("GOOGL", Decimal("10"), Decimal("100.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("10"), Decimal("150.00")))
+        default_portfolio.open_position(PositionRequest("GOOGL", Decimal("10"), Decimal("100.00")))
 
         # Try to open third position
         can_open, reason = default_portfolio.can_open_position(
@@ -250,11 +250,13 @@ class TestPositionOpening:
         initial_cash = default_portfolio.cash_balance
 
         position = default_portfolio.open_position(
-            symbol="AAPL",
-            quantity=Decimal("10"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("5.00"),
-            strategy="momentum",
+            PositionRequest(
+                symbol="AAPL",
+                quantity=Decimal("10"),
+                entry_price=Decimal("150.00"),
+                commission=Decimal("5.00"),
+                strategy="momentum",
+            )
         )
 
         assert position.symbol == "AAPL"
@@ -273,7 +275,7 @@ class TestPositionOpening:
     def test_open_position_inherits_strategy(self, default_portfolio):
         """Test position inherits portfolio strategy if not specified"""
         position = default_portfolio.open_position(
-            symbol="AAPL", quantity=Decimal("10"), entry_price=Decimal("150.00")
+            PositionRequest(symbol="AAPL", quantity=Decimal("10"), entry_price=Decimal("150.00"))
         )
 
         assert position.strategy == "test_strategy"
@@ -284,8 +286,8 @@ class TestPositionOpening:
 
         with pytest.raises(ValueError, match="Cannot open position: Insufficient cash"):
             default_portfolio.open_position(
-                symbol="AAPL", quantity=Decimal("10"), entry_price=Decimal("150.00")
-            )
+            PositionRequest(symbol="AAPL", quantity=Decimal("10"), entry_price=Decimal("150.00"))
+        )
 
 
 class TestPositionClosing:
@@ -299,10 +301,12 @@ class TestPositionClosing:
 
         # Open position
         default_portfolio.open_position(
-            symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("5.00"),
+            PositionRequest(
+                symbol="AAPL",
+                quantity=Decimal("100"),
+                entry_price=Decimal("150.00"),
+                commission=Decimal("5.00"),
+            )
         )
 
         initial_cash = default_portfolio.cash_balance
@@ -329,10 +333,12 @@ class TestPositionClosing:
 
         # Open position
         default_portfolio.open_position(
-            symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("5.00"),
+            PositionRequest(
+                symbol="AAPL",
+                quantity=Decimal("100"),
+                entry_price=Decimal("150.00"),
+                commission=Decimal("5.00"),
+            )
         )
 
         # Close with loss
@@ -354,10 +360,12 @@ class TestPositionClosing:
 
         # Open position
         default_portfolio.open_position(
-            symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("5.00"),
+            PositionRequest(
+                symbol="AAPL",
+                quantity=Decimal("100"),
+                entry_price=Decimal("150.00"),
+                commission=Decimal("5.00"),
+            )
         )
 
         # Close at same price (loss due to commission)
@@ -382,7 +390,7 @@ class TestPositionClosing:
 
         # Open and close position
         default_portfolio.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00")
+            PositionRequest(symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00"))
         )
         default_portfolio.close_position("AAPL", Decimal("160.00"))
 
@@ -401,7 +409,7 @@ class TestPositionUpdates:
         default_portfolio.max_portfolio_risk = Decimal("0.20")  # 20%
 
         default_portfolio.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00")
+            PositionRequest(symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00"))
         )
 
         default_portfolio.update_position_price("AAPL", Decimal("160.00"))
@@ -422,9 +430,9 @@ class TestPositionUpdates:
         default_portfolio.max_portfolio_risk = Decimal("0.50")  # 50%
 
         # Open multiple positions
-        default_portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
-        default_portfolio.open_position("GOOGL", Decimal("50"), Decimal("100.00"))
-        default_portfolio.open_position("MSFT", Decimal("75"), Decimal("300.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
+        default_portfolio.open_position(PositionRequest("GOOGL", Decimal("50"), Decimal("100.00")))
+        default_portfolio.open_position(PositionRequest("MSFT", Decimal("75"), Decimal("300.00")))
 
         # Close one position
         default_portfolio.close_position("MSFT", Decimal("310.00"))
@@ -488,8 +496,8 @@ class TestPortfolioValueCalculations:
         default_portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
         # Open positions
-        default_portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
-        default_portfolio.open_position("GOOGL", Decimal("50"), Decimal("100.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
+        default_portfolio.open_position(PositionRequest("GOOGL", Decimal("50"), Decimal("100.00")))
 
         # Update prices
         default_portfolio.update_position_price("AAPL", Decimal("160.00"))
@@ -510,8 +518,8 @@ class TestPortfolioValueCalculations:
         default_portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
         # Open positions
-        default_portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
-        default_portfolio.open_position("GOOGL", Decimal("50"), Decimal("100.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
+        default_portfolio.open_position(PositionRequest("GOOGL", Decimal("50"), Decimal("100.00")))
 
         # Without current prices
         assert default_portfolio.get_positions_value() == Decimal("0")
@@ -533,7 +541,7 @@ class TestPortfolioValueCalculations:
         default_portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
         # With profit
-        default_portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
         default_portfolio.update_position_price("AAPL", Decimal("165.00"))
 
         # Current value: 85000 (cash) + 16500 (position) = 101500
@@ -571,8 +579,8 @@ class TestPnLCalculations:
         default_portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
         # Open positions
-        default_portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
-        default_portfolio.open_position("GOOGL", Decimal("50"), Decimal("100.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
+        default_portfolio.open_position(PositionRequest("GOOGL", Decimal("50"), Decimal("100.00")))
 
         # Without current prices
         assert default_portfolio.get_unrealized_pnl() == Decimal("0")
@@ -590,7 +598,7 @@ class TestPnLCalculations:
         default_portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
         # Open and partially close position
-        default_portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
+        default_portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
 
         # Partially close with profit
         position = default_portfolio.positions["AAPL"]
@@ -733,7 +741,7 @@ class TestPortfolioSerialization:
         portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
         # Open position with profit
-        portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("5"))
+        portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00"), Decimal("5")))
         portfolio.update_position_price("AAPL", Decimal("160.00"))
 
         # Add some closed trades
@@ -777,7 +785,7 @@ class TestPortfolioStringRepresentation:
         portfolio.max_position_size = Decimal("20000")
         portfolio.max_portfolio_risk = Decimal("0.30")  # 30%
 
-        portfolio.open_position("AAPL", Decimal("100"), Decimal("150.00"))
+        portfolio.open_position(PositionRequest("AAPL", Decimal("100"), Decimal("150.00")))
         portfolio.update_position_price("AAPL", Decimal("160.00"))
 
         str_repr = str(portfolio)
@@ -816,10 +824,12 @@ class TestEdgeCases:
         symbols = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"]
         for i, symbol in enumerate(symbols):
             default_portfolio.open_position(
-                symbol=symbol,
-                quantity=Decimal("10"),
-                entry_price=Decimal(str(100 + i * 10)),
-                commission=Decimal("1"),
+                PositionRequest(
+                    symbol=symbol,
+                    quantity=Decimal("10"),
+                    entry_price=Decimal(str(100 + i * 10)),
+                    commission=Decimal("1"),
+                )
             )
 
         # Update all prices
@@ -843,10 +853,12 @@ class TestEdgeCases:
         default_portfolio.max_portfolio_risk = Decimal("0.20")  # 20%
 
         default_portfolio.open_position(
-            symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("0"),
+            PositionRequest(
+                symbol="AAPL",
+                quantity=Decimal("100"),
+                entry_price=Decimal("150.00"),
+                commission=Decimal("0"),
+            )
         )
 
         assert default_portfolio.total_commission_paid == Decimal("0")
@@ -863,9 +875,11 @@ class TestEdgeCases:
         """Test handling very small position sizes"""
         # Small fractional shares
         position = default_portfolio.open_position(
-            symbol="BRK.A",
-            quantity=Decimal("0.001"),
-            entry_price=Decimal("500000.00"),  # $500 position
+            PositionRequest(
+                symbol="BRK.A",
+                quantity=Decimal("0.001"),
+                entry_price=Decimal("500000.00"),  # $500 position
+            )
         )
 
         assert position.quantity == Decimal("0.001")
@@ -881,7 +895,7 @@ class TestEdgeCases:
         )
 
         portfolio.open_position(
-            symbol="MEGA", quantity=Decimal("1000000"), entry_price=Decimal("100")
+            PositionRequest(symbol="MEGA", quantity=Decimal("1000000"), entry_price=Decimal("100"))
         )
 
         assert portfolio.cash_balance == Decimal("900000000")
@@ -894,7 +908,7 @@ class TestEdgeCases:
         """Test precision in financial calculations"""
         # Use prices that would cause rounding issues with floats
         default_portfolio.open_position(
-            symbol="AAPL", quantity=Decimal("3"), entry_price=Decimal("149.99")
+            PositionRequest(symbol="AAPL", quantity=Decimal("3"), entry_price=Decimal("149.99"))
         )
 
         # Price that creates repeating decimal

@@ -8,8 +8,8 @@ and transaction management.
 
 # Standard library imports
 import asyncio
-from decimal import Decimal
 import logging
+from decimal import Decimal
 
 # Local imports
 from src.domain.entities.order import Order, OrderSide

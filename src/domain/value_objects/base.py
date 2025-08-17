@@ -6,7 +6,6 @@ from functools import total_ordering
 from typing import Any, Self
 
 
-@total_ordering
 class ValueObject(ABC):
     """Abstract base class for all value objects.
 
@@ -14,7 +13,6 @@ class ValueObject(ABC):
     - Immutability enforcement
     - Equality comparison
     - Hashability
-    - Automatic ordering via @total_ordering
     """
 
     __slots__ = ()  # Subclasses should define their own __slots__
