@@ -167,10 +167,15 @@ class ServiceFactory:
         Returns:
             Configured trading calendar
         """
+        from src.infrastructure.time.timezone_service import PythonTimeService
+
         if exchange is None:
             exchange = Exchange.NYSE
 
-        return TradingCalendar(exchange)
+        # Create time service dependency
+        time_service = PythonTimeService()
+
+        return TradingCalendar(time_service, exchange)
 
     @staticmethod
     def create_domain_validator() -> DomainValidator:

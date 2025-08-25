@@ -306,3 +306,9 @@ class PythonTimeService(TimeService):
             raise RuntimeError("No timezone library available")
 
         return LocalizedDatetimeAdapter(utc_dt)
+
+    def create_adapter(self, dt: datetime) -> LocalizedDatetime:
+        """Create a LocalizedDatetime adapter from a standard datetime."""
+        if dt.tzinfo is None:
+            raise ValueError("Datetime must be timezone-aware")
+        return LocalizedDatetimeAdapter(dt)

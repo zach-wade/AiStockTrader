@@ -133,9 +133,8 @@ class MarketHours:
 
         # Convert to market timezone
         if self.time_service.is_timezone_aware(check_time):
-            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
-
-            adapter = LocalizedDatetimeAdapter(check_time)
+            # Use time service to create adapter instead of importing from infrastructure
+            adapter = self.time_service.create_adapter(check_time)
             market_time = self.time_service.convert_timezone(adapter, self.timezone)
         else:
             market_time = self.time_service.localize_naive_datetime(check_time, self.timezone)
@@ -416,9 +415,8 @@ class TradingCalendar:
         ny_tz = self._time_service.get_timezone("America/New_York")
 
         if self._time_service.is_timezone_aware(check_time):
-            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
-
-            adapter = LocalizedDatetimeAdapter(check_time)
+            # Use time service to create adapter instead of importing from infrastructure
+            adapter = self._time_service.create_adapter(check_time)
             ny_time = self._time_service.convert_timezone(adapter, ny_tz)
         else:
             ny_time = self._time_service.localize_naive_datetime(check_time, ny_tz)
@@ -528,9 +526,8 @@ class TradingCalendar:
                 ny_tz = self._time_service.get_timezone("America/New_York")
 
                 if self._time_service.is_timezone_aware(from_time):
-                    from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
-
-                    adapter = LocalizedDatetimeAdapter(from_time)
+                    # Use time service to create adapter instead of importing from infrastructure
+                    adapter = self._time_service.create_adapter(from_time)
                 else:
                     adapter = self._time_service.localize_naive_datetime(from_time, ny_tz)
 

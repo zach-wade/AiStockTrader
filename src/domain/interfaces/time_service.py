@@ -209,3 +209,18 @@ class TimeService(ABC):
         Returns:
             LocalizedDatetime: Datetime in UTC
         """
+
+    @abstractmethod
+    def create_adapter(self, dt: datetime) -> LocalizedDatetime:
+        """
+        Create a LocalizedDatetime adapter from a standard datetime.
+
+        Args:
+            dt: Datetime object (must be timezone-aware)
+
+        Returns:
+            LocalizedDatetime: Adapted datetime object
+
+        Raises:
+            ValueError: If datetime is not timezone-aware
+        """

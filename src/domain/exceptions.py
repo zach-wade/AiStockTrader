@@ -221,3 +221,27 @@ class InsufficientResourcesException(DomainException):
         self.resource_type = resource_type
         self.required = required
         self.available = available
+
+
+class ValidationError(DomainException):
+    """Exception raised when domain validation fails."""
+
+    def __init__(
+        self,
+        message: str,
+        field: str | None = None,
+        value: Any = None,
+        constraint: str | None = None,
+    ) -> None:
+        details = {}
+        if field:
+            details["field"] = field
+        if value is not None:
+            details["value"] = value
+        if constraint:
+            details["constraint"] = constraint
+
+        super().__init__(message, details)
+        self.field = field
+        self.value = value
+        self.constraint = constraint

@@ -208,27 +208,37 @@ class TestServiceFactoryCommissionCalculator:
         assert isinstance(validator, OrderValidator)
         assert validator.constraints == constraints
 
+    @patch("src.infrastructure.time.timezone_service.PythonTimeService")
     @patch("src.application.coordinators.service_factory.TradingCalendar")
-    def test_create_trading_calendar(self, mock_calendar_class):
+    def test_create_trading_calendar(self, mock_calendar_class, mock_time_service_class):
         """Test creating trading calendar."""
         mock_calendar = Mock()
         mock_calendar_class.return_value = mock_calendar
+        mock_time_service = Mock()
+        mock_time_service_class.return_value = mock_time_service
 
         calendar = ServiceFactory.create_trading_calendar()
 
         assert calendar == mock_calendar
-        mock_calendar_class.assert_called_once_with(Exchange.NYSE)
+        mock_time_service_class.assert_called_once()
+        mock_calendar_class.assert_called_once_with(mock_time_service, Exchange.NYSE)
 
+    @patch("src.infrastructure.time.timezone_service.PythonTimeService")
     @patch("src.application.coordinators.service_factory.TradingCalendar")
-    def test_create_trading_calendar_custom_exchange(self, mock_calendar_class):
+    def test_create_trading_calendar_custom_exchange(
+        self, mock_calendar_class, mock_time_service_class
+    ):
         """Test creating trading calendar for custom exchange."""
         mock_calendar = Mock()
         mock_calendar_class.return_value = mock_calendar
+        mock_time_service = Mock()
+        mock_time_service_class.return_value = mock_time_service
 
         calendar = ServiceFactory.create_trading_calendar(exchange=Exchange.NASDAQ)
 
         assert calendar == mock_calendar
-        mock_calendar_class.assert_called_once_with(Exchange.NASDAQ)
+        mock_time_service_class.assert_called_once()
+        mock_calendar_class.assert_called_once_with(mock_time_service, Exchange.NASDAQ)
 
     def test_create_domain_validator(self):
         """Test creating domain validator."""

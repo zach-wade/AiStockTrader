@@ -129,11 +129,9 @@ class MarketHoursService:
         elif not self._time_service.is_timezone_aware(current_time):
             now = self._time_service.localize_naive_datetime(current_time, self.timezone)
         else:
-            # Convert to proper adapter and then convert timezone
-            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
-
+            # Create adapter using time service instead of importing from infrastructure
             if not hasattr(current_time, "native_datetime"):
-                adapter = LocalizedDatetimeAdapter(current_time)
+                adapter = self._time_service.create_adapter(current_time)
             else:
                 adapter = current_time
             now = self._time_service.convert_timezone(adapter, self.timezone)
@@ -207,15 +205,11 @@ class MarketHoursService:
             check_dt = self._time_service.combine_date_time_timezone(dt, time(12, 0), self.timezone)
         elif not self._time_service.is_timezone_aware(dt):
             check_dt = self._time_service.localize_naive_datetime(dt, self.timezone)
+        elif hasattr(dt, "native_datetime"):
+            check_dt = dt
         else:
-            # Convert to proper adapter if needed
-            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
-
-            if hasattr(dt, "native_datetime"):
-                check_dt = dt
-            else:
-                adapter = LocalizedDatetimeAdapter(dt)
-                check_dt = self._time_service.convert_timezone(adapter, self.timezone)
+            adapter = self._time_service.create_adapter(dt)
+            check_dt = self._time_service.convert_timezone(adapter, self.timezone)
 
         return not (self.is_weekend(check_dt) or self.is_holiday(check_dt))
 
