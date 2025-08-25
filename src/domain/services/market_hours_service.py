@@ -6,9 +6,9 @@ that was previously in the infrastructure layer. It determines market
 status based on current time and market calendar rules.
 """
 
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 
 import pytz
 
@@ -49,7 +49,7 @@ class MarketHoursService:
     AFTER_MARKET_CLOSE_MINUTE = 0
 
     # Major US market holidays for 2024-2025 (business rules)
-    DEFAULT_HOLIDAYS = {
+    DEFAULT_HOLIDAYS: ClassVar[set[str]] = {
         # 2024 Holidays
         "2024-01-01",  # New Year's Day
         "2024-01-15",  # Martin Luther King Jr. Day
@@ -332,3 +332,167 @@ class MarketHoursService:
             "after_market_close": self.after_market_close.strftime("%H:%M"),
             "holidays_count": len(self.holidays),
         }
+
+    def get_regular_market_hours(self, trading_day: date) -> dict[str, Any] | None:
+        """
+        Get regular market hours for a specific trading day.
+
+        Args:
+            trading_day: The date to get market hours for
+
+        Returns:
+            Dictionary with open and close times, or None if not a trading day
+        """
+        # Convert date to datetime for checking
+        dt = datetime.combine(trading_day, time(12, 0))
+
+        if not self.is_trading_day(dt):
+            return None
+
+        # Localize the times for the given day
+        market_open = self.timezone.localize(datetime.combine(trading_day, self.regular_open))
+        market_close = self.timezone.localize(datetime.combine(trading_day, self.regular_close))
+
+        return {
+            "open": market_open,
+            "close": market_close,
+            "is_holiday": self.is_holiday(dt),
+            "is_weekend": self.is_weekend(dt),
+        }
+
+    def get_extended_market_hours(self, trading_day: date) -> dict[str, Any] | None:
+        """
+        Get extended market hours for a specific trading day.
+
+        Args:
+            trading_day: The date to get extended hours for
+
+        Returns:
+            Dictionary with pre-market and after-hours times, or None if not a trading day
+        """
+        # Convert date to datetime for checking
+        dt = datetime.combine(trading_day, time(12, 0))
+
+        if not self.is_trading_day(dt):
+            return None
+
+        # Localize the times for the given day
+        pre_market_open = self.timezone.localize(
+            datetime.combine(trading_day, self.pre_market_open)
+        )
+        after_market_close = self.timezone.localize(
+            datetime.combine(trading_day, self.after_market_close)
+        )
+
+        return {
+            "pre_market_open": pre_market_open,
+            "pre_market_close": self.timezone.localize(
+                datetime.combine(trading_day, self.regular_open)
+            ),
+            "regular_open": self.timezone.localize(
+                datetime.combine(trading_day, self.regular_open)
+            ),
+            "regular_close": self.timezone.localize(
+                datetime.combine(trading_day, self.regular_close)
+            ),
+            "after_market_open": self.timezone.localize(
+                datetime.combine(trading_day, self.regular_close)
+            ),
+            "after_market_close": after_market_close,
+        }
+
+    def get_next_trading_day(self, from_date: date | None = None) -> date:
+        """
+        Get the next trading day from a given date.
+
+        Args:
+            from_date: Date to start from (defaults to today)
+
+        Returns:
+            The next trading day
+        """
+        if from_date is None:
+            from_date = datetime.now(self.timezone).date()
+
+        # Start checking from the next day
+        next_day = from_date + timedelta(days=1)
+
+        # Keep incrementing until we find a trading day
+        while not self.is_trading_day(datetime.combine(next_day, time(12, 0))):
+            next_day += timedelta(days=1)
+
+        return next_day
+
+    def get_previous_trading_day(self, from_date: date | None = None) -> date:
+        """
+        Get the previous trading day from a given date.
+
+        Args:
+            from_date: Date to start from (defaults to today)
+
+        Returns:
+            The previous trading day
+        """
+        if from_date is None:
+            from_date = datetime.now(self.timezone).date()
+
+        # Start checking from the previous day
+        prev_day = from_date - timedelta(days=1)
+
+        # Keep decrementing until we find a trading day
+        while not self.is_trading_day(datetime.combine(prev_day, time(12, 0))):
+            prev_day -= timedelta(days=1)
+
+        return prev_day
+
+    def time_until_market_open(self, from_time: datetime | None = None) -> timedelta | None:
+        """
+        Calculate time until next market open.
+
+        Args:
+            from_time: Time to calculate from (defaults to now)
+
+        Returns:
+            Timedelta until market opens, or None if market is currently open
+        """
+        if from_time is None:
+            from_time = datetime.now(self.timezone)
+        elif from_time.tzinfo is None:
+            from_time = self.timezone.localize(from_time)
+
+        # If market is currently open, return None
+        if self.is_market_open(from_time):
+            return None
+
+        # Get next market open
+        next_open = self.get_next_market_open(from_time)
+        if next_open:
+            return next_open - from_time
+
+        return None
+
+    def get_time_until_market_open(self, from_time: datetime | None = None) -> timedelta | None:
+        """Alias for time_until_market_open for backward compatibility."""
+        return self.time_until_market_open(from_time)
+
+    def get_time_until_market_close(self, from_time: datetime | None = None) -> timedelta | None:
+        """
+        Calculate time until market close.
+
+        Args:
+            from_time: Time to calculate from (defaults to now)
+
+        Returns:
+            Timedelta until market closes, or None if market is closed
+        """
+        if from_time is None:
+            from_time = datetime.now(self.timezone)
+        elif from_time.tzinfo is None:
+            from_time = self.timezone.localize(from_time)
+
+        # Get next market close
+        next_close = self.get_next_market_close(from_time)
+        if next_close:
+            return next_close - from_time
+
+        return None

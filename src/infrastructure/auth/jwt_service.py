@@ -81,15 +81,33 @@ class JWTService:
         self.access_token_expire = timedelta(minutes=access_token_expire_minutes)
         self.refresh_token_expire = timedelta(days=refresh_token_expire_days)
 
-        # Load or generate keys
+        # Load keys - require persistent keys for production security
         if private_key_path and os.path.exists(private_key_path):
             self.private_key = self._load_private_key(private_key_path)
+        elif os.getenv("ENVIRONMENT", "development") == "production":
+            raise InvalidTokenException(
+                "JWT private key is required for production. "
+                "Please generate RSA keys and set the private_key_path parameter. "
+                "Use: openssl genrsa -out private_key.pem 2048"
+            )
         else:
-            logger.warning("No private key found, generating new key pair")
+            # Only allow key generation in development/testing
+            logger.warning(
+                "No private key found - generating ephemeral keys for DEVELOPMENT ONLY. "
+                "These keys will be lost on restart and all tokens will be invalidated!"
+            )
             self.private_key, self.public_key = self._generate_key_pair()
 
         if public_key_path and os.path.exists(public_key_path):
             self.public_key = self._load_public_key(public_key_path)
+        elif not hasattr(self, "public_key"):
+            # If we didn't generate keys above, we need the public key
+            if os.getenv("ENVIRONMENT", "development") == "production":
+                raise InvalidTokenException(
+                    "JWT public key is required for production. "
+                    "Please generate RSA keys and set the public_key_path parameter. "
+                    "Use: openssl rsa -in private_key.pem -pubout -out public_key.pem"
+                )
 
         # Redis for token management
         self.redis = redis_client or self._create_redis_client()

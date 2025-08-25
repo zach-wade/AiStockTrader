@@ -305,16 +305,34 @@ class SecretEncryption:
                 encryption_key.encode() if isinstance(encryption_key, str) else encryption_key
             )
         else:
-            # Generate a key from password if no key provided
-            password = os.getenv("SECRET_MASTER_PASSWORD", "default-password").encode()
-            salt = os.getenv("SECRET_SALT", "default-salt").encode()
+            # Require proper configuration - no defaults for security
+            password = os.getenv("SECRET_MASTER_PASSWORD")
+            salt = os.getenv("SECRET_SALT")
+
+            if not password or not salt:
+                raise SecretEncryptionError(
+                    "SECRET_MASTER_PASSWORD and SECRET_SALT environment variables are required "
+                    "for encryption. Please set these securely before running the application."
+                )
+
+            # Validate minimum security requirements
+            if len(password) < 16:
+                raise SecretEncryptionError(
+                    "SECRET_MASTER_PASSWORD must be at least 16 characters for security"
+                )
+
+            if len(salt) < 16:
+                raise SecretEncryptionError(
+                    "SECRET_SALT must be at least 16 characters for security"
+                )
+
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA256(),
                 length=32,
-                salt=salt,
+                salt=salt.encode(),
                 iterations=100000,
             )
-            key = base64.urlsafe_b64encode(kdf.derive(password))
+            key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
             self._fernet = Fernet(key)
 
     def encrypt(self, value: str) -> str:

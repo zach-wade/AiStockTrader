@@ -89,7 +89,7 @@ class Portfolio:
         if self.max_position_size and self.max_position_size <= 0:
             raise ValueError("Max position size must be positive")
 
-        if self.max_portfolio_risk and (
+        if self.max_portfolio_risk is not None and (
             self.max_portfolio_risk <= 0 or self.max_portfolio_risk > 1
         ):
             raise ValueError("Max portfolio risk must be between 0 and 1")

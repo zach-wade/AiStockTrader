@@ -63,6 +63,17 @@ class AlpacaBroker(IBroker):
         if not self.api_key or not self.secret_key:
             raise InvalidCredentialsError("Alpaca API credentials not provided")
 
+        # Validate API key format (Alpaca keys follow specific patterns)
+        if not self._validate_api_key_format(self.api_key):
+            raise InvalidCredentialsError(
+                "Invalid Alpaca API key format. Expected format: PKXXXXXXXXXXXXXXXX"
+            )
+
+        if not self._validate_secret_key_format(self.secret_key):
+            raise InvalidCredentialsError(
+                "Invalid Alpaca secret key format. Expected base64-encoded string of 40+ characters"
+            )
+
         self.paper = paper
         self.client: TradingClient | None = None
         self._order_map: dict[UUID, str] = {}  # Internal UUID to Alpaca ID
@@ -72,14 +83,18 @@ class AlpacaBroker(IBroker):
         logger.info(f"Initialized thread-safe Alpaca broker ({'paper' if paper else 'live'})")
 
     def connect(self) -> None:
-        """Connect to Alpaca API."""
+        """Connect to Alpaca API with authentication validation."""
+        # First validate authentication
+        self.validate_authentication()
+
+        # Then establish connection
         self.client = TradingClient(
             api_key=self.api_key,
             secret_key=self.secret_key,
             paper=self.paper,
         )
         self._connected = True
-        logger.info("Connected to Alpaca API")
+        logger.info("Connected to Alpaca API with validated credentials")
 
     def disconnect(self) -> None:
         """Disconnect from Alpaca API."""
@@ -468,3 +483,78 @@ class AlpacaBroker(IBroker):
             AlpacaOrderStatus.REJECTED: OrderStatus.REJECTED,
         }
         return mapping.get(alpaca_status, OrderStatus.PENDING)
+
+    def _validate_api_key_format(self, api_key: str) -> bool:
+        """Validate Alpaca API key format."""
+        import re
+
+        # Alpaca API keys typically start with PK and are 20 characters
+        # Paper trading keys may have different format
+        pattern = r"^[A-Z0-9]{20,}$"
+        return bool(re.match(pattern, api_key))
+
+    def _validate_secret_key_format(self, secret_key: str) -> bool:
+        """Validate Alpaca secret key format."""
+        import base64
+        import re
+
+        # Secret keys are base64 encoded and typically 40+ characters
+        if len(secret_key) < 40:
+            return False
+
+        # Check if it's valid base64
+        pattern = r"^[A-Za-z0-9+/]+=*$"
+        if not re.match(pattern, secret_key):
+            return False
+
+        try:
+            # Try to decode to verify it's valid base64
+            base64.b64decode(secret_key)
+            return True
+        except Exception:
+            return False
+
+    def validate_authentication(self) -> bool:
+        """
+        Test authentication with Alpaca API.
+
+        Returns:
+            True if authentication is successful
+
+        Raises:
+            InvalidCredentialsError: If authentication fails
+        """
+        try:
+            # Temporarily connect to test credentials
+            temp_client = TradingClient(
+                api_key=self.api_key,
+                secret_key=self.secret_key,
+                paper=self.paper,
+            )
+
+            # Try to get account info to verify credentials work
+            account = temp_client.get_account()
+
+            # If we get here, credentials are valid
+            logger.info(
+                f"Successfully authenticated with Alpaca ({'paper' if self.paper else 'live'} mode)"
+            )
+            logger.info(f"Account ID: {getattr(account, 'account_number', 'unknown')}")
+            return True
+
+        except APIError as e:
+            error_msg = str(e)
+            if "401" in error_msg or "forbidden" in error_msg.lower():
+                raise InvalidCredentialsError(
+                    f"Authentication failed - invalid API credentials: {error_msg}"
+                )
+            elif "429" in error_msg:
+                raise InvalidCredentialsError(
+                    "Rate limited - too many authentication attempts. Please wait and try again."
+                )
+            else:
+                raise InvalidCredentialsError(
+                    f"Failed to authenticate with Alpaca API: {error_msg}"
+                )
+        except Exception as e:
+            raise InvalidCredentialsError(f"Unexpected error during authentication: {e}")

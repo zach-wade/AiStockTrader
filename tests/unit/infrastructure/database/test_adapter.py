@@ -121,8 +121,8 @@ class TestPostgreSQLAdapterConnectionManagement:
             async with adapter.acquire_connection():
                 pass
 
-        assert exc_info.operation == "acquire_connection"
-        assert exc_info.timeout_seconds == 30.0
+        # exc_info.value contains the actual exception
+        assert str(exc_info.value) == "Timeout"
 
 
 class TestPostgreSQLAdapterQueryExecution:

@@ -28,6 +28,7 @@ from src.application.interfaces.repositories import (
 from src.domain.entities.order import Order, OrderSide, OrderStatus
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
+from src.domain.value_objects.quantity import Quantity
 
 
 class MockOrderRepository:
@@ -48,7 +49,13 @@ class MockOrderRepository:
 
     async def get_orders_by_symbol(self, symbol: str) -> list[Order]:
         self.call_log.append(("get_orders_by_symbol", symbol))
-        return [order for order in self.orders.values() if order.symbol == symbol]
+        # Handle both string and Symbol comparison
+        return [
+            order
+            for order in self.orders.values()
+            if (hasattr(order.symbol, "value") and order.symbol.value == symbol)
+            or order.symbol == symbol
+        ]
 
     async def get_orders_by_status(self, status: OrderStatus) -> list[Order]:
         self.call_log.append(("get_orders_by_status", status))
@@ -239,7 +246,7 @@ class TestOrderRepositoryInterface:
 
         request = OrderRequest(
             symbol=Symbol("AAPL"),
-            quantity="100",
+            quantity=Quantity("100"),
             side=OrderSide.BUY,
             limit_price=Price("150.00"),
             reason="Test order",
@@ -283,7 +290,7 @@ class TestOrderRepositoryInterface:
 
         other_request = OrderRequest(
             symbol=Symbol("GOOGL"),
-            quantity="50",
+            quantity=Quantity("50"),
             side=OrderSide.SELL,
         )
         other_order = Order.create_market_order(other_request)

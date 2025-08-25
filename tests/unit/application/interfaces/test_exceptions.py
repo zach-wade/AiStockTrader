@@ -252,7 +252,7 @@ class TestValidationError:
         assert str(error) == expected_message
         assert error.entity_type == entity_type
         assert error.field == field
-        assert error is None
+        assert error.value is None
 
     def test_init_with_complex_value(self):
         """Test creating ValidationError with complex value."""
