@@ -313,7 +313,9 @@ class TestCancelOrderFailures:
 
         # Assert
         assert response.success is False
-        assert response.error == f"Order cannot be cancelled in status: {OrderStatus.CANCELLED}"
+        assert (
+            response.error == f"Order cannot be cancelled in status: {OrderStatus.CANCELLED.value}"
+        )
         assert response.cancelled is False
 
     @pytest.mark.asyncio
@@ -330,7 +332,7 @@ class TestCancelOrderFailures:
 
         # Assert
         assert response.success is False
-        assert response.error == f"Order cannot be cancelled in status: {OrderStatus.FILLED}"
+        assert response.error == f"Order cannot be cancelled in status: {OrderStatus.FILLED.value}"
         assert response.cancelled is False
 
     @pytest.mark.asyncio
@@ -358,7 +360,9 @@ class TestCancelOrderFailures:
 
         # Assert
         assert response.success is False
-        assert response.error == f"Order cannot be cancelled in status: {OrderStatus.REJECTED}"
+        assert (
+            response.error == f"Order cannot be cancelled in status: {OrderStatus.REJECTED.value}"
+        )
 
     @pytest.mark.asyncio
     async def test_cancel_expired_order(
@@ -814,7 +818,7 @@ class TestOrderEntityIntegration:
                 assert response.cancelled is True
             else:
                 assert response.success is False
-                assert f"Order cannot be cancelled in status: {status}" in response.error
+                assert f"Order cannot be cancelled in status: {status.value}" in response.error
 
     @pytest.mark.asyncio
     async def test_order_cancel_method_integration(

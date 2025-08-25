@@ -453,16 +453,16 @@ class MarketHoursService:
             from_time: Time to calculate from (defaults to now)
 
         Returns:
-            Timedelta until market opens, or None if market is currently open
+            Timedelta until market opens, or timedelta(0) if market is currently open
         """
         if from_time is None:
             from_time = datetime.now(self.timezone)
         elif from_time.tzinfo is None:
             from_time = self.timezone.localize(from_time)
 
-        # If market is currently open, return None
+        # If market is currently open, return 0
         if self.is_market_open(from_time):
-            return None
+            return timedelta(0)
 
         # Get next market open
         next_open = self.get_next_market_open(from_time)
@@ -489,6 +489,10 @@ class MarketHoursService:
             from_time = datetime.now(self.timezone)
         elif from_time.tzinfo is None:
             from_time = self.timezone.localize(from_time)
+
+        # If market is closed, return None
+        if not self.is_market_open(from_time):
+            return None
 
         # Get next market close
         next_close = self.get_next_market_close(from_time)

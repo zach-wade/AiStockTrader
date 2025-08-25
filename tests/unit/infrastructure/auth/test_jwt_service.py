@@ -47,8 +47,10 @@ class TestJWTService:
     @pytest.fixture
     def jwt_service(self, mock_redis):
         """Create JWT service instance for testing."""
-        with patch("src.infrastructure.auth.jwt_service.redis") as mock_redis_module:
-            mock_redis_module.from_url.return_value = mock_redis
+        # Patch the redis module before importing JWTService
+        with patch("src.infrastructure.auth.jwt_service.redis.from_url") as mock_from_url:
+            mock_from_url.return_value = mock_redis
+            # Create service with mock redis client to avoid connection attempts
             service = JWTService(redis_client=mock_redis)
             return service
 

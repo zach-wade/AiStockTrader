@@ -360,8 +360,8 @@ class TestMarketHoursService:
             mock_datetime.combine = datetime.combine
             time_until = service.get_time_until_market_open()
             assert time_until is not None
-            # Should be time until Tuesday 9:30 AM
-            expected = timedelta(hours=13, minutes=30)
+            # Should be time until Tuesday 9:30 AM (Monday is MLK Day holiday)
+            expected = timedelta(days=1, hours=13, minutes=30)
             assert time_until == expected
 
     def test_time_until_market_open_after_close(self, service, eastern_tz):
