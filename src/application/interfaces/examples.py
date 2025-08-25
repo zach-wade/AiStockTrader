@@ -8,10 +8,11 @@ These examples show the intended usage patterns for clean architecture.
 # Standard library imports
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 # Local imports
-from src.domain.entities.order import Order, OrderSide, OrderStatus
+from src.domain.entities.order import Order, OrderRequest, OrderSide, OrderStatus
 from src.domain.entities.position import Position
 
 from .exceptions import OrderNotFoundError, PositionNotFoundError
@@ -43,9 +44,8 @@ class TradingService:
         Example of using repository interface for simple operations.
         """
         # Create domain entity
-        order = Order.create_market_order(
-            symbol=symbol, quantity=quantity, side=side, reason=reason
-        )
+        request = OrderRequest(symbol=symbol, quantity=quantity, side=side, reason=reason)
+        order = Order.create_market_order(request)
 
         # Save using repository interface
         async with self._uow:
@@ -88,11 +88,12 @@ class TradingService:
 
             # Save changes
             updated_order = await uow.orders.update_order(order)
-            updated_position = await uow.positions.save_position(position)
+            updated_position = await uow.positions.persist_position(position)
 
             return updated_order, updated_position
 
-        return await self._tx_manager.execute_in_transaction(trade_operation)
+        result = await self._tx_manager.execute_in_transaction(trade_operation)
+        return cast(tuple[Order, Position], result)
 
     async def close_position_completely(
         self, symbol: str, exit_price: Decimal
@@ -111,12 +112,13 @@ class TradingService:
 
             # Create closing order
             closing_side = OrderSide.SELL if position.is_long() else OrderSide.BUY
-            closing_order = Order.create_market_order(
+            close_request = OrderRequest(
                 symbol=symbol,
                 quantity=abs(position.quantity),
                 side=closing_side,
                 reason=f"Close position {position.id}",
             )
+            closing_order = Order.create_market_order(close_request)
 
             # Mark order as filled immediately (assuming market execution)
             closing_order.submit(f"broker_{closing_order.id}")
@@ -131,9 +133,10 @@ class TradingService:
 
             return updated_position, saved_order
 
-        return await self._tx_manager.execute_in_transaction(close_operation)
+        result = await self._tx_manager.execute_in_transaction(close_operation)
+        return cast(tuple[Position, Order], result)
 
-    async def get_portfolio_summary(self, portfolio_id: UUID) -> dict:
+    async def get_portfolio_summary(self, portfolio_id: UUID) -> dict[str, Any]:
         """
         Get portfolio summary with positions and recent orders.
 
@@ -205,9 +208,10 @@ class TradingService:
 
             return updated_positions
 
-        return await self._tx_manager.execute_in_transaction(bulk_update_operation)
+        result = await self._tx_manager.execute_in_transaction(bulk_update_operation)
+        return cast(list[Position], result)
 
-    async def get_trading_metrics(self, symbol: str) -> dict:
+    async def get_trading_metrics(self, symbol: str) -> dict[str, Any]:
         """
         Get comprehensive trading metrics for a symbol.
 
@@ -262,7 +266,7 @@ class TradingService:
 
 
 # Example usage patterns for testing and documentation
-async def example_usage_patterns():
+async def example_usage_patterns() -> None:
     """
     Example patterns showing repository interface usage.
 

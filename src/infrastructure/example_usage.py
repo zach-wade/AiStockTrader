@@ -10,9 +10,10 @@ and transaction management.
 import asyncio
 import logging
 from decimal import Decimal
+from typing import Any
 
 # Local imports
-from src.domain.entities.order import Order, OrderSide
+from src.domain.entities.order import Order, OrderRequest, OrderSide
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.infrastructure.database import (
@@ -42,6 +43,8 @@ async def setup_database() -> None:
     connection = await ConnectionFactory.create_connection(config)
 
     # Create adapter and migration manager
+    if connection._pool is None:
+        raise RuntimeError("Failed to create database connection pool")
     adapter = PostgreSQLAdapter(connection._pool)
     migration_manager = MigrationManager(adapter)
 
@@ -67,7 +70,7 @@ async def example_trading_workflow() -> None:
     transaction_manager = PostgreSQLTransactionManager(factory)
 
     # Example 1: Create a portfolio
-    async def create_portfolio(uow):
+    async def create_portfolio(uow: Any) -> Portfolio:
         """Create a new trading portfolio."""
         portfolio = Portfolio(
             name="Example Trading Portfolio",
@@ -79,24 +82,25 @@ async def example_trading_workflow() -> None:
 
         saved_portfolio = await uow.portfolios.save_portfolio(portfolio)
         logger.info(f"Created portfolio: {saved_portfolio.name}")
-        return saved_portfolio
+        return saved_portfolio  # type: ignore[no-any-return]
 
     # Example 2: Place a market order
-    async def place_market_order(uow):
+    async def place_market_order(uow: Any) -> Order:
         """Place a market buy order."""
-        order = Order.create_market_order(
+        request = OrderRequest(
             symbol="AAPL",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             reason="Example market order",
         )
+        order = Order.create_market_order(request)
 
         saved_order = await uow.orders.save_order(order)
         logger.info(f"Placed order: {saved_order}")
-        return saved_order
+        return saved_order  # type: ignore[no-any-return]
 
     # Example 3: Open a position
-    async def open_position(uow):
+    async def open_position(uow: Any) -> Position:
         """Open a new trading position."""
         position = Position.open_position(
             symbol="AAPL",
@@ -106,12 +110,12 @@ async def example_trading_workflow() -> None:
             strategy="Example Strategy",
         )
 
-        saved_position = await uow.positions.save_position(position)
+        saved_position = await uow.positions.persist_position(position)
         logger.info(f"Opened position: {saved_position}")
-        return saved_position
+        return saved_position  # type: ignore[no-any-return]
 
     # Example 4: Complex transaction with multiple operations
-    async def complex_trading_operation(uow):
+    async def complex_trading_operation(uow: Any) -> Any:
         """Perform multiple operations in a single transaction."""
         # Get the portfolio
         portfolio = await uow.portfolios.get_portfolio_by_name("Example Trading Portfolio")
@@ -119,13 +123,14 @@ async def example_trading_workflow() -> None:
             raise ValueError("Portfolio not found")
 
         # Place a limit order
-        limit_order = Order.create_limit_order(
+        limit_request = OrderRequest(
             symbol="TSLA",
             quantity=Decimal("50"),
             side=OrderSide.BUY,
             limit_price=Decimal("200.00"),
             reason="Complex operation limit order",
         )
+        limit_order = Order.create_limit_order(limit_request)
         await uow.orders.save_order(limit_order)
 
         # Simulate order filling
@@ -141,7 +146,7 @@ async def example_trading_workflow() -> None:
             commission=Decimal("0.50"),
             strategy="Example Strategy",
         )
-        await uow.positions.save_position(position)
+        await uow.positions.persist_position(position)
 
         # Update portfolio
         portfolio.cash_balance -= Decimal("50") * Decimal("199.50") + Decimal("0.50")
@@ -172,7 +177,10 @@ async def example_trading_workflow() -> None:
 
             logger.info(f"Active orders: {len(all_orders)}")
             logger.info(f"Active positions: {len(all_positions)}")
-            logger.info(f"Current portfolio value: ${current_portfolio.get_total_value()}")
+            if current_portfolio:
+                logger.info(f"Current portfolio value: ${current_portfolio.get_total_value()}")
+            else:
+                logger.warning("No current portfolio found")
 
     except Exception as e:
         logger.error(f"Trading workflow failed: {e}")

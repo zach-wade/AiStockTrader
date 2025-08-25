@@ -1,0 +1,15 @@
+[run]
+source = src/domain
+omit =
+    */tests/*
+    */__pycache__/*
+    */migrations/*
+    */config/*
+
+[report]
+precision = 2
+skip_covered = False
+show_missing = True
+
+[html]
+directory = htmlcov_domain

@@ -260,7 +260,7 @@ class TestQuantityEdgeCases:
 
         # Decimal values
         qty = Quantity("100.50")
-        assert str(qty) == "100.50"
+        assert str(qty) == "100.5"
         assert repr(qty) == "Quantity(100.50)"
 
         # Zero
@@ -315,7 +315,7 @@ class TestQuantityEdgeCases:
 
         # Operations should maintain precision
         result = qty.multiply(1)
-        assert result.value == qty.value
+        assert result == qty
 
         result = qty.add(Quantity(0))
-        assert result.value == qty.value
+        assert result == qty

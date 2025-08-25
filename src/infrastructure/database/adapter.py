@@ -10,12 +10,12 @@ import builtins
 import logging
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, TypeAlias
 
 # Third-party imports
 import psycopg
 from psycopg import AsyncConnection
-from psycopg.rows import Row, dict_row
+from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 # Local imports
@@ -29,6 +29,9 @@ from src.application.interfaces.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+# Type alias for database row results
+Row: TypeAlias = dict[str, Any]
+
 
 class PostgreSQLAdapter:
     """
@@ -41,6 +44,11 @@ class PostgreSQLAdapter:
     def __init__(self, pool: AsyncConnectionPool) -> None:
         """
         Initialize adapter with connection pool.
+
+        Security Note:
+            This adapter uses parameterized queries to prevent SQL injection.
+            All user input is passed through query parameters (using %s placeholders)
+            and never directly interpolated into SQL strings.
 
         Args:
             pool: psycopg3 async connection pool
@@ -94,9 +102,14 @@ class PostgreSQLAdapter:
         """
         Execute a SQL query that doesn't return data.
 
+        Security Note:
+            Uses parameterized queries with %s placeholders to prevent SQL injection.
+            Never use string formatting or f-strings to build queries with user input.
+            Table/column names must be validated separately if dynamic.
+
         Args:
-            query: SQL query string
-            *args: Query parameters
+            query: SQL query string with %s placeholders for parameters
+            *args: Query parameters to safely bind to placeholders
             timeout: Query timeout in seconds
 
         Returns:
@@ -131,9 +144,13 @@ class PostgreSQLAdapter:
         """
         Fetch a single record from the database.
 
+        Security Note:
+            Uses parameterized queries with %s placeholders to prevent SQL injection.
+            All data values must be passed as parameters, never interpolated.
+
         Args:
-            query: SQL query string
-            *args: Query parameters
+            query: SQL query string with %s placeholders for parameters
+            *args: Query parameters to safely bind to placeholders
             timeout: Query timeout in seconds
 
         Returns:
@@ -165,9 +182,13 @@ class PostgreSQLAdapter:
         """
         Fetch all records from the database.
 
+        Security Note:
+            Uses parameterized queries with %s placeholders to prevent SQL injection.
+            All data values must be passed as parameters, never interpolated.
+
         Args:
-            query: SQL query string
-            *args: Query parameters
+            query: SQL query string with %s placeholders for parameters
+            *args: Query parameters to safely bind to placeholders
             timeout: Query timeout in seconds
 
         Returns:
@@ -199,9 +220,13 @@ class PostgreSQLAdapter:
         """
         Fetch values from a single column.
 
+        Security Note:
+            Uses parameterized queries with %s placeholders to prevent SQL injection.
+            All data values must be passed as parameters, never interpolated.
+
         Args:
-            query: SQL query string that returns single column
-            *args: Query parameters
+            query: SQL query string with %s placeholders that returns single column
+            *args: Query parameters to safely bind to placeholders
             timeout: Query timeout in seconds
 
         Returns:
@@ -239,9 +264,14 @@ class PostgreSQLAdapter:
         """
         Execute a query multiple times with different parameters.
 
+        Security Note:
+            Uses parameterized queries with %s placeholders to prevent SQL injection.
+            Each tuple in args_list is safely bound to the query placeholders.
+            Never use string formatting to build queries.
+
         Args:
-            query: SQL query string
-            args_list: List of parameter tuples
+            query: SQL query string with %s placeholders for parameters
+            args_list: List of parameter tuples to safely bind to placeholders
             timeout: Query timeout in seconds
 
         Raises:
@@ -278,8 +308,8 @@ class PostgreSQLAdapter:
             if not self._connection:
                 self._connection = await self._pool.connection().__aenter__()
 
-            self._transaction = self._connection.transaction()
-            await self._transaction.__aenter__()
+            transaction_context = self._connection.transaction()
+            self._transaction = await transaction_context.__aenter__()
             logger.debug("Transaction started")
 
         except psycopg.OperationalError as e:
@@ -298,7 +328,8 @@ class PostgreSQLAdapter:
             raise TransactionError("No active transaction to commit")
 
         try:
-            await self._transaction.__aexit__(None, None, None)
+            if self._transaction is not None:
+                await self._transaction.__aexit__(None, None, None)
             logger.debug("Transaction committed")
         except psycopg.OperationalError as e:
             logger.error(f"Failed to commit transaction: {e}")
@@ -318,7 +349,8 @@ class PostgreSQLAdapter:
             return
 
         try:
-            await self._transaction.__aexit__(Exception, Exception(), None)
+            if self._transaction is not None:
+                await self._transaction.__aexit__(Exception, Exception(), None)
             logger.debug("Transaction rolled back")
         except psycopg.OperationalError as e:
             logger.error(f"Failed to rollback transaction: {e}")
@@ -342,11 +374,15 @@ class PostgreSQLAdapter:
         """
         Perform a health check on the database connection.
 
+        Security Note:
+            Uses a static query with no user input to prevent SQL injection.
+
         Returns:
             True if database is healthy, False otherwise
         """
         try:
             async with self.acquire_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+                # Static query - no user input, safe from SQL injection
                 await cur.execute("SELECT 1")
                 await cur.fetchone()
                 return True

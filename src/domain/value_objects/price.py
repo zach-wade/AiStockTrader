@@ -2,7 +2,7 @@
 
 # Standard library imports
 from decimal import ROUND_HALF_UP, Decimal
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 
 class Price:
@@ -82,7 +82,7 @@ class Price:
         num_ticks = (self._value / self._tick_size).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
         rounded_value = num_ticks * self._tick_size
 
-        return Price(rounded_value, self._tick_size, self._market_type)
+        return type(self)(rounded_value, self._tick_size, self._market_type)
 
     def is_valid(self) -> bool:
         """Check if price is valid for trading."""
@@ -104,7 +104,7 @@ class Price:
         if not isinstance(other, Price):
             raise TypeError(f"Cannot add Price and {type(other)}")
 
-        return Price(self._value + other._value, self._tick_size, self._market_type)
+        return type(self)(self._value + other._value, self._tick_size, self._market_type)
 
     def subtract(self, other: Self) -> Self:
         """Subtract another price.
@@ -125,7 +125,7 @@ class Price:
         if result < 0:
             raise ValueError("Price cannot be negative")
 
-        return Price(result, self._tick_size, self._market_type)
+        return type(self)(result, self._tick_size, self._market_type)
 
     def multiply(self, factor: Decimal | float | int) -> Self:
         """Multiply price by a factor.
@@ -139,7 +139,7 @@ class Price:
         if not isinstance(factor, Decimal):
             factor = Decimal(str(factor))
 
-        return Price(self._value * factor, self._tick_size, self._market_type)
+        return type(self)(self._value * factor, self._tick_size, self._market_type)
 
     def divide(self, divisor: Decimal | float | int) -> Self:
         """Divide price by a divisor.
@@ -159,32 +159,32 @@ class Price:
         if divisor == 0:
             raise ValueError("Cannot divide by zero")
 
-        return Price(self._value / divisor, self._tick_size, self._market_type)
+        return type(self)(self._value / divisor, self._tick_size, self._market_type)
 
-    def calculate_spread(self, other: Self) -> Decimal:
-        """Calculate spread between two prices.
+    def calculate_difference(self, other: Self) -> Decimal:
+        """Calculate difference between two prices.
 
         Args:
             other: Another Price instance
 
         Returns:
-            Spread as Decimal
+            Difference as Decimal
         """
         if not isinstance(other, Price):
-            raise TypeError(f"Cannot calculate spread with {type(other)}")
+            raise TypeError(f"Cannot calculate difference with {type(other)}")
 
         return abs(self._value - other._value)
 
-    def calculate_spread_percentage(self, other: Self) -> Decimal:
-        """Calculate spread as percentage.
+    def calculate_difference_percentage(self, other: Self) -> Decimal:
+        """Calculate difference as percentage.
 
         Args:
             other: Another Price instance
 
         Returns:
-            Spread percentage as Decimal
+            Difference percentage as Decimal
         """
-        spread = self.calculate_spread(other)
+        difference = self.calculate_difference(other)
         if self._value == 0 and other._value == 0:
             return Decimal(0)
 
@@ -192,16 +192,16 @@ class Price:
         if avg_price == 0:
             return Decimal(0)
 
-        return (spread / avg_price) * 100
+        return (difference / avg_price) * 100
 
-    def format(self, decimal_places: int | None = None) -> str:
-        """Format price for display.
+    def to_string(self, decimal_places: int | None = None) -> str:
+        """Convert price to string representation.
 
         Args:
             decimal_places: Number of decimal places (auto if None)
 
         Returns:
-            Formatted string representation
+            String representation of the price
         """
         if decimal_places is None:
             # Auto-detect based on tick size
@@ -246,10 +246,10 @@ class Price:
 
     def __str__(self) -> str:
         """Get string representation."""
-        return self.format()
+        return self.to_string()
 
     @classmethod
-    def from_bid_ask(cls, bid: Decimal | float, ask: Decimal | float, **kwargs) -> Self:
+    def from_bid_ask(cls, bid: Decimal | float, ask: Decimal | float, **kwargs: Any) -> Self:
         """Create Price from bid/ask midpoint.
 
         Args:

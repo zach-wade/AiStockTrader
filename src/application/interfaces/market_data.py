@@ -152,7 +152,7 @@ class Quote:
     @property
     def spread_percentage(self) -> Decimal:
         """Calculate the bid-ask spread as a percentage of midpoint."""
-        return self.bid_price.calculate_spread_percentage(self.ask_price)
+        return self.bid_price.calculate_difference_percentage(self.ask_price)
 
     @property
     def midpoint(self) -> Price:

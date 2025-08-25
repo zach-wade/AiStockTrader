@@ -1,11 +1,11 @@
 {
-  "start_time": "2025-08-17T14:04:34.680994+00:00",
-  "end_time": "2025-08-17T14:04:34.784030+00:00",
+  "start_time": "2025-08-25T12:34:59.134319+00:00",
+  "end_time": "2025-08-25T12:34:59.236970+00:00",
   "health_checks_passed": 3,
   "health_checks_failed": 0,
   "prices_fetched": 3,
-  "signals_generated": 0,
+  "signals_generated": 1,
   "orders_submitted": 0,
-  "orders_rejected": 0,
+  "orders_rejected": 1,
   "errors": []
 }

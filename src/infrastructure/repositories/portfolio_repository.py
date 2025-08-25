@@ -3,24 +3,29 @@ PostgreSQL Portfolio Repository Implementation
 
 Concrete implementation of IPortfolioRepository using PostgreSQL database.
 Handles portfolio persistence, retrieval, and mapping between domain entities and database records.
+Implements optimistic locking for concurrent operations safety.
 """
 
 # Standard library imports
+import asyncio
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
-
-# Third-party imports
-from psycopg.rows import Row
 
 # Local imports
 from src.application.interfaces.exceptions import PortfolioNotFoundError, RepositoryError
 from src.application.interfaces.repositories import IPortfolioRepository
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
-from src.infrastructure.database.adapter import PostgreSQLAdapter
+from src.infrastructure.database.adapter import PostgreSQLAdapter, Row
 
 logger = logging.getLogger(__name__)
+
+
+class OptimisticLockException(Exception):
+    """Raised when an optimistic lock conflict occurs during concurrent updates."""
+
+    pass
 
 
 class PostgreSQLPortfolioRepository(IPortfolioRepository):
@@ -29,17 +34,21 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
 
     Provides portfolio persistence and retrieval using PostgreSQL database.
     Maps between Portfolio domain entities and database records.
+    Implements optimistic locking with version numbers for concurrent safety.
     Note: Positions are stored separately and loaded as needed.
     """
 
-    def __init__(self, adapter: PostgreSQLAdapter) -> None:
+    def __init__(self, adapter: PostgreSQLAdapter, max_retries: int = 3) -> None:
         """
         Initialize repository with database adapter.
 
         Args:
             adapter: PostgreSQL database adapter
+            max_retries: Maximum retries for optimistic lock conflicts
         """
         self.adapter = adapter
+        self.max_retries = max_retries
+        self._version_lock = asyncio.Lock()
 
     async def save_portfolio(self, portfolio: Portfolio) -> Portfolio:
         """
@@ -68,15 +77,19 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             raise RepositoryError(f"Failed to save portfolio: {e}") from e
 
     async def _insert_portfolio(self, portfolio: Portfolio) -> Portfolio:
-        """Insert a new portfolio into the database."""
+        """Insert a new portfolio into the database with initial version."""
+        # Set initial version
+        if not hasattr(portfolio, "version"):
+            portfolio.version = 1
+
         insert_query = """
         INSERT INTO portfolios (
             id, name, initial_capital, cash_balance, max_position_size,
             max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
             total_commission_paid, trades_count, winning_trades, losing_trades,
-            created_at, last_updated, strategy, tags
+            created_at, last_updated, strategy, tags, version
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
 
@@ -99,9 +112,10 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             portfolio.last_updated,
             portfolio.strategy,
             portfolio.tags,
+            1,  # Initial version
         )
 
-        logger.debug(f"Inserted portfolio {portfolio.id}")
+        logger.debug(f"Inserted portfolio {portfolio.id} with version 1")
         return portfolio
 
     async def get_portfolio_by_id(self, portfolio_id: UUID) -> Portfolio | None:
@@ -122,7 +136,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             SELECT id, name, initial_capital, cash_balance, max_position_size,
                    max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
                    total_commission_paid, trades_count, winning_trades, losing_trades,
-                   created_at, last_updated, strategy, tags
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
             FROM portfolios
             WHERE id = %s
             """
@@ -161,7 +175,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             SELECT id, name, initial_capital, cash_balance, max_position_size,
                    max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
                    total_commission_paid, trades_count, winning_trades, losing_trades,
-                   created_at, last_updated, strategy, tags
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
             FROM portfolios
             WHERE name = %s
             """
@@ -199,7 +213,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             SELECT id, name, initial_capital, cash_balance, max_position_size,
                    max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
                    total_commission_paid, trades_count, winning_trades, losing_trades,
-                   created_at, last_updated, strategy, tags
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
             FROM portfolios
             ORDER BY COALESCE(last_updated, created_at) DESC
             LIMIT 1
@@ -236,7 +250,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             SELECT id, name, initial_capital, cash_balance, max_position_size,
                    max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
                    total_commission_paid, trades_count, winning_trades, losing_trades,
-                   created_at, last_updated, strategy, tags
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
             FROM portfolios
             ORDER BY created_at DESC
             """
@@ -272,7 +286,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             SELECT id, name, initial_capital, cash_balance, max_position_size,
                    max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
                    total_commission_paid, trades_count, winning_trades, losing_trades,
-                   created_at, last_updated, strategy, tags
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
             FROM portfolios
             WHERE strategy = %s
             ORDER BY created_at DESC
@@ -318,7 +332,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             SELECT id, name, initial_capital, cash_balance, max_position_size,
                    max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
                    total_commission_paid, trades_count, winning_trades, losing_trades,
-                   created_at, last_updated, strategy, tags
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
             FROM portfolios
             WHERE id = %s
               AND (last_updated BETWEEN %s AND %s OR created_at BETWEEN %s AND %s)
@@ -342,7 +356,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
 
     async def update_portfolio(self, portfolio: Portfolio) -> Portfolio:
         """
-        Update an existing portfolio.
+        Update an existing portfolio with optimistic locking.
 
         Args:
             portfolio: The portfolio entity to update
@@ -353,49 +367,88 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
         Raises:
             RepositoryError: If update operation fails
             PortfolioNotFoundError: If portfolio doesn't exist
+            OptimisticLockException: If version conflict occurs
         """
-        try:
-            update_query = """
-            UPDATE portfolios SET
-                name = %s, initial_capital = %s, cash_balance = %s,
-                max_position_size = %s, max_portfolio_risk = %s, max_positions = %s,
-                max_leverage = %s, total_realized_pnl = %s, total_commission_paid = %s,
-                trades_count = %s, winning_trades = %s, losing_trades = %s,
-                last_updated = %s, strategy = %s, tags = %s
-            WHERE id = %s
-            """
+        retries = 0
+        while retries < self.max_retries:
+            try:
+                async with self._version_lock:
+                    # Get current version
+                    current_version = getattr(portfolio, "version", 1)
+                    new_version = current_version + 1
 
-            result = await self.adapter.execute_query(
-                update_query,
-                portfolio.name,
-                portfolio.initial_capital,
-                portfolio.cash_balance,
-                portfolio.max_position_size,
-                portfolio.max_portfolio_risk,
-                portfolio.max_positions,
-                portfolio.max_leverage,
-                portfolio.total_realized_pnl,
-                portfolio.total_commission_paid,
-                portfolio.trades_count,
-                portfolio.winning_trades,
-                portfolio.losing_trades,
-                portfolio.last_updated,
-                portfolio.strategy,
-                portfolio.tags,
-                portfolio.id,  # id moved to end for WHERE clause
-            )
+                    # Update with version check
+                    update_query = """
+                    UPDATE portfolios SET
+                        name = %s, initial_capital = %s, cash_balance = %s,
+                        max_position_size = %s, max_portfolio_risk = %s, max_positions = %s,
+                        max_leverage = %s, total_realized_pnl = %s, total_commission_paid = %s,
+                        trades_count = %s, winning_trades = %s, losing_trades = %s,
+                        last_updated = %s, strategy = %s, tags = %s, version = %s
+                    WHERE id = %s AND version = %s
+                    RETURNING version
+                    """
 
-            if "UPDATE 0" in result:
-                raise PortfolioNotFoundError(portfolio.id)
+                    result = await self.adapter.execute_query(
+                        update_query,
+                        portfolio.name,
+                        portfolio.initial_capital,
+                        portfolio.cash_balance,
+                        portfolio.max_position_size,
+                        portfolio.max_portfolio_risk,
+                        portfolio.max_positions,
+                        portfolio.max_leverage,
+                        portfolio.total_realized_pnl,
+                        portfolio.total_commission_paid,
+                        portfolio.trades_count,
+                        portfolio.winning_trades,
+                        portfolio.losing_trades,
+                        portfolio.last_updated or datetime.now(UTC),
+                        portfolio.strategy,
+                        portfolio.tags,
+                        new_version,  # New version
+                        portfolio.id,
+                        current_version,  # Check current version
+                    )
 
-            logger.debug(f"Updated portfolio {portfolio.id}")
-            return portfolio
+                    if "UPDATE 0" in result:
+                        # Check if portfolio exists
+                        check_query = "SELECT version FROM portfolios WHERE id = %s"
+                        check_result = await self.adapter.fetch_one(check_query, portfolio.id)
 
-        except PortfolioNotFoundError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to update portfolio {portfolio.id}: {e}")
-            raise RepositoryError(f"Failed to update portfolio: {e}") from e
+                        if check_result is None:
+                            raise PortfolioNotFoundError(portfolio.id)
+                        else:
+                            # Version conflict - retry
+                            retries += 1
+                            if retries >= self.max_retries:
+                                raise OptimisticLockException(
+                                    f"Failed to update portfolio {portfolio.id} after {self.max_retries} retries due to version conflicts"
+                                )
+
+                            # Reload portfolio with new version
+                            reloaded = await self.get_portfolio_by_id(portfolio.id)
+                            if reloaded:
+                                portfolio.version = getattr(reloaded, "version", 1)
+
+                            # Small delay before retry
+                            await asyncio.sleep(0.1 * retries)
+                            continue
+
+                    # Update successful
+                    portfolio.version = new_version
+                    logger.debug(f"Updated portfolio {portfolio.id} to version {new_version}")
+                    return portfolio
+
+            except (PortfolioNotFoundError, OptimisticLockException):
+                raise
+            except Exception as e:
+                logger.error(f"Failed to update portfolio {portfolio.id}: {e}")
+                raise RepositoryError(f"Failed to update portfolio: {e}") from e
+
+        raise OptimisticLockException(
+            f"Failed to update portfolio {portfolio.id} after {self.max_retries} retries"
+        )
 
     async def delete_portfolio(self, portfolio_id: UUID) -> bool:
         """
@@ -497,7 +550,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
         Returns:
             Portfolio entity
         """
-        return Portfolio(
+        portfolio = Portfolio(
             id=record["id"],
             name=record["name"],
             initial_capital=record["initial_capital"],
@@ -517,6 +570,10 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             strategy=record["strategy"],
             tags=record["tags"] or {},
         )
+        # Add version if present
+        if "version" in record:
+            portfolio.version = record["version"]
+        return portfolio
 
     def _map_record_to_position(self, record: Row) -> Position:
         """

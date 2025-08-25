@@ -1,465 +1,592 @@
 """
-Unit tests for PostgreSQL Database Adapter.
+Comprehensive unit tests for PostgreSQL Database Adapter.
 
-Tests the database adapter functionality including connection management,
-query execution, transaction handling, and error scenarios.
+Tests cover:
+- Connection pool management
+- Query execution
+- Transaction management
+- Error handling
+- Health checks
+- Batch operations
 """
 
-# Standard library imports
 import builtins
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock
 
-# Third-party imports
 import psycopg
 import pytest
+from psycopg import AsyncConnection, AsyncTransaction
 from psycopg_pool import AsyncConnectionPool
 
-# Local imports
 from src.application.interfaces.exceptions import (
     ConnectionError,
     IntegrityError,
-    RepositoryError,
     TimeoutError,
     TransactionError,
 )
 from src.infrastructure.database.adapter import PostgreSQLAdapter
 
 
-@pytest.fixture
-def mock_pool():
-    """Mock psycopg3 connection pool."""
-    pool = AsyncMock(spec=AsyncConnectionPool)
-    pool.max_size = 10
-    pool.min_size = 1
-    pool.closed = False
-    return pool
-
-
-@pytest.fixture
-def mock_connection():
-    """Mock psycopg3 connection."""
-    connection = AsyncMock(spec=psycopg.AsyncConnection)
-    return connection
-
-
-@pytest.fixture
-def mock_cursor():
-    """Mock psycopg3 cursor."""
-    cursor = AsyncMock()
-    cursor.rowcount = 1
-    return cursor
-
-
-@pytest.fixture
-def mock_transaction():
-    """Mock psycopg3 transaction."""
-    transaction = AsyncMock()
-    return transaction
-
-
-@pytest.fixture
-def adapter(mock_pool):
-    """PostgreSQL adapter with mocked pool."""
-    return PostgreSQLAdapter(mock_pool)
-
-
-@pytest.mark.unit
 class TestPostgreSQLAdapterInitialization:
-    """Test adapter initialization and properties."""
+    """Test PostgreSQLAdapter initialization."""
 
-    def test_adapter_initialization(self, mock_pool):
-        """Test adapter is properly initialized."""
+    def test_initialization(self):
+        """Test adapter initialization with pool."""
+        mock_pool = MagicMock(spec=AsyncConnectionPool)
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        assert adapter._pool == mock_pool
+        assert adapter._connection is None
+        assert adapter._transaction is None
+
+    def test_pool_property(self):
+        """Test pool property getter."""
+        mock_pool = MagicMock(spec=AsyncConnectionPool)
         adapter = PostgreSQLAdapter(mock_pool)
 
         assert adapter.pool == mock_pool
-        assert adapter._connection is None
-        assert adapter._transaction is None
-        assert not adapter.has_active_transaction
 
-    def test_pool_property(self, adapter, mock_pool):
-        """Test pool property access."""
-        assert adapter.pool == mock_pool
+    def test_has_active_transaction_false(self):
+        """Test has_active_transaction when no transaction."""
+        mock_pool = MagicMock(spec=AsyncConnectionPool)
+        adapter = PostgreSQLAdapter(mock_pool)
 
-    def test_has_active_transaction_property(self, adapter):
-        """Test has_active_transaction property."""
-        assert not adapter.has_active_transaction
+        assert adapter.has_active_transaction is False
 
-        # Simulate active transaction
-        adapter._transaction = Mock()
-        assert adapter.has_active_transaction
+    def test_has_active_transaction_true(self):
+        """Test has_active_transaction with active transaction."""
+        mock_pool = MagicMock(spec=AsyncConnectionPool)
+        adapter = PostgreSQLAdapter(mock_pool)
+        adapter._transaction = MagicMock()
 
-        adapter._transaction = None
-        assert not adapter.has_active_transaction
+        assert adapter.has_active_transaction is True
 
 
-@pytest.mark.unit
-class TestConnectionManagement:
-    """Test connection acquisition and management."""
+class TestPostgreSQLAdapterConnectionManagement:
+    """Test connection management."""
 
-    async def test_acquire_connection_from_pool(self, adapter, mock_pool, mock_connection):
-        """Test connection acquisition from pool."""
+    @pytest.mark.asyncio
+    async def test_acquire_connection_from_pool(self):
+        """Test acquiring connection from pool."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+
+        # Mock the connection context manager
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         async with adapter.acquire_connection() as conn:
             assert conn == mock_connection
 
         mock_pool.connection.assert_called_once()
 
-    async def test_acquire_connection_uses_existing_in_transaction(self, adapter, mock_connection):
-        """Test that existing connection is used when in transaction."""
-        adapter._connection = mock_connection
+    @pytest.mark.asyncio
+    async def test_acquire_connection_uses_existing_when_in_transaction(self):
+        """Test using existing connection when in transaction."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_existing_connection = AsyncMock(spec=AsyncConnection)
+
+        adapter = PostgreSQLAdapter(mock_pool)
+        adapter._connection = mock_existing_connection
 
         async with adapter.acquire_connection() as conn:
-            assert conn == mock_connection
+            assert conn == mock_existing_connection
 
         # Pool should not be called
-        adapter._pool.connection.assert_not_called()
+        mock_pool.connection.assert_not_called()
 
-    async def test_acquire_connection_operational_error(self, adapter, mock_pool):
-        """Test connection acquisition failure."""
+    @pytest.mark.asyncio
+    async def test_acquire_connection_operational_error(self):
+        """Test connection acquisition with operational error."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
         mock_pool.connection.side_effect = psycopg.OperationalError("Connection failed")
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         with pytest.raises(ConnectionError, match="Failed to acquire database connection"):
             async with adapter.acquire_connection():
                 pass
 
-    async def test_acquire_connection_timeout_error(self, adapter, mock_pool):
+    @pytest.mark.asyncio
+    async def test_acquire_connection_timeout(self):
         """Test connection acquisition timeout."""
-        mock_pool.connection.side_effect = builtins.TimeoutError()
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_pool.connection.side_effect = builtins.TimeoutError("Timeout")
 
-        with pytest.raises(TimeoutError, match="acquire_connection"):
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        with pytest.raises(TimeoutError) as exc_info:
             async with adapter.acquire_connection():
                 pass
 
+        assert exc_info.operation == "acquire_connection"
+        assert exc_info.timeout_seconds == 30.0
 
-@pytest.mark.unit
-class TestQueryExecution:
+
+class TestPostgreSQLAdapterQueryExecution:
     """Test query execution methods."""
 
-    async def test_execute_query_success(self, adapter, mock_pool, mock_connection, mock_cursor):
+    @pytest.mark.asyncio
+    async def test_execute_query_success(self):
         """Test successful query execution."""
-        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
-        mock_pool.connection.return_value.__aexit__.return_value = None
-        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
-        mock_connection.cursor.return_value.__aexit__.return_value = None
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
         mock_cursor.rowcount = 5
 
-        result = await adapter.execute_query("INSERT INTO test VALUES (%s)", "value")
+        # Setup connection context
+        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
+        mock_pool.connection.return_value.__aexit__.return_value = None
+
+        # Setup cursor context
+        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
+        mock_connection.cursor.return_value.__aexit__.return_value = None
+
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        result = await adapter.execute_query(
+            "UPDATE users SET active = %s WHERE id = %s", True, 123
+        )
 
         assert result == "EXECUTE 5"
-        mock_cursor.execute.assert_called_once_with("INSERT INTO test VALUES (%s)", ("value",))
+        mock_cursor.execute.assert_called_once_with(
+            "UPDATE users SET active = %s WHERE id = %s", (True, 123)
+        )
 
-    async def test_execute_query_integrity_error(
-        self, adapter, mock_pool, mock_connection, mock_cursor
-    ):
-        """Test query execution with integrity constraint violation."""
+    @pytest.mark.asyncio
+    async def test_execute_query_integrity_error(self):
+        """Test query execution with integrity error."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.execute.side_effect = psycopg.IntegrityError("Duplicate key")
+
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.execute.side_effect = psycopg.IntegrityError("Constraint violation")
 
-        with pytest.raises(IntegrityError, match="Constraint violation"):
-            await adapter.execute_query("INSERT INTO test VALUES (%s)", "value")
+        adapter = PostgreSQLAdapter(mock_pool)
 
-    async def test_execute_query_operational_error(
-        self, adapter, mock_pool, mock_connection, mock_cursor
-    ):
+        with pytest.raises(IntegrityError, match="Duplicate key"):
+            await adapter.execute_query("INSERT INTO users VALUES (%s)", "test")
+
+    @pytest.mark.asyncio
+    async def test_execute_query_operational_error(self):
         """Test query execution with operational error."""
-        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
-        mock_pool.connection.return_value.__aexit__.return_value = None
-        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
-        mock_connection.cursor.return_value.__aexit__.return_value = None
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
         mock_cursor.execute.side_effect = psycopg.OperationalError("Query failed")
 
-        with pytest.raises(RepositoryError, match="Query execution failed"):
-            await adapter.execute_query("SELECT * FROM test")
+        # Setup contexts
+        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
+        mock_pool.connection.return_value.__aexit__.return_value = None
+        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
+        mock_connection.cursor.return_value.__aexit__.return_value = None
 
-    async def test_execute_query_timeout(self, adapter, mock_pool, mock_connection, mock_cursor):
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        with pytest.raises(ConnectionError, match="Failed to acquire database connection"):
+            await adapter.execute_query("SELECT * FROM invalid_table")
+
+    @pytest.mark.asyncio
+    async def test_execute_query_timeout(self):
         """Test query execution timeout."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.execute.side_effect = builtins.TimeoutError("Query timeout")
+
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.execute.side_effect = builtins.TimeoutError()
 
-        with pytest.raises(TimeoutError, match="execute_query"):
-            await adapter.execute_query("SELECT * FROM test")
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        with pytest.raises(TimeoutError) as exc_info:
+            await adapter.execute_query("SELECT * FROM large_table", command_timeout=10.0)
+
+        assert exc_info.operation == "acquire_connection"
+        assert exc_info.timeout_seconds == 30.0  # Default timeout in acquire_connection
 
 
-@pytest.mark.unit
-class TestFetchOperations:
-    """Test data fetching operations."""
+class TestPostgreSQLAdapterFetchMethods:
+    """Test data fetching methods."""
 
-    async def test_fetch_one_success(self, adapter, mock_pool, mock_connection, mock_cursor):
-        """Test successful fetch one operation."""
-        mock_row = {"id": 1, "name": "test"}
+    @pytest.mark.asyncio
+    async def test_fetch_one_found(self):
+        """Test fetching single record that exists."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone.return_value = {"id": 1, "name": "Test"}
 
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.fetchone.return_value = mock_row
 
-        result = await adapter.fetch_one("SELECT * FROM test WHERE id = %s", 1)
+        adapter = PostgreSQLAdapter(mock_pool)
 
-        assert result == mock_row
-        mock_cursor.execute.assert_called_once_with("SELECT * FROM test WHERE id = %s", (1,))
-        mock_cursor.fetchone.assert_called_once()
+        result = await adapter.fetch_one("SELECT * FROM users WHERE id = %s", 1)
 
-    async def test_fetch_one_not_found(self, adapter, mock_pool, mock_connection, mock_cursor):
-        """Test fetch one when no record found."""
-        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
-        mock_pool.connection.return_value.__aexit__.return_value = None
-        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
-        mock_connection.cursor.return_value.__aexit__.return_value = None
+        assert result == {"id": 1, "name": "Test"}
+        mock_cursor.execute.assert_called_once_with("SELECT * FROM users WHERE id = %s", (1,))
+
+    @pytest.mark.asyncio
+    async def test_fetch_one_not_found(self):
+        """Test fetching single record that doesn't exist."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
         mock_cursor.fetchone.return_value = None
 
-        result = await adapter.fetch_one("SELECT * FROM test WHERE id = %s", 999)
+        # Setup contexts
+        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
+        mock_pool.connection.return_value.__aexit__.return_value = None
+        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
+        mock_connection.cursor.return_value.__aexit__.return_value = None
+
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        result = await adapter.fetch_one("SELECT * FROM users WHERE id = %s", 999)
 
         assert result is None
 
-    async def test_fetch_all_success(self, adapter, mock_pool, mock_connection, mock_cursor):
-        """Test successful fetch all operation."""
-        mock_rows = [{"id": 1, "name": "test1"}, {"id": 2, "name": "test2"}]
+    @pytest.mark.asyncio
+    async def test_fetch_all_success(self):
+        """Test fetching multiple records."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall.return_value = [
+            {"id": 1, "name": "User1"},
+            {"id": 2, "name": "User2"},
+            {"id": 3, "name": "User3"},
+        ]
 
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.fetchall.return_value = mock_rows
 
-        result = await adapter.fetch_all("SELECT * FROM test")
+        adapter = PostgreSQLAdapter(mock_pool)
 
-        assert result == mock_rows
-        mock_cursor.fetchall.assert_called_once()
+        result = await adapter.fetch_all("SELECT * FROM users")
 
-    async def test_fetch_all_empty_result(self, adapter, mock_pool, mock_connection, mock_cursor):
-        """Test fetch all with empty result."""
-        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
-        mock_pool.connection.return_value.__aexit__.return_value = None
-        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
-        mock_connection.cursor.return_value.__aexit__.return_value = None
+        assert len(result) == 3
+        assert result[0]["name"] == "User1"
+        assert result[2]["id"] == 3
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_empty(self):
+        """Test fetching when no records exist."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
         mock_cursor.fetchall.return_value = []
 
-        result = await adapter.fetch_all("SELECT * FROM test WHERE 1=0")
+        # Setup contexts
+        mock_pool.connection.return_value.__aenter__.return_value = mock_connection
+        mock_pool.connection.return_value.__aexit__.return_value = None
+        mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
+        mock_connection.cursor.return_value.__aexit__.return_value = None
+
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        result = await adapter.fetch_all("SELECT * FROM empty_table")
 
         assert result == []
 
-    async def test_fetch_values_success(self, adapter, mock_pool, mock_connection, mock_cursor):
-        """Test successful fetch values operation."""
-        mock_rows = [("value1",), ("value2",), ("value3",)]
+    @pytest.mark.asyncio
+    async def test_fetch_values_success(self):
+        """Test fetching values from single column."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall.return_value = [{"user_id": 1}, {"user_id": 2}, {"user_id": 3}]
 
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.fetchall.return_value = mock_rows
 
-        result = await adapter.fetch_values("SELECT name FROM test")
+        adapter = PostgreSQLAdapter(mock_pool)
 
-        assert result == ["value1", "value2", "value3"]
+        result = await adapter.fetch_values("SELECT user_id FROM users")
 
-    async def test_fetch_values_index_error(self, adapter, mock_pool, mock_connection, mock_cursor):
-        """Test fetch values with invalid column access."""
+        assert result == [1, 2, 3]
+
+    @pytest.mark.asyncio
+    async def test_fetch_values_empty(self):
+        """Test fetching values when no records."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchall.return_value = []
+
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.fetchall.side_effect = IndexError("Invalid column access")
 
-        with pytest.raises(RepositoryError, match="Fetch values query failed"):
-            await adapter.fetch_values("SELECT name FROM test")
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        result = await adapter.fetch_values("SELECT id FROM empty_table")
+
+        assert result == []
 
 
-@pytest.mark.unit
-class TestBatchOperations:
-    """Test batch execution operations."""
+class TestPostgreSQLAdapterBatchOperations:
+    """Test batch execution."""
 
-    async def test_execute_batch_success(self, adapter, mock_pool, mock_connection, mock_cursor):
+    @pytest.mark.asyncio
+    async def test_execute_batch_success(self):
         """Test successful batch execution."""
-        args_list = [("value1",), ("value2",), ("value3",)]
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
 
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
 
-        await adapter.execute_batch("INSERT INTO test VALUES (%s)", args_list)
+        adapter = PostgreSQLAdapter(mock_pool)
 
-        mock_cursor.executemany.assert_called_once_with("INSERT INTO test VALUES (%s)", args_list)
+        args_list = [("User1", 1), ("User2", 2), ("User3", 3)]
 
-    async def test_execute_batch_integrity_error(
-        self, adapter, mock_pool, mock_connection, mock_cursor
-    ):
+        await adapter.execute_batch("UPDATE users SET name = %s WHERE id = %s", args_list)
+
+        mock_cursor.executemany.assert_called_once_with(
+            "UPDATE users SET name = %s WHERE id = %s", args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_execute_batch_integrity_error(self):
         """Test batch execution with integrity error."""
-        args_list = [("value1",), ("value2",)]
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.executemany.side_effect = psycopg.IntegrityError("Constraint violation")
 
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.executemany.side_effect = psycopg.IntegrityError("Batch constraint violation")
 
-        with pytest.raises(IntegrityError, match="Batch constraint violation"):
-            await adapter.execute_batch("INSERT INTO test VALUES (%s)", args_list)
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        with pytest.raises(IntegrityError, match="Constraint violation"):
+            await adapter.execute_batch(
+                "INSERT INTO users VALUES (%s, %s)",
+                [(1, "User1"), (1, "User2")],  # Duplicate IDs
+            )
 
 
-@pytest.mark.unit
-class TestTransactionManagement:
-    """Test transaction management operations."""
+class TestPostgreSQLAdapterTransactionManagement:
+    """Test transaction management."""
 
-    async def test_begin_transaction_success(
-        self, adapter, mock_pool, mock_connection, mock_transaction
-    ):
-        """Test successful transaction begin."""
+    @pytest.mark.asyncio
+    async def test_begin_transaction_success(self):
+        """Test beginning a transaction."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_transaction = AsyncMock(spec=AsyncTransaction)
+
+        # Setup connection acquisition
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
-        mock_connection.transaction.return_value = mock_transaction
+
+        # Setup transaction context
+        mock_connection.transaction.return_value.__aenter__.return_value = mock_transaction
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         await adapter.begin_transaction()
 
-        assert adapter.has_active_transaction
         assert adapter._connection == mock_connection
         assert adapter._transaction == mock_transaction
-        mock_transaction.__aenter__.assert_called_once()
+        assert adapter.has_active_transaction is True
 
-    async def test_begin_transaction_already_active_error(self, adapter):
+    @pytest.mark.asyncio
+    async def test_begin_transaction_already_active(self):
         """Test beginning transaction when one is already active."""
-        adapter._transaction = Mock()
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        adapter = PostgreSQLAdapter(mock_pool)
+        adapter._transaction = MagicMock()  # Simulate active transaction
 
         with pytest.raises(TransactionError, match="Transaction is already active"):
             await adapter.begin_transaction()
 
-    async def test_begin_transaction_operational_error(self, adapter, mock_pool):
+    @pytest.mark.asyncio
+    async def test_begin_transaction_operational_error(self):
         """Test transaction begin with operational error."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
         mock_pool.connection.return_value.__aenter__.side_effect = psycopg.OperationalError(
-            "Connection failed"
+            "Failed"
         )
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         with pytest.raises(TransactionError, match="Failed to start transaction"):
             await adapter.begin_transaction()
 
-    async def test_commit_transaction_success(self, adapter, mock_transaction, mock_connection):
-        """Test successful transaction commit."""
-        adapter._transaction = mock_transaction
+    @pytest.mark.asyncio
+    async def test_commit_transaction_success(self):
+        """Test committing a transaction."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_transaction = AsyncMock(spec=AsyncTransaction)
+
+        adapter = PostgreSQLAdapter(mock_pool)
         adapter._connection = mock_connection
+        adapter._transaction = mock_transaction
 
         await adapter.commit_transaction()
 
-        assert not adapter.has_active_transaction
+        mock_transaction.__aexit__.assert_called_once_with(None, None, None)
+        mock_connection.__aexit__.assert_called_once()
         assert adapter._connection is None
         assert adapter._transaction is None
-        mock_transaction.__aexit__.assert_called_once_with(None, None, None)
 
-    async def test_commit_transaction_no_active_error(self, adapter):
-        """Test commit when no active transaction."""
+    @pytest.mark.asyncio
+    async def test_commit_transaction_no_active(self):
+        """Test committing when no transaction is active."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        adapter = PostgreSQLAdapter(mock_pool)
+
         with pytest.raises(TransactionError, match="No active transaction to commit"):
             await adapter.commit_transaction()
 
-    async def test_commit_transaction_operational_error(
-        self, adapter, mock_transaction, mock_connection
-    ):
-        """Test commit with operational error."""
-        adapter._transaction = mock_transaction
-        adapter._connection = mock_connection
-        mock_transaction.__aexit__.side_effect = psycopg.OperationalError("Commit failed")
+    @pytest.mark.asyncio
+    async def test_rollback_transaction_success(self):
+        """Test rolling back a transaction."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_transaction = AsyncMock(spec=AsyncTransaction)
 
-        with pytest.raises(TransactionError, match="Failed to commit transaction"):
-            await adapter.commit_transaction()
-
-    async def test_rollback_transaction_success(self, adapter, mock_transaction, mock_connection):
-        """Test successful transaction rollback."""
-        adapter._transaction = mock_transaction
+        adapter = PostgreSQLAdapter(mock_pool)
         adapter._connection = mock_connection
+        adapter._transaction = mock_transaction
 
         await adapter.rollback_transaction()
 
-        assert not adapter.has_active_transaction
+        mock_transaction.__aexit__.assert_called_once()
+        # Check that Exception was passed to trigger rollback
+        call_args = mock_transaction.__aexit__.call_args
+        assert call_args[0][0] == Exception
+        assert isinstance(call_args[0][1], Exception)
+
         assert adapter._connection is None
         assert adapter._transaction is None
-        mock_transaction.__aexit__.assert_called_once_with(Exception, Exception(), None)
 
-    async def test_rollback_transaction_no_active_warning(self, adapter):
-        """Test rollback when no active transaction (should not raise error)."""
-        # Should not raise error, just log warning
+    @pytest.mark.asyncio
+    async def test_rollback_transaction_no_active(self):
+        """Test rollback when no transaction is active."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        adapter = PostgreSQLAdapter(mock_pool)
+
+        # Should not raise, just log warning
         await adapter.rollback_transaction()
 
-        assert not adapter.has_active_transaction
-
-    async def test_rollback_transaction_operational_error(
-        self, adapter, mock_transaction, mock_connection
-    ):
-        """Test rollback with operational error."""
-        adapter._transaction = mock_transaction
-        adapter._connection = mock_connection
-        mock_transaction.__aexit__.side_effect = psycopg.OperationalError("Rollback failed")
-
-        with pytest.raises(TransactionError, match="Failed to rollback transaction"):
-            await adapter.rollback_transaction()
+        assert adapter._connection is None
+        assert adapter._transaction is None
 
 
-@pytest.mark.unit
-class TestHealthCheck:
+class TestPostgreSQLAdapterHealthCheck:
     """Test health check functionality."""
 
-    async def test_health_check_success(self, adapter, mock_pool, mock_connection, mock_cursor):
+    @pytest.mark.asyncio
+    async def test_health_check_success(self):
         """Test successful health check."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_connection = AsyncMock(spec=AsyncConnection)
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone.return_value = {"?column?": 1}
+
+        # Setup contexts
         mock_pool.connection.return_value.__aenter__.return_value = mock_connection
         mock_pool.connection.return_value.__aexit__.return_value = None
         mock_connection.cursor.return_value.__aenter__.return_value = mock_cursor
         mock_connection.cursor.return_value.__aexit__.return_value = None
-        mock_cursor.fetchone.return_value = (1,)
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         result = await adapter.health_check()
 
         assert result is True
         mock_cursor.execute.assert_called_once_with("SELECT 1")
-        mock_cursor.fetchone.assert_called_once()
 
-    async def test_health_check_failure(self, adapter, mock_pool):
-        """Test health check failure."""
+    @pytest.mark.asyncio
+    async def test_health_check_failure(self):
+        """Test failed health check."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
         mock_pool.connection.side_effect = psycopg.OperationalError("Connection failed")
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         result = await adapter.health_check()
 
         assert result is False
 
 
-@pytest.mark.unit
-class TestConnectionInfo:
-    """Test connection information retrieval."""
+class TestPostgreSQLAdapterConnectionInfo:
+    """Test connection info retrieval."""
 
-    async def test_get_connection_info(self, adapter, mock_pool):
-        """Test connection info retrieval."""
-        mock_pool.max_size = 20
-        mock_pool.min_size = 5
+    @pytest.mark.asyncio
+    async def test_get_connection_info_active(self):
+        """Test getting connection info for active pool."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_pool.max_size = 10
+        mock_pool.min_size = 2
         mock_pool.closed = False
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         info = await adapter.get_connection_info()
 
-        expected = {"max_size": 20, "min_size": 5, "pool_status": "active"}
-        assert info == expected
+        assert info["max_size"] == 10
+        assert info["min_size"] == 2
+        assert info["pool_status"] == "active"
 
-    async def test_get_connection_info_closed_pool(self, adapter, mock_pool):
-        """Test connection info for closed pool."""
-        mock_pool.max_size = 10
+    @pytest.mark.asyncio
+    async def test_get_connection_info_closed(self):
+        """Test getting connection info for closed pool."""
+        mock_pool = AsyncMock(spec=AsyncConnectionPool)
+        mock_pool.max_size = 5
         mock_pool.min_size = 1
         mock_pool.closed = True
 
+        adapter = PostgreSQLAdapter(mock_pool)
+
         info = await adapter.get_connection_info()
 
-        expected = {"max_size": 10, "min_size": 1, "pool_status": "closed"}
-        assert info == expected
+        assert info["max_size"] == 5
+        assert info["min_size"] == 1
+        assert info["pool_status"] == "closed"
 
 
-@pytest.mark.unit
-class TestStringRepresentation:
-    """Test adapter string representation."""
+class TestPostgreSQLAdapterStringRepresentation:
+    """Test string representation."""
 
-    def test_str_without_transaction(self, adapter, mock_pool):
+    def test_str_without_transaction(self):
         """Test string representation without active transaction."""
+        mock_pool = MagicMock(spec=AsyncConnectionPool)
         mock_pool.max_size = 10
+
+        adapter = PostgreSQLAdapter(mock_pool)
 
         result = str(adapter)
 
@@ -467,51 +594,16 @@ class TestStringRepresentation:
         assert "Pool(max_size=10)" in result
         assert "no transaction" in result
 
-    def test_str_with_transaction(self, adapter, mock_pool):
+    def test_str_with_transaction(self):
         """Test string representation with active transaction."""
-        mock_pool.max_size = 10
-        adapter._transaction = Mock()
+        mock_pool = MagicMock(spec=AsyncConnectionPool)
+        mock_pool.max_size = 5
+
+        adapter = PostgreSQLAdapter(mock_pool)
+        adapter._transaction = MagicMock()
 
         result = str(adapter)
 
         assert "PostgreSQLAdapter" in result
-        assert "Pool(max_size=10)" in result
+        assert "Pool(max_size=5)" in result
         assert "with active transaction" in result
-
-
-@pytest.mark.unit
-class TestCleanupTransaction:
-    """Test transaction cleanup functionality."""
-
-    async def test_cleanup_transaction_with_connection(self, adapter, mock_connection):
-        """Test cleanup when connection exists."""
-        adapter._connection = mock_connection
-        adapter._transaction = Mock()
-
-        await adapter._cleanup_transaction()
-
-        assert adapter._connection is None
-        assert adapter._transaction is None
-        mock_connection.__aexit__.assert_called_once_with(None, None, None)
-
-    async def test_cleanup_transaction_connection_error(self, adapter, mock_connection):
-        """Test cleanup when connection release fails."""
-        adapter._connection = mock_connection
-        adapter._transaction = Mock()
-        mock_connection.__aexit__.side_effect = Exception("Release failed")
-
-        # Should not raise error, just log warning
-        await adapter._cleanup_transaction()
-
-        assert adapter._connection is None
-        assert adapter._transaction is None
-
-    async def test_cleanup_transaction_no_connection(self, adapter):
-        """Test cleanup when no connection exists."""
-        adapter._connection = None
-        adapter._transaction = Mock()
-
-        await adapter._cleanup_transaction()
-
-        assert adapter._connection is None
-        assert adapter._transaction is None

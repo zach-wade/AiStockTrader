@@ -1,509 +1,209 @@
 """
-Paper Trading Broker - Simulated broker for testing without real money
+Paper Trading Broker - Thin adapter for simulated trading
 """
 
-# Standard library imports
 import logging
-import secrets
+import threading
 from dataclasses import dataclass
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-# Local imports
 from src.application.interfaces.broker import (
     AccountInfo,
     BrokerConnectionError,
-    InsufficientFundsError,
-    InvalidOrderError,
-    MarketClosedError,
+    IBroker,
     MarketHours,
     OrderNotFoundError,
 )
-from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
-from src.domain.entities.portfolio import Portfolio, PositionRequest
+from src.domain.entities.order import Order, OrderStatus, OrderType
 from src.domain.entities.position import Position
-
-from .constants import (
-    DAYS_TO_MONDAY_FROM_FRIDAY,
-    DAYS_TO_MONDAY_FROM_SATURDAY,
-    RANDOM_MIN_FACTOR,
-    WEEKDAY_FRIDAY,
-    WEEKDAY_SATURDAY,
-)
+from src.domain.services.trading_calendar import Exchange, TradingCalendar
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class PaperBrokerConfig:
-    """Configuration for paper trading broker."""
+class PaperBrokerState:
+    """Minimal state storage for paper trading."""
 
     initial_capital: Decimal = Decimal("100000")
-    slippage_pct: Decimal = Decimal("0.001")  # 0.1% default slippage
-    fill_delay_seconds: int = 1
-    commission_per_share: Decimal = Decimal("0.01")
-    min_commission: Decimal = Decimal("1.0")
-    simulate_partial_fills: bool = False
+    cash_balance: Decimal = Decimal("100000")
+    orders: dict[UUID, Order] | None = None
+    positions: dict[str, Position] | None = None
+    market_prices: dict[str, Decimal] | None = None
+
+    def __post_init__(self) -> None:
+        if self.orders is None:
+            self.orders = {}
+        if self.positions is None:
+            self.positions = {}
+        if self.market_prices is None:
+            self.market_prices = {}
 
 
-@dataclass
-class SimulatedFill:
-    """Represents a simulated order fill"""
-
-    order_id: UUID
-    fill_price: Decimal
-    fill_quantity: Decimal
-    timestamp: datetime
-    slippage: Decimal = Decimal("0")
-
-
-class PaperBroker:
+class PaperBroker(IBroker):
     """
-    Paper trading broker for simulated order execution.
+    Thin paper trading broker adapter with thread safety.
 
-    Simulates realistic order fills with configurable slippage and delays.
-    All data is kept in memory - no real trades are executed.
+    This is a minimal implementation that only stores state.
+    All business logic is delegated to use cases via BrokerCoordinator.
+    Thread-safe for concurrent access.
     """
 
     def __init__(
-        self,
-        config: PaperBrokerConfig | None = None,
-    ):
-        """
-        Initialize paper broker.
-
-        Args:
-            config: Configuration for the paper broker
-        """
-        if config is None:
-            config = PaperBrokerConfig()
-
-        self.initial_capital = config.initial_capital
-        self.slippage_pct = config.slippage_pct
-        self.fill_delay_seconds = config.fill_delay_seconds
-        self.commission_per_share = config.commission_per_share
-        self.min_commission = config.min_commission
-        self.simulate_partial_fills = config.simulate_partial_fills
-
-        # Initialize portfolio
-        self.portfolio = Portfolio(
-            name="Paper Trading Portfolio",
-            initial_capital=self.initial_capital,
-            cash_balance=self.initial_capital,
-        )
-
-        # Order tracking
-        self.orders: dict[UUID, Order] = {}
-        self.pending_fills: list[SimulatedFill] = []
-
-        # Market data (would normally come from a data provider)
-        self.market_prices: dict[str, Decimal] = {}
-        self.last_prices: dict[str, Decimal] = {}
-
-        # Simulated market hours (NYSE regular hours)
-        self.market_open_time = time(9, 30)  # 9:30 AM ET
-        self.market_close_time = time(16, 0)  # 4:00 PM ET
-
+        self, initial_capital: Decimal = Decimal("100000"), exchange: Exchange = Exchange.NYSE
+    ) -> None:
+        """Initialize paper broker with minimal state and thread safety."""
+        self._lock = threading.RLock()  # Reentrant lock for thread safety
+        self.state = PaperBrokerState(initial_capital=initial_capital, cash_balance=initial_capital)
         self._connected = False
-
-        logger.info(
-            f"Initialized paper broker with ${self.initial_capital} capital, "
-            f"{self.slippage_pct}% slippage"
-        )
+        self.trading_calendar = TradingCalendar(exchange)
+        logger.info(f"Initialized thread-safe paper broker with ${initial_capital} capital")
 
     def connect(self) -> None:
-        """Establish connection (simulated)"""
+        """Establish connection (simulated)."""
         self._connected = True
         logger.info("Connected to paper trading broker")
 
     def disconnect(self) -> None:
-        """Close connection (simulated)"""
+        """Close connection (simulated)."""
         self._connected = False
         logger.info("Disconnected from paper trading broker")
 
     def is_connected(self) -> bool:
-        """Check if connected"""
+        """Check if connected."""
         return self._connected
 
     def _check_connection(self) -> None:
-        """Ensure broker is connected"""
+        """Ensure broker is connected."""
         if not self._connected:
-            raise BrokerConnectionError("Not connected to paper broker. Call connect() first.")
-
-    def set_market_price(self, symbol: str, price: Decimal) -> None:
-        """
-        Set the current market price for a symbol.
-
-        This is used to simulate market data for paper trading.
-        In production, this would come from a real data feed.
-        """
-        self.market_prices[symbol] = price
-        self.last_prices[symbol] = price
-
-        # Update portfolio positions with new price
-        if symbol in self.portfolio.positions:
-            self.portfolio.update_position_price(symbol, price)
-
-        # Process any pending limit orders
-        self._process_pending_orders(symbol, price)
-
-    def _process_pending_orders(self, symbol: str, current_price: Decimal) -> None:
-        """Process pending orders that might be triggered by price movement"""
-        for order in self.orders.values():
-            if order.symbol != symbol or not order.is_active():
-                continue
-
-            # Check limit orders
-            if order.order_type == OrderType.LIMIT and order.limit_price:
-                should_fill = False
-
-                if (
-                    order.side == OrderSide.BUY
-                    and current_price <= order.limit_price
-                    or order.side == OrderSide.SELL
-                    and current_price >= order.limit_price
-                ):
-                    should_fill = True
-
-                if should_fill:
-                    self._simulate_fill(order, order.limit_price)
-
-            # Check stop orders
-            elif order.order_type == OrderType.STOP and order.stop_price:
-                should_trigger = False
-
-                if (
-                    order.side == OrderSide.BUY
-                    and current_price >= order.stop_price
-                    or order.side == OrderSide.SELL
-                    and current_price <= order.stop_price
-                ):
-                    should_trigger = True
-
-                if should_trigger:
-                    # Stop order becomes market order
-                    fill_price = self._apply_slippage(current_price, order.side)
-                    self._simulate_fill(order, fill_price)
-
-    def _apply_slippage(self, price: Decimal, side: OrderSide) -> Decimal:
-        """Apply slippage to a price based on order side"""
-        slippage = price * self.slippage_pct
-
-        # Add randomness to slippage (50% to 150% of configured slippage)
-        # Use secrets for cryptographic randomness
-        random_factor = RANDOM_MIN_FACTOR + (secrets.randbits(16) / 65536)
-        slippage *= Decimal(str(random_factor))
-
-        if side == OrderSide.BUY:
-            # Buyers pay more (adverse selection)
-            return price + slippage
-        else:
-            # Sellers receive less
-            return price - slippage
-
-    def _calculate_commission(self, quantity: Decimal) -> Decimal:
-        """Calculate commission for a trade"""
-        commission = quantity * self.commission_per_share
-        return max(commission, self.min_commission)
-
-    def _simulate_fill(
-        self, order: Order, fill_price: Decimal, partial_quantity: Decimal | None = None
-    ) -> None:
-        """Simulate an order fill"""
-        # Determine fill quantity
-        if partial_quantity and self.simulate_partial_fills:
-            fill_quantity = min(partial_quantity, order.get_remaining_quantity())
-        else:
-            fill_quantity = order.get_remaining_quantity()
-
-        # Calculate commission
-        commission = self._calculate_commission(fill_quantity)
-
-        # Update order
-        order.fill(fill_quantity, fill_price, datetime.now(UTC))
-
-        # Update portfolio
-        if order.side == OrderSide.BUY:
-            # Opening or adding to long position
-            if order.symbol in self.portfolio.positions:
-                position = self.portfolio.positions[order.symbol]
-                if not position.is_closed():
-                    position.add_to_position(fill_quantity, fill_price, commission)
-                else:
-                    # Reopen position
-                    request = PositionRequest(
-                        symbol=order.symbol,
-                        quantity=fill_quantity,
-                        entry_price=fill_price,
-                        commission=commission,
-                    )
-                    self.portfolio.open_position(request)
-            else:
-                request = PositionRequest(
-                    symbol=order.symbol,
-                    quantity=fill_quantity,
-                    entry_price=fill_price,
-                    commission=commission,
-                )
-                self.portfolio.open_position(request)
-        elif order.symbol in self.portfolio.positions:
-            position = self.portfolio.positions[order.symbol]
-            if position.is_long():
-                # Closing or reducing long position
-                position.reduce_position(fill_quantity, fill_price, commission)
-            else:
-                # Opening or adding to short position
-                position.add_to_position(-fill_quantity, fill_price, commission)
-        else:
-            # Opening short position
-            request = PositionRequest(
-                symbol=order.symbol,
-                quantity=-fill_quantity,
-                entry_price=fill_price,
-                commission=commission,
-            )
-            self.portfolio.open_position(request)
-
-        logger.info(
-            f"Filled order {order.id}: {order.side.value} {fill_quantity} {order.symbol} "
-            f"@ ${fill_price:.2f} (commission: ${commission:.2f})"
-        )
+            raise BrokerConnectionError("Not connected to paper broker")
 
     def submit_order(self, order: Order) -> Order:
-        """Submit an order for paper execution"""
+        """Store order submission - processing delegated to use cases. Thread-safe."""
         self._check_connection()
+        with self._lock:
+            broker_id = f"PAPER-{order.id}"
+            order.submit(broker_id)
+            assert self.state.orders is not None  # Always initialized in __post_init__
+            self.state.orders[order.id] = order
 
-        # Validate order
-        if order.quantity <= 0:
-            raise InvalidOrderError("Order quantity must be positive")
+            # Auto-fill market orders if we have a market price
+            if order.order_type == OrderType.MARKET and self.state.market_prices:
+                market_price = self.state.market_prices.get(order.symbol)
+                if market_price:
+                    order.fill(filled_quantity=order.quantity, fill_price=market_price)
+                    logger.info(f"Auto-filled market order: {order.id} at {market_price}")
 
-        # Check market hours for market orders
-        if order.order_type == OrderType.MARKET and not self.is_market_open():
-            raise MarketClosedError("Cannot submit market order while market is closed")
-
-        # Get current price
-        current_price = self.market_prices.get(order.symbol)
-        if not current_price:
-            # Use a default price for testing if not set
-            current_price = Decimal("100.00")
-            self.market_prices[order.symbol] = current_price
-            logger.warning(f"No market price for {order.symbol}, using default ${current_price}")
-
-        # Check buying power
-        required_capital = order.quantity * current_price
-        commission = self._calculate_commission(order.quantity)
-
-        if (
-            order.side == OrderSide.BUY
-            and required_capital + commission > self.portfolio.cash_balance
-        ):
-            raise InsufficientFundsError(
-                f"Insufficient funds: ${self.portfolio.cash_balance:.2f} available, "
-                f"${required_capital + commission:.2f} required"
-            )
-
-        # Generate broker order ID
-        broker_order_id = f"PAPER-{order.id}"
-        order.submit(broker_order_id)
-
-        # Store order
-        self.orders[order.id] = order
-
-        # Process based on order type
-        if order.order_type == OrderType.MARKET:
-            # Simulate immediate fill with slippage
-            fill_price = self._apply_slippage(current_price, order.side)
-
-            # Add delay if configured
-            if self.fill_delay_seconds > 0:
-                fill_time = datetime.now(UTC) + timedelta(seconds=self.fill_delay_seconds)
-                self.pending_fills.append(
-                    SimulatedFill(
-                        order_id=order.id,
-                        fill_price=fill_price,
-                        fill_quantity=order.quantity,
-                        timestamp=fill_time,
-                        slippage=fill_price - current_price,
-                    )
-                )
-            else:
-                self._simulate_fill(order, fill_price)
-
-        elif order.order_type == OrderType.LIMIT:
-            # Check if limit order can be filled immediately
-            if order.limit_price and (
-                (order.side == OrderSide.BUY and current_price <= order.limit_price)
-                or (order.side == OrderSide.SELL and current_price >= order.limit_price)
-            ):
-                self._simulate_fill(order, order.limit_price)
-
-        logger.info(f"Submitted paper order: {order}")
+            logger.info(f"Stored paper order: {order.id}")
         return order
 
     def cancel_order(self, order_id: UUID) -> bool:
-        """Cancel a paper order"""
+        """Mark order as cancelled - validation delegated to use cases. Thread-safe."""
         self._check_connection()
+        with self._lock:
+            assert self.state.orders is not None  # Always initialized in __post_init__
+            if order_id not in self.state.orders:
+                raise OrderNotFoundError(f"Order {order_id} not found")
 
-        if order_id not in self.orders:
-            raise OrderNotFoundError(f"Order {order_id} not found")
-
-        order = self.orders[order_id]
-
-        if not order.is_active():
+            order = self.state.orders[order_id]
+            if order.is_active():
+                order.cancel("User requested")
+                logger.info(f"Cancelled order {order_id}")
+                return True
             return False
 
-        order.cancel("User requested cancellation")
-
-        # Remove from pending fills
-        self.pending_fills = [f for f in self.pending_fills if f.order_id != order_id]
-
-        logger.info(f"Cancelled paper order {order_id}")
-        return True
+    def get_order(self, order_id: UUID) -> Order:
+        """Get order from state. Thread-safe."""
+        self._check_connection()
+        with self._lock:
+            assert self.state.orders is not None  # Always initialized in __post_init__
+            if order_id not in self.state.orders:
+                raise OrderNotFoundError(f"Order {order_id} not found")
+            return self.state.orders[order_id]
 
     def get_order_status(self, order_id: UUID) -> OrderStatus:
-        """Get status of a paper order"""
+        """Get order status from state. Thread-safe."""
         self._check_connection()
-
-        if order_id not in self.orders:
-            raise OrderNotFoundError(f"Order {order_id} not found")
-
-        # Process any pending fills
-        self._process_pending_fills()
-
-        return self.orders[order_id].status
+        with self._lock:
+            assert self.state.orders is not None  # Always initialized in __post_init__
+            if order_id not in self.state.orders:
+                raise OrderNotFoundError(f"Order {order_id} not found")
+            return self.state.orders[order_id].status
 
     def update_order(self, order: Order) -> Order:
-        """Update order with latest status"""
+        """Update order in state. Thread-safe."""
         self._check_connection()
-
-        if order.id not in self.orders:
-            raise OrderNotFoundError(f"Order {order.id} not found")
-
-        # Process any pending fills
-        self._process_pending_fills()
-
-        # Return the stored order (which has the latest status)
-        return self.orders[order.id]
-
-    def _process_pending_fills(self) -> None:
-        """Process any pending simulated fills"""
-        now = datetime.now(UTC)
-        fills_to_process = []
-
-        for fill in self.pending_fills[:]:
-            if fill.timestamp <= now:
-                fills_to_process.append(fill)
-                self.pending_fills.remove(fill)
-
-        for fill in fills_to_process:
-            if fill.order_id in self.orders:
-                order = self.orders[fill.order_id]
-                if order.is_active():
-                    self._simulate_fill(order, fill.fill_price, fill.fill_quantity)
+        with self._lock:
+            assert self.state.orders is not None  # Always initialized in __post_init__
+            if order.id not in self.state.orders:
+                raise OrderNotFoundError(f"Order {order.id} not found")
+            self.state.orders[order.id] = order
+        return order
 
     def get_recent_orders(self, limit: int = 100) -> list[Order]:
-        """Get recent paper orders"""
+        """Get recent orders from state. Thread-safe."""
         self._check_connection()
-
-        # Process pending fills first
-        self._process_pending_fills()
-
-        # Return most recent orders
-        all_orders = list(self.orders.values())
-        all_orders.sort(key=lambda o: o.created_at, reverse=True)
-
-        return all_orders[:limit]
+        with self._lock:
+            assert self.state.orders is not None  # Always initialized in __post_init__
+            orders = list(self.state.orders.values())
+        orders.sort(key=lambda o: o.created_at, reverse=True)
+        return orders[:limit]
 
     def get_positions(self) -> list[Position]:
-        """Get all current positions"""
+        """Get positions from state. Thread-safe."""
         self._check_connection()
-
-        return self.portfolio.get_open_positions()
+        with self._lock:
+            assert self.state.positions is not None  # Always initialized in __post_init__
+            return list(self.state.positions.values())
 
     def get_account_info(self) -> AccountInfo:
-        """Get paper account information"""
+        """Get account info from state. Thread-safe."""
         self._check_connection()
 
-        # Process pending fills first
-        self._process_pending_fills()
+        with self._lock:
+            assert self.state.positions is not None  # Always initialized in __post_init__
+            positions_value = (
+                Decimal(
+                    sum(
+                        p.get_position_value() or Decimal("0")
+                        for p in self.state.positions.values()
+                    )
+                )
+                if self.state.positions
+                else Decimal("0")
+            )
 
-        portfolio_value = self.portfolio.get_total_value()
-        positions_value = self.portfolio.get_positions_value()
+            equity = self.state.cash_balance + positions_value
+            cash_balance = self.state.cash_balance
 
         return AccountInfo(
             account_id="PAPER-001",
             account_type="paper",
-            equity=portfolio_value,
-            cash=self.portfolio.cash_balance,
-            buying_power=self.portfolio.cash_balance,  # Simplified - no margin
+            equity=equity,
+            cash=cash_balance,
+            buying_power=cash_balance,
             positions_value=positions_value,
-            unrealized_pnl=self.portfolio.get_unrealized_pnl(),
-            realized_pnl=self.portfolio.total_realized_pnl,
-            margin_used=Decimal("0"),  # No margin in paper trading
+            unrealized_pnl=Decimal("0"),  # Calculated by use cases
+            realized_pnl=Decimal("0"),  # Calculated by use cases
+            margin_used=Decimal("0"),
             margin_available=Decimal("0"),
             pattern_day_trader=False,
-            trades_today=len(
-                [o for o in self.orders.values() if o.created_at.date() == datetime.now(UTC).date()]
-            ),
+            trades_today=0,
             trades_remaining=None,
             last_updated=datetime.now(UTC),
         )
 
     def is_market_open(self) -> bool:
-        """Check if market is open (simulated)"""
-        now = datetime.now(UTC)
-        current_time = now.time()
-
-        # Check if it's a weekday (Monday = 0, Sunday = 6)
-        if now.weekday() > WEEKDAY_FRIDAY:  # Weekend
-            return False
-
-        # Check if within market hours
-        # Note: This is simplified and doesn't account for holidays
-        return self.market_open_time <= current_time <= self.market_close_time
+        """Check if market is currently open using trading calendar."""
+        return self.trading_calendar.is_market_open()
 
     def get_market_hours(self) -> MarketHours:
-        """Get market hours information (simulated)"""
-        now = datetime.now(UTC)
-        is_open = self.is_market_open()
-
-        # Calculate next open/close
-        if is_open:
-            # Market is open, next event is close
-            next_close = now.replace(
-                hour=self.market_close_time.hour,
-                minute=self.market_close_time.minute,
-                second=0,
-                microsecond=0,
-            )
-            next_open = None
-        else:
-            # Market is closed
-            next_close = None
-
-            # If it's before market open today
-            if now.time() < self.market_open_time and now.weekday() <= WEEKDAY_FRIDAY:
-                next_open = now.replace(
-                    hour=self.market_open_time.hour,
-                    minute=self.market_open_time.minute,
-                    second=0,
-                    microsecond=0,
-                )
-            else:
-                # Next open is tomorrow or Monday
-                days_ahead = 1
-                if now.weekday() == WEEKDAY_FRIDAY:  # Friday
-                    days_ahead = DAYS_TO_MONDAY_FROM_FRIDAY
-                elif now.weekday() == WEEKDAY_SATURDAY:  # Saturday
-                    days_ahead = DAYS_TO_MONDAY_FROM_SATURDAY
-
-                next_open = (now + timedelta(days=days_ahead)).replace(
-                    hour=self.market_open_time.hour,
-                    minute=self.market_open_time.minute,
-                    second=0,
-                    microsecond=0,
-                )
+        """Get market hours from trading calendar."""
+        is_open = self.trading_calendar.is_market_open()
+        next_open = self.trading_calendar.next_market_open()
+        next_close = self.trading_calendar.next_market_close()
 
         return MarketHours(
             is_open=is_open,
@@ -511,16 +211,9 @@ class PaperBroker:
             next_close=next_close,
         )
 
-    def reset(self) -> None:
-        """Reset the paper broker to initial state"""
-        self.portfolio = Portfolio(
-            name="Paper Trading Portfolio",
-            initial_capital=self.initial_capital,
-            cash_balance=self.initial_capital,
-        )
-        self.orders.clear()
-        self.pending_fills.clear()
-        self.market_prices.clear()
-        self.last_prices.clear()
-
-        logger.info("Reset paper broker to initial state")
+    def update_market_price(self, symbol: str, price: Decimal) -> None:
+        """Update market price for a symbol. Thread-safe."""
+        with self._lock:
+            if self.state.market_prices is None:
+                self.state.market_prices = {}
+            self.state.market_prices[symbol] = price

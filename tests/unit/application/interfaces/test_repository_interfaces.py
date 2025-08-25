@@ -27,7 +27,7 @@ from src.application.interfaces.repositories import (
 )
 from src.domain.entities.order import Order, OrderSide, OrderStatus
 from src.domain.entities.portfolio import Portfolio
-from src.domain.entities.position import Position, PositionSide
+from src.domain.entities.position import Position
 
 
 class MockOrderRepository:
@@ -48,7 +48,7 @@ class MockOrderRepository:
 
     async def get_orders_by_symbol(self, symbol: str) -> list[Order]:
         self.call_log.append(("get_orders_by_symbol", symbol))
-        return [order for order in self.orders.values() if order.symbol.value == symbol]
+        return [order for order in self.orders.values() if order.symbol == symbol]
 
     async def get_orders_by_status(self, status: OrderStatus) -> list[Order]:
         self.call_log.append(("get_orders_by_status", status))
@@ -92,8 +92,8 @@ class MockPositionRepository:
         self.positions = {}
         self.call_log = []
 
-    async def save_position(self, position: Position) -> Position:
-        self.call_log.append(("save_position", position.id))
+    async def persist_position(self, position: Position) -> Position:
+        self.call_log.append(("persist_position", position.id))
         self.positions[position.id] = position
         return position
 
@@ -232,14 +232,14 @@ class TestOrderRepositoryInterface:
 
     @pytest.fixture
     def sample_order(self):
+        # Local imports
         from src.domain.entities.order import OrderRequest
-        from src.domain.value_objects.symbol import Symbol
-        from src.domain.value_objects.quantity import Quantity
         from src.domain.value_objects.price import Price
-        
+        from src.domain.value_objects.symbol import Symbol
+
         request = OrderRequest(
             symbol=Symbol("AAPL"),
-            quantity=Quantity("100"),
+            quantity="100",
             side=OrderSide.BUY,
             limit_price=Price("150.00"),
             reason="Test order",
@@ -277,13 +277,13 @@ class TestOrderRepositoryInterface:
         await repository.save_order(sample_order)
 
         # Create another order with different symbol
+        # Local imports
         from src.domain.entities.order import OrderRequest
         from src.domain.value_objects.symbol import Symbol
-        from src.domain.value_objects.quantity import Quantity
-        
+
         other_request = OrderRequest(
             symbol=Symbol("GOOGL"),
-            quantity=Quantity("50"),
+            quantity="50",
             side=OrderSide.SELL,
         )
         other_order = Order.create_market_order(other_request)
@@ -382,17 +382,17 @@ class TestPositionRepositoryInterface:
             strategy="test_strategy",
         )
 
-    async def test_save_position_success(self, repository, sample_position):
+    async def test_persist_position_success(self, repository, sample_position):
         """Test successful position save."""
-        result = await repository.save_position(sample_position)
+        result = await repository.persist_position(sample_position)
 
         assert result == sample_position
-        assert ("save_position", sample_position.id) in repository.call_log
+        assert ("persist_position", sample_position.id) in repository.call_log
         assert sample_position.id in repository.positions
 
     async def test_get_position_by_id_found(self, repository, sample_position):
         """Test get position by ID when position exists."""
-        await repository.save_position(sample_position)
+        await repository.persist_position(sample_position)
 
         result = await repository.get_position_by_id(sample_position.id)
 
@@ -401,7 +401,7 @@ class TestPositionRepositoryInterface:
 
     async def test_get_position_by_symbol(self, repository, sample_position):
         """Test get current position by symbol."""
-        await repository.save_position(sample_position)
+        await repository.persist_position(sample_position)
 
         result = await repository.get_position_by_symbol("AAPL")
 
@@ -410,7 +410,7 @@ class TestPositionRepositoryInterface:
 
     async def test_get_active_positions(self, repository, sample_position):
         """Test get active positions."""
-        await repository.save_position(sample_position)
+        await repository.persist_position(sample_position)
 
         result = await repository.get_active_positions()
 
@@ -420,7 +420,7 @@ class TestPositionRepositoryInterface:
 
     async def test_close_position_success(self, repository, sample_position):
         """Test successful position closure."""
-        await repository.save_position(sample_position)
+        await repository.persist_position(sample_position)
 
         result = await repository.close_position(sample_position.id)
 
@@ -543,7 +543,7 @@ class TestRepositoryTypeAnnotations:
         """Test IPositionRepository has correct type annotations."""
 
         expected_methods = [
-            "save_position",
+            "persist_position",
             "get_position_by_id",
             "get_position_by_symbol",
             "get_positions_by_symbol",

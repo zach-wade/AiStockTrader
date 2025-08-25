@@ -90,7 +90,7 @@ class MockUnitOfWorkFactory:
     def create_unit_of_work(self) -> IUnitOfWork:
         self.call_log.append("create_unit_of_work")
         if self.should_fail:
-            raise FactoryError("Failed to create unit of work")
+            raise FactoryError("UnitOfWork", "Failed to create unit of work")
         return MockUnitOfWork()
 
 
@@ -378,10 +378,11 @@ class TestTransactionErrorHandling:
 
     def test_factory_error_creation(self):
         """Test FactoryError creation and inheritance."""
-        error = FactoryError("Factory failed")
+        error = FactoryError("UnitOfWork", "Factory failed")
 
-        assert str(error) == "Factory failed"
+        assert str(error) == "UnitOfWork factory error: Factory failed"
         assert isinstance(error, Exception)
+        assert error.factory_type == "UnitOfWork"
 
 
 @pytest.mark.unit
@@ -407,10 +408,10 @@ class TestInterfaceTypeAnnotations:
         for method in expected_methods:
             assert hasattr(IUnitOfWork, method)
 
-        # Check repository properties
+        # Check repository properties via annotations (Protocol classes don't have actual attributes)
         expected_properties = ["orders", "positions", "portfolios"]
         for prop in expected_properties:
-            assert hasattr(IUnitOfWork, prop)
+            assert prop in IUnitOfWork.__annotations__
 
     def test_unit_of_work_factory_protocol_methods(self):
         """Test IUnitOfWorkFactory protocol has expected methods."""

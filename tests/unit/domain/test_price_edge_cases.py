@@ -124,41 +124,41 @@ class TestPriceEdgeCases:
         with pytest.raises(TypeError, match="Cannot compare"):
             _ = price > "100"
 
-        # Spread calculation with non-Price
-        with pytest.raises(TypeError, match="Cannot calculate spread"):
-            price.calculate_spread(100)
+        # Difference calculation with non-Price
+        with pytest.raises(TypeError, match="Cannot calculate difference"):
+            price.calculate_difference(100)
 
     def test_price_spread_calculations_edge_cases(self):
         """Test edge cases in spread calculations."""
         # Zero spread
         price1 = Price(100)
         price2 = Price(100)
-        assert price1.calculate_spread(price2) == Decimal("0")
-        assert price1.calculate_spread_percentage(price2) == Decimal("0")
+        assert price1.calculate_difference(price2) == Decimal("0")
+        assert price1.calculate_difference_percentage(price2) == Decimal("0")
 
         # Both prices zero
         zero1 = Price(0)
         zero2 = Price(0)
-        assert zero1.calculate_spread(zero2) == Decimal("0")
-        assert zero1.calculate_spread_percentage(zero2) == Decimal("0")
+        assert zero1.calculate_difference(zero2) == Decimal("0")
+        assert zero1.calculate_difference_percentage(zero2) == Decimal("0")
 
         # One price zero
         hundred = Price(100)
         zero = Price(0)
-        assert hundred.calculate_spread(zero) == Decimal("100")
+        assert hundred.calculate_difference(zero) == Decimal("100")
         # Percentage: 100 / ((100 + 0) / 2) * 100 = 200%
-        assert hundred.calculate_spread_percentage(zero) == Decimal("200")
+        assert hundred.calculate_difference_percentage(zero) == Decimal("200")
 
         # Very small spread
         price1 = Price(100)
         price2 = Price(100.001)
-        spread = price1.calculate_spread(price2)
-        assert spread == Decimal("0.001")
+        difference = price1.calculate_difference(price2)
+        assert difference == Decimal("0.001")
 
-        # Spread percentage calculation precision
-        spread_pct = price1.calculate_spread_percentage(price2)
+        # Difference percentage calculation precision
+        difference_pct = price1.calculate_difference_percentage(price2)
         expected = (Decimal("0.001") / Decimal("100.0005")) * 100
-        assert abs(spread_pct - expected) < Decimal("0.00001")
+        assert abs(difference_pct - expected) < Decimal("0.00001")
 
     def test_price_from_bid_ask_edge_cases(self):
         """Test creating price from bid/ask with edge cases."""
@@ -188,32 +188,32 @@ class TestPriceEdgeCases:
         """Test edge cases in price formatting."""
         # Auto-detect decimal places from tick size
         price = Price(1234.567, tick_size=0.01)
-        assert price.format() == "1234.57"
+        assert price.to_string() == "1234.57"
 
         price = Price(1234.567, tick_size=0.001)
-        assert price.format() == "1234.567"
+        assert price.to_string() == "1234.567"
 
         price = Price(1234.567, tick_size=1)
-        assert price.format() == "1235"
+        assert price.to_string() == "1235"
 
         # Override decimal places
         price = Price(1234.567)
-        assert price.format(decimal_places=0) == "1235"
-        assert price.format(decimal_places=4) == "1234.5670"
+        assert price.to_string(decimal_places=0) == "1235"
+        assert price.to_string(decimal_places=4) == "1234.5670"
 
         # Zero price formatting
         zero = Price(0)
-        assert zero.format() == "0.00"
-        assert zero.format(decimal_places=4) == "0.0000"
+        assert zero.to_string() == "0.00"
+        assert zero.to_string(decimal_places=4) == "0.0000"
 
         # Very large price
         large = Price(999999999.99)
-        assert large.format() == "999999999.99"
+        assert large.to_string() == "999999999.99"
 
         # Very small price
         small = Price(0.00000001, market_type="crypto")
         # Formatting very small prices may round to 0 based on default precision
-        formatted = small.format()
+        formatted = small.to_string()
         # Just verify it produces a valid formatted string
         assert isinstance(formatted, str)
         assert len(formatted) > 0

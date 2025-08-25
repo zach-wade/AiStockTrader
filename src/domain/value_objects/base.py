@@ -34,9 +34,22 @@ class ValueObject(ABC):
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Prevent modification after initialization."""
-        if hasattr(self, name):
+        # Track if we're in __init__ by checking call stack
+        import inspect
+
+        frame = inspect.currentframe()
+        caller_frame = frame.f_back if frame else None
+        in_init = caller_frame and caller_frame.f_code.co_name == "__init__"
+
+        if in_init:
+            # During initialization, allow setting attributes
+            super().__setattr__(name, value)
+        elif hasattr(self, name):
+            # After initialization, prevent modification of existing attributes
             raise AttributeError(f"Cannot modify immutable value object attribute '{name}'")
-        super().__setattr__(name, value)
+        else:
+            # After initialization, prevent adding new attributes
+            raise AttributeError(f"Cannot add new attribute '{name}' to immutable value object")
 
 
 @total_ordering

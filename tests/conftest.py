@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
+# Third-party imports
 # Load test environment variables
 from dotenv import load_dotenv
 
@@ -214,15 +215,29 @@ def pytest_configure(config):
 @pytest.fixture
 def test_database_config():
     """Test database configuration."""
+    import os
+
     return {
         "host": "localhost",
         "port": 5432,
-        "database": "ai_trader_test",
+        "database": "ai_trader",
         "user": "zachwade",
-        "password": "",
+        "password": os.environ.get("TEST_DB_PASSWORD", ""),
         "min_pool_size": 1,
         "max_pool_size": 5,
     }
+
+
+@pytest.fixture
+async def db_connection(test_database_config):
+    """Create async database connection for integration tests."""
+    from src.infrastructure.database.connection import DatabaseConfig, DatabaseConnection
+
+    config = DatabaseConfig(**test_database_config)
+    connection = DatabaseConnection(config)
+    await connection.connect()
+    yield connection
+    await connection.disconnect()
 
 
 @pytest.fixture

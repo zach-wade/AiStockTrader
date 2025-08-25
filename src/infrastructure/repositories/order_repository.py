@@ -8,10 +8,8 @@ Handles order persistence, retrieval, and mapping between domain entities and da
 # Standard library imports
 import logging
 from datetime import datetime
+from typing import Any
 from uuid import UUID
-
-# Third-party imports
-from psycopg.rows import Row
 
 # Local imports
 from src.application.interfaces.exceptions import OrderNotFoundError, RepositoryError
@@ -382,7 +380,7 @@ class PostgreSQLOrderRepository(IOrderRepository):
             logger.error(f"Failed to get orders by broker ID {broker_order_id}: {e}")
             raise RepositoryError(f"Failed to retrieve orders by broker ID: {e}") from e
 
-    def _map_record_to_order(self, record: Row) -> Order:
+    def _map_record_to_order(self, record: dict[str, Any]) -> Order:
         """
         Map database record to Order entity.
 

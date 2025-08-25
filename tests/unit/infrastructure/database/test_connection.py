@@ -38,7 +38,7 @@ def valid_config():
         password=TEST_PASSWORD,
         min_pool_size=1,
         max_pool_size=10,
-        timeout=30.0,
+        command_timeout=30.0,
     )
 
 
@@ -53,7 +53,7 @@ def config_from_env():
         "DATABASE_PASSWORD": ENV_PASSWORD,
         "DATABASE_MIN_POOL_SIZE": "2",
         "DATABASE_MAX_POOL_SIZE": "20",
-        "DATABASE_TIMEOUT": "60.0",
+        "DATABASE_COMMAND_TIMEOUT": "60.0",
     }
 
 
@@ -78,7 +78,7 @@ class TestDatabaseConfig:
         assert config.password == TEST_PASSWORD
         assert config.min_pool_size == 1
         assert config.max_pool_size == 10
-        assert config.timeout == 30.0
+        assert config.command_timeout == 30.0
 
     def test_config_creation_with_custom_values(self):
         """Test config creation with custom values."""
@@ -90,14 +90,14 @@ class TestDatabaseConfig:
             password=CUSTOM_PASSWORD,
             min_pool_size=5,
             max_pool_size=50,
-            timeout=120.0,
+            command_timeout=120.0,
         )
 
         assert config.host == "custom_host"
         assert config.port == 5433
         assert config.min_pool_size == 5
         assert config.max_pool_size == 50
-        assert config.timeout == 120.0
+        assert config.command_timeout == 120.0
 
     def test_config_connection_string(self):
         """Test connection string generation."""
@@ -173,7 +173,7 @@ class TestDatabaseConfig:
                 database="test_db",
                 user="test_user",
                 password=TEST_PASSWORD,
-                timeout=-1.0,
+                command_timeout=-1.0,
             )
 
     def test_config_validation_empty_required_fields(self):
@@ -226,7 +226,7 @@ class TestConnectionFactory:
         # Defaults should be used for optional vars
         assert config.min_pool_size == 1
         assert config.max_pool_size == 10
-        assert config.timeout == 30.0
+        assert config.command_timeout == 30.0
 
     @patch.dict(
         os.environ,
@@ -238,7 +238,7 @@ class TestConnectionFactory:
             "DATABASE_PASSWORD": ENV_PASSWORD,
             "DATABASE_MIN_POOL_SIZE": "5",
             "DATABASE_MAX_POOL_SIZE": "25",
-            "DATABASE_TIMEOUT": "60.0",
+            "DATABASE_COMMAND_TIMEOUT": "60.0",
         },
     )
     def test_from_env_with_all_vars(self):
@@ -252,7 +252,7 @@ class TestConnectionFactory:
         assert config.password == ENV_PASSWORD
         assert config.min_pool_size == 5
         assert config.max_pool_size == 25
-        assert config.timeout == 60.0
+        assert config.command_timeout == 60.0
 
     @patch.dict(
         os.environ,

@@ -50,15 +50,13 @@ async def db_adapter():
         # Clean up any existing test data
         # Delete test data instead of truncating to avoid issues with partitioned tables
         await adapter.execute_query(
-            "DELETE FROM market_data_1m WHERE symbol IN (%s, %s)",
-            "ZTEST", "AAPL"
+            "DELETE FROM market_data_1m WHERE symbol IN (%s, %s)", "ZTEST", "AAPL"
         )
         yield adapter
     finally:
         # Clean up after tests
         await adapter.execute_query(
-            "DELETE FROM market_data_1m WHERE symbol IN (%s, %s)",
-            "ZTEST", "AAPL"
+            "DELETE FROM market_data_1m WHERE symbol IN (%s, %s)", "ZTEST", "AAPL"
         )
         await connection.disconnect()
         ConnectionFactory.reset()  # Reset factory for clean test state
@@ -173,7 +171,7 @@ class TestMarketDataRepository:
         # Verify at least some bars were saved by checking the latest
         latest = await repository.get_latest_bar("AAPL", "1min")
         assert latest is not None
-        
+
         # The batch save should have succeeded without error
         # Further verification would require checking the actual database
 
@@ -257,9 +255,10 @@ class TestMarketDataRepository:
         """Test deleting old bars."""
         await repository.save_bars(sample_bars)
 
-        # Delete bars older than 5 minutes ago
+        # Delete bars older than 5 minutes ago FOR THIS SYMBOL ONLY
         cutoff = sample_bars[5].timestamp
-        deleted_count = await repository.delete_old_bars(cutoff)
+        # SAFETY: Pass symbol to avoid deleting production data
+        deleted_count = await repository.delete_bars_before(cutoff, symbol="AAPL")
 
         # Should have deleted bars 6-9 (4 bars)
         assert deleted_count == 4

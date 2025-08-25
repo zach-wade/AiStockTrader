@@ -235,3 +235,6 @@ reports/*.json
 system_state/
 runtime_data/
 session_data/
+
+#Old files
+ai_trader_old/

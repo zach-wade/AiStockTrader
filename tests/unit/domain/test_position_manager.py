@@ -134,7 +134,7 @@ def closed_position():
     position = Position(
         symbol="AAPL",
         quantity=Decimal("0"),
-        average_entry_price=Decimal("150.00"),
+        average_entry_price=Decimal("150.00", closed_at=datetime.now(UTC)),
         realized_pnl=Decimal("500.00"),
         commission_paid=Decimal("2.00"),
     )
@@ -439,7 +439,7 @@ class TestCalculatePnl:
         pnl = position_manager.calculate_pnl(long_position, current_price)
 
         # Unrealized P&L: 100 * (160 - 150) = 1000, less commission of $1 = $999
-        assert pnl.amount == Decimal("999.00")
+        assert pnl == Decimal("999.00")
         assert pnl.currency == "USD"
 
     def test_calculate_pnl_for_long_position_loss(self, position_manager, long_position):
@@ -448,7 +448,7 @@ class TestCalculatePnl:
         pnl = position_manager.calculate_pnl(long_position, current_price)
 
         # Unrealized P&L: 100 * (145 - 150) = -500, less commission of $1 = -$501
-        assert pnl.amount == Decimal("-501.00")
+        assert pnl == Decimal("-501.00")
 
     def test_calculate_pnl_for_short_position_profit(self, position_manager, short_position):
         """Test P&L calculation for profitable short position."""
@@ -456,7 +456,7 @@ class TestCalculatePnl:
         pnl = position_manager.calculate_pnl(short_position, current_price)
 
         # Unrealized P&L for short: -100 * (155 - 160) = 500, less commission of $1 = $499
-        assert pnl.amount == Decimal("499.00")
+        assert pnl == Decimal("499.00")
 
     def test_calculate_pnl_for_short_position_loss(self, position_manager, short_position):
         """Test P&L calculation for losing short position."""
@@ -464,7 +464,7 @@ class TestCalculatePnl:
         pnl = position_manager.calculate_pnl(short_position, current_price)
 
         # Unrealized P&L for short: -100 * (165 - 160) = -500, less commission of $1 = -$501
-        assert pnl.amount == Decimal("-501.00")
+        assert pnl == Decimal("-501.00")
 
     def test_calculate_pnl_for_closed_position(self, position_manager, closed_position):
         """Test P&L calculation for closed position returns realized P&L."""
@@ -472,7 +472,7 @@ class TestCalculatePnl:
         pnl = position_manager.calculate_pnl(closed_position, current_price)
 
         # Should return realized P&L for closed position
-        assert pnl.amount == Decimal("500.00")
+        assert pnl == Decimal("500.00")
 
     def test_calculate_pnl_for_position_with_no_pnl(self, position_manager):
         """Test P&L calculation when position has no P&L."""
@@ -484,7 +484,7 @@ class TestCalculatePnl:
             current_price = Price(Decimal("150.00"))
             pnl = position_manager.calculate_pnl(position, current_price)
 
-            assert pnl.amount == Decimal("0")
+            assert pnl == Decimal("0")
 
 
 # ==================== Test merge_positions ====================
@@ -765,7 +765,7 @@ class TestCalculatePositionSize:
         # Risk amount: 10000 * 0.02 = 200
         # Price diff: 100 - 95 = 5
         # Position size: 200 / 5 = 40
-        assert size.value == Decimal("40")
+        assert size == Decimal("40")
 
     def test_calculate_position_size_with_tight_stop(self, position_manager):
         """Test position size with tight stop loss."""
@@ -781,7 +781,7 @@ class TestCalculatePositionSize:
         # Risk amount: 10000 * 0.01 = 100
         # Price diff: 100 - 99 = 1
         # Position size: 100 / 1 = 100
-        assert size.value == Decimal("100")
+        assert size == Decimal("100")
 
     def test_calculate_position_size_with_wide_stop(self, position_manager):
         """Test position size with wide stop loss."""
@@ -797,7 +797,7 @@ class TestCalculatePositionSize:
         # Risk amount: 10000 * 0.02 = 200
         # Price diff: 100 - 80 = 20
         # Position size: 200 / 20 = 10
-        assert size.value == Decimal("10")
+        assert size == Decimal("10")
 
     def test_calculate_position_size_for_short(self, position_manager):
         """Test position size calculation for short position."""
@@ -813,7 +813,7 @@ class TestCalculatePositionSize:
         # Risk amount: 10000 * 0.02 = 200
         # Price diff: |100 - 105| = 5
         # Position size: 200 / 5 = 40
-        assert size.value == Decimal("40")
+        assert size == Decimal("40")
 
     def test_calculate_position_size_rounds_to_whole_number(self, position_manager):
         """Test position size is rounded to whole number."""
@@ -829,7 +829,7 @@ class TestCalculatePositionSize:
         # Risk amount: 10000 * 0.015 = 150
         # Price diff: 100 - 97 = 3
         # Position size: 150 / 3 = 50
-        assert size.value == Decimal("50")
+        assert size == Decimal("50")
 
     def test_calculate_position_size_with_fractional_result(self, position_manager):
         """Test position size with fractional result rounds down."""
@@ -845,7 +845,7 @@ class TestCalculatePositionSize:
         # Risk amount: 10000 * 0.02 = 200
         # Price diff: 100 - 97 = 3
         # Position size: 200 / 3 = 66.666... rounds to 67
-        assert size.value == Decimal("67")
+        assert size == Decimal("67")
 
     def test_calculate_position_size_with_small_account(self, position_manager):
         """Test position size calculation with small account."""
@@ -861,7 +861,7 @@ class TestCalculatePositionSize:
         # Risk amount: 1000 * 0.02 = 20
         # Price diff: 100 - 95 = 5
         # Position size: 20 / 5 = 4
-        assert size.value == Decimal("4")
+        assert size == Decimal("4")
 
     def test_invalid_risk_per_trade_zero(self, position_manager):
         """Test error with zero risk per trade."""
@@ -947,7 +947,7 @@ class TestCalculatePositionSize:
             account_balance, risk_pct, entry_price, stop_loss_price
         )
 
-        assert size.value == expected_size
+        assert size == expected_size
 
 
 # ==================== Integration Tests ====================

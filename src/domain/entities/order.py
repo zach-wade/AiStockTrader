@@ -112,7 +112,7 @@ class Order:
             raise ValueError("Order symbol cannot be empty")
 
         # Check if quantity is positive (handle both Decimal and Quantity types)
-        qty_value = self.quantity.value if hasattr(self.quantity, 'value') else self.quantity
+        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
         if qty_value <= 0:
             raise ValueError(f"Order quantity must be positive, got {qty_value}")
 
@@ -131,21 +131,19 @@ class Order:
             raise ValueError("Filled quantity cannot be negative")
 
         # Compare filled_quantity with quantity (handle both Decimal and Quantity types)
-        qty_value = self.quantity.value if hasattr(self.quantity, 'value') else self.quantity
+        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
         if self.filled_quantity > qty_value:
             raise ValueError("Filled quantity cannot exceed order quantity")
 
     @classmethod
-    def create_market_order(
-        cls, request: OrderRequest
-    ) -> "Order":
+    def create_market_order(cls, request: OrderRequest) -> "Order":
         """Factory method to create a market order"""
         return cls(
-            symbol=request.symbol, 
-            quantity=request.quantity, 
-            side=request.side, 
-            order_type=OrderType.MARKET, 
-            reason=request.reason
+            symbol=request.symbol,
+            quantity=request.quantity,
+            side=request.side,
+            order_type=OrderType.MARKET,
+            reason=request.reason,
         )
 
     @classmethod
@@ -258,9 +256,11 @@ class Order:
             raise ValueError("Fill price must be positive")
 
         new_filled_quantity = self.filled_quantity + filled_quantity
-        if new_filled_quantity > self.quantity:
+        # Handle both Decimal and Quantity types for comparison
+        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+        if new_filled_quantity > qty_value:
             raise ValueError(
-                f"Total filled quantity {new_filled_quantity} exceeds order quantity {self.quantity}"
+                f"Total filled quantity {new_filled_quantity} exceeds order quantity {qty_value}"
             )
 
         # Update average fill price
@@ -274,8 +274,9 @@ class Order:
 
         self.filled_quantity = new_filled_quantity
 
-        # Update status
-        if self.filled_quantity >= self.quantity:
+        # Update status (handle both Decimal and Quantity types)
+        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+        if self.filled_quantity >= qty_value:
             self.status = OrderStatus.FILLED
             self.filled_at = timestamp or datetime.now(UTC)
         else:
@@ -318,13 +319,16 @@ class Order:
 
     def get_remaining_quantity(self) -> Decimal:
         """Get quantity still to be filled"""
-        return self.quantity - self.filled_quantity
+        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+        return Decimal(qty_value) - self.filled_quantity
 
     def get_fill_ratio(self) -> Decimal:
         """Get ratio of filled quantity to total quantity"""
-        if self.quantity == 0:
+        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+        qty_decimal = Decimal(qty_value)
+        if qty_decimal == 0:
             return Decimal("0")
-        return self.filled_quantity / self.quantity
+        return self.filled_quantity / qty_decimal
 
     def get_notional_value(self) -> Decimal | None:
         """Get total value of the order"""
@@ -333,7 +337,11 @@ class Order:
                 return self.filled_quantity * self.average_fill_price
             return None
         elif self.order_type == OrderType.LIMIT and self.limit_price:
-            return self.quantity * self.limit_price
+            qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+            limit_value = (
+                self.limit_price.value if hasattr(self.limit_price, "value") else self.limit_price
+            )
+            return Decimal(qty_value) * Decimal(limit_value)
         return None
 
     def __str__(self) -> str:

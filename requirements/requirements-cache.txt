@@ -1,0 +1,25 @@
+# Redis Cache Layer Dependencies
+# Install with: pip install -r requirements-cache.txt
+
+# Core Redis dependencies
+redis>=4.5.0,<6.0.0              # Async Redis client
+hiredis>=2.0.0,<3.0.0            # High-performance Redis parser (optional but recommended)
+
+# Serialization dependencies (optional, for advanced serialization)
+msgpack>=1.0.0,<2.0.0            # Fast binary serialization
+orjson>=3.8.0,<4.0.0             # Fast JSON serialization
+
+# Compression dependencies (optional, for large value compression)
+lz4>=4.0.0,<5.0.0                # Fast compression algorithm
+zstd>=1.5.0,<2.0.0               # High-ratio compression algorithm
+
+# Monitoring dependencies (if using with monitoring system)
+prometheus-client>=0.16.0,<1.0.0 # Prometheus metrics (optional)
+
+# Development and testing dependencies
+pytest-asyncio>=0.21.0,<1.0.0    # Async testing support
+pytest-redis>=3.0.0,<4.0.0       # Redis testing utilities
+fakeredis>=2.10.0,<3.0.0         # Redis mock for testing
+
+# Optional performance monitoring
+psutil>=5.9.0,<6.0.0             # System metrics

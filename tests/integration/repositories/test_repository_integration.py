@@ -18,7 +18,7 @@ import pytest
 
 # Local imports
 from src.application.interfaces.exceptions import RepositoryError
-from src.domain.entities.order import Order, OrderSide, OrderStatus
+from src.domain.entities.order import Order, OrderRequest, OrderSide, OrderStatus
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position, PositionSide
 from src.infrastructure.database.connection import ConnectionFactory, DatabaseConfig
@@ -115,13 +115,14 @@ class TestOrderRepositoryIntegration:
     async def test_order_crud_operations(self, order_repository):
         """Test complete order CRUD operations against real database."""
         # Create order
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TEST_AAPL",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
             reason="Integration test order",
         )
+        order = Order.create_limit_order(request)
 
         # Save order
         saved_order = await order_repository.save_order(order)
@@ -159,9 +160,25 @@ class TestOrderRepositoryIntegration:
         """Test order query operations against real database."""
         # Create multiple test orders
         orders = [
-            Order.create_limit_order("TEST_AAPL", Decimal("100"), OrderSide.BUY, Decimal("150.00")),
-            Order.create_limit_order("TEST_AAPL", Decimal("50"), OrderSide.SELL, Decimal("155.00")),
-            Order.create_market_order("TEST_GOOGL", Decimal("10"), OrderSide.BUY),
+            Order.create_limit_order(
+                OrderRequest(
+                    symbol="TEST_AAPL",
+                    quantity=Decimal("100"),
+                    side=OrderSide.BUY,
+                    limit_price=Decimal("150.00"),
+                )
+            ),
+            Order.create_limit_order(
+                OrderRequest(
+                    symbol="TEST_AAPL",
+                    quantity=Decimal("50"),
+                    side=OrderSide.SELL,
+                    limit_price=Decimal("155.00"),
+                )
+            ),
+            Order.create_market_order(
+                OrderRequest(symbol="TEST_GOOGL", quantity=Decimal("10"), side=OrderSide.BUY)
+            ),
         ]
 
         # Save all orders
@@ -198,12 +215,13 @@ class TestOrderRepositoryIntegration:
     async def test_order_date_range_queries(self, order_repository):
         """Test order date range queries."""
         # Create order
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TEST_DATE",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
         await order_repository.save_order(order)
 
         # Query with date range that includes the order
@@ -240,7 +258,7 @@ class TestPositionRepositoryIntegration:
         )
 
         # Save position
-        saved_position = await position_repository.save_position(position)
+        saved_position = await position_repository.persist_position(position)
         assert saved_position.id == position.id
 
         # Retrieve position
@@ -300,7 +318,7 @@ class TestPositionRepositoryIntegration:
 
         # Save positions
         for position in positions:
-            await position_repository.save_position(position)
+            await position_repository.persist_position(position)
 
         # Test active positions
         active_positions = await position_repository.get_active_positions()
@@ -377,12 +395,13 @@ class TestUnitOfWorkIntegration:
 
     async def test_transaction_commit_success(self, unit_of_work):
         """Test successful transaction commit across multiple repositories."""
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TEST_TRANSACTION",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         position = Position(
             id=uuid4(),
@@ -406,7 +425,7 @@ class TestUnitOfWorkIntegration:
         # Execute transaction
         async with unit_of_work as uow:
             saved_order = await uow.orders.save_order(order)
-            saved_position = await uow.positions.save_position(position)
+            saved_position = await uow.positions.persist_position(position)
             saved_portfolio = await uow.portfolios.save_portfolio(portfolio)
 
             assert saved_order.id == order.id
@@ -424,12 +443,13 @@ class TestUnitOfWorkIntegration:
 
     async def test_transaction_rollback_on_error(self, unit_of_work):
         """Test transaction rollback when error occurs."""
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TEST_ROLLBACK",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         # Execute transaction that should fail
         try:
@@ -448,12 +468,13 @@ class TestUnitOfWorkIntegration:
 
     async def test_manual_transaction_management(self, unit_of_work):
         """Test manual transaction management."""
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TEST_MANUAL",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         # Begin transaction manually
         await unit_of_work.begin_transaction()
@@ -479,19 +500,21 @@ class TestUnitOfWorkIntegration:
 
     async def test_nested_transactions(self, unit_of_work):
         """Test nested transaction behavior."""
-        order1 = Order.create_limit_order(
+        request1 = OrderRequest(
             symbol="TEST_NESTED1",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order1 = Order.create_limit_order(request1)
 
-        order2 = Order.create_limit_order(
+        request2 = OrderRequest(
             symbol="TEST_NESTED2",
             quantity=Decimal("50"),
             side=OrderSide.SELL,
             limit_price=Decimal("155.00"),
         )
+        order2 = Order.create_limit_order(request2)
 
         # Outer transaction
         async with unit_of_work as outer_uow:
@@ -520,12 +543,13 @@ class TestConcurrentOperations:
 
         async def create_order(symbol_suffix):
             repo = PostgreSQLOrderRepository(database_connection)
-            order = Order.create_limit_order(
+            request = OrderRequest(
                 symbol=f"TEST_CONCURRENT_{symbol_suffix}",
                 quantity=Decimal("100"),
                 side=OrderSide.BUY,
                 limit_price=Decimal("150.00"),
             )
+            order = Order.create_limit_order(request)
             return await repo.save_order(order)
 
         # Create multiple orders concurrently
@@ -555,7 +579,7 @@ class TestConcurrentOperations:
             opened_at=datetime.now(UTC),
             strategy="concurrent_test",
         )
-        await repo.save_position(position)
+        await repo.persist_position(position)
 
         async def update_position_price(new_price):
             # Retrieve fresh position
@@ -586,10 +610,12 @@ class TestPerformanceCharacteristics:
         # Create multiple orders
         orders = [
             Order.create_limit_order(
-                symbol=f"TEST_BULK_{i}",
-                quantity=Decimal("100"),
-                side=OrderSide.BUY,
-                limit_price=Decimal("150.00"),
+                OrderRequest(
+                    symbol=f"TEST_BULK_{i}",
+                    quantity=Decimal("100"),
+                    side=OrderSide.BUY,
+                    limit_price=Decimal("150.00"),
+                )
             )
             for i in range(10)
         ]
@@ -651,23 +677,25 @@ class TestErrorHandlingIntegration:
 
     async def test_database_constraint_violations(self, order_repository):
         """Test handling of database constraint violations."""
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TEST_CONSTRAINT",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         # Save order first time should succeed
         await order_repository.save_order(order)
 
         # Try to save order with same ID should handle constraint violation
-        duplicate_order = Order.create_limit_order(
+        duplicate_request = OrderRequest(
             symbol="TEST_CONSTRAINT_2",
             quantity=Decimal("50"),
             side=OrderSide.SELL,
             limit_price=Decimal("155.00"),
         )
+        duplicate_order = Order.create_limit_order(duplicate_request)
         duplicate_order.id = order.id  # Force duplicate ID
 
         # This should either succeed (if implemented as upsert) or raise appropriate error

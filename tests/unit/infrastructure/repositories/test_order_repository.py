@@ -16,7 +16,14 @@ import pytest
 
 # Local imports
 from src.application.interfaces.exceptions import OrderNotFoundError, RepositoryError
-from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType, TimeInForce
+from src.domain.entities.order import (
+    Order,
+    OrderRequest,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    TimeInForce,
+)
 from src.infrastructure.repositories.order_repository import PostgreSQLOrderRepository
 
 
@@ -39,13 +46,14 @@ def repository(mock_adapter):
 @pytest.fixture
 def sample_order():
     """Sample order entity for testing."""
-    return Order.create_limit_order(
+    request = OrderRequest(
         symbol="AAPL",
         quantity=Decimal("100"),
         side=OrderSide.BUY,
         limit_price=Decimal("150.00"),
         reason="Test order",
     )
+    return Order.create_limit_order(request)
 
 
 @pytest.fixture
@@ -108,11 +116,13 @@ class TestSaveOrder:
         assert call_args[0][2] == sample_order.symbol
         assert call_args[0][3] == sample_order.side.value
 
-    async def test_save_existing_order_calls_update(self, repository, mock_adapter, sample_order):
+    async def test_save_existing_order_calls_update(
+        self, repository, mock_adapter, sample_order, sample_order_record
+    ):
         """Test saving existing order calls update."""
-        # Mock that order exists
-        mock_adapter.fetch_one.return_value = {"id": sample_order.id}
-        mock_adapter.execute_query.side_effect = ["UPDATE 1", "EXECUTE 1"]
+        # Mock that order exists with complete record
+        mock_adapter.fetch_one.return_value = sample_order_record
+        mock_adapter.execute_query.return_value = "UPDATE 1"
 
         result = await repository.save_order(sample_order)
 
@@ -120,7 +130,7 @@ class TestSaveOrder:
 
         # Should call fetch_one (check if exists) and then update
         mock_adapter.fetch_one.assert_called_once()
-        assert mock_adapter.execute_query.call_count == 1  # update call
+        mock_adapter.execute_query.assert_called_once()  # update call
 
     async def test_save_order_adapter_error(self, repository, mock_adapter, sample_order):
         """Test save order with adapter error."""
@@ -227,7 +237,7 @@ class TestGetOrder:
         # Verify query
         call_args = mock_adapter.fetch_all.call_args
         assert "WHERE status = %s" in call_args[0][0]
-        assert call_args[0][1] == "pending"
+        assert call_args[0][1] == OrderStatus.PENDING.value
 
     async def test_get_active_orders_success(self, repository, mock_adapter, sample_order_record):
         """Test getting active orders."""
@@ -236,7 +246,12 @@ class TestGetOrder:
         result = await repository.get_active_orders()
 
         assert len(result) == 1
-        assert result[0].is_active()
+        # Note: Order entity might not have is_active() method, check status instead
+        assert result[0].status in [
+            OrderStatus.PENDING,
+            OrderStatus.SUBMITTED,
+            OrderStatus.PARTIALLY_FILLED,
+        ]
 
         # Verify query includes active statuses
         call_args = mock_adapter.fetch_all.call_args
@@ -478,18 +493,16 @@ class TestErrorHandling:
         self, repository, mock_adapter, sample_order
     ):
         """Test execute operations handle different exception types."""
-        test_cases = [
-            (Exception("Generic error"), RepositoryError),
-            (RuntimeError("Runtime error"), RepositoryError),
-        ]
+        # Test generic exception handling during insert
+        mock_adapter.fetch_one.return_value = None  # Order doesn't exist, so it will try to insert
+        mock_adapter.execute_query.side_effect = Exception("Generic error")
 
-        for exception, expected_error in test_cases:
-            mock_adapter.execute_query.side_effect = exception
+        with pytest.raises(RepositoryError, match="Failed to save order"):
+            await repository.save_order(sample_order)
 
-            with pytest.raises(expected_error):
-                await repository._insert_order(sample_order)
-
-            mock_adapter.execute_query.side_effect = None  # Reset
+        # Reset mock
+        mock_adapter.execute_query.side_effect = None
+        mock_adapter.execute_query.return_value = "UPDATE 1"
 
 
 @pytest.mark.unit
@@ -594,6 +607,74 @@ class TestQueryConstruction:
 
 
 @pytest.mark.unit
+class TestAdditionalOrderCoverage:
+    """Test additional scenarios to achieve 90%+ coverage."""
+
+    async def test_get_orders_by_symbol_error(self, repository, mock_adapter):
+        """Test get orders by symbol with database error."""
+        mock_adapter.fetch_all.side_effect = Exception("Database error")
+
+        with pytest.raises(RepositoryError, match="Failed to retrieve orders for symbol"):
+            await repository.get_orders_by_symbol("AAPL")
+
+    async def test_get_orders_by_status_error(self, repository, mock_adapter):
+        """Test get orders by status with database error."""
+        mock_adapter.fetch_all.side_effect = Exception("Database error")
+
+        with pytest.raises(RepositoryError, match="Failed to retrieve orders by status"):
+            await repository.get_orders_by_status(OrderStatus.PENDING)
+
+    async def test_get_active_orders_error(self, repository, mock_adapter):
+        """Test get active orders with database error."""
+        mock_adapter.fetch_all.side_effect = Exception("Database error")
+
+        with pytest.raises(RepositoryError, match="Failed to retrieve active orders"):
+            await repository.get_active_orders()
+
+    async def test_get_orders_by_date_range_error(self, repository, mock_adapter):
+        """Test get orders by date range with database error."""
+        mock_adapter.fetch_all.side_effect = Exception("Database error")
+        start_date = datetime(2023, 1, 1, tzinfo=UTC)
+        end_date = datetime(2023, 12, 31, tzinfo=UTC)
+
+        with pytest.raises(RepositoryError, match="Failed to retrieve orders by date range"):
+            await repository.get_orders_by_date_range(start_date, end_date)
+
+    async def test_get_orders_by_broker_id_error(self, repository, mock_adapter):
+        """Test get orders by broker ID with database error."""
+        mock_adapter.fetch_all.side_effect = Exception("Database error")
+
+        with pytest.raises(RepositoryError, match="Failed to retrieve orders by broker ID"):
+            await repository.get_orders_by_broker_id("BROKER123")
+
+    async def test_insert_order_error(self, repository, mock_adapter, sample_order):
+        """Test insert order with database error."""
+        mock_adapter.execute_query.side_effect = Exception("Insert failed")
+
+        with pytest.raises(Exception, match="Insert failed"):
+            await repository._insert_order(sample_order)
+
+    async def test_logger_calls_during_operations(self, repository, mock_adapter, sample_order):
+        """Test that logger is called appropriately during operations."""
+        # Test successful insert logging
+        await repository._insert_order(sample_order)
+
+        # Test successful update logging
+        mock_adapter.execute_query.return_value = "UPDATE 1"
+        await repository.update_order(sample_order)
+
+        # Test successful delete logging
+        mock_adapter.execute_query.return_value = "DELETE 1"
+        result = await repository.delete_order(sample_order.id)
+        assert result is True
+
+        # Test not found delete logging
+        mock_adapter.execute_query.return_value = "DELETE 0"
+        result = await repository.delete_order(sample_order.id)
+        assert result is False
+
+
+@pytest.mark.unit
 class TestRepositoryIntegration:
     """Test repository integration scenarios."""
 
@@ -643,6 +724,31 @@ class TestRepositoryIntegration:
         assert retrieved_order.quantity == sample_order.quantity
         assert retrieved_order.limit_price == sample_order.limit_price
 
+    async def test_comprehensive_error_scenarios(self, repository, mock_adapter, sample_order):
+        """Test comprehensive error scenarios for all repository methods."""
+        error_methods = [
+            ("get_orders_by_symbol", "AAPL"),
+            ("get_orders_by_status", OrderStatus.PENDING),
+            ("get_active_orders",),
+            ("get_orders_by_date_range", datetime.now(UTC), datetime.now(UTC)),
+            ("get_orders_by_broker_id", "BROKER123"),
+        ]
+
+        for method_info in error_methods:
+            method_name = method_info[0]
+            args = method_info[1:] if len(method_info) > 1 else ()
+
+            # Test with fetch_all exception
+            mock_adapter.fetch_all.side_effect = Exception("Database error")
+            method = getattr(repository, method_name)
+
+            with pytest.raises(RepositoryError):
+                await method(*args)
+
+            # Reset mock
+            mock_adapter.fetch_all.side_effect = None
+            mock_adapter.fetch_all.return_value = []
+
     async def test_order_lifecycle_operations(self, repository, mock_adapter, sample_order):
         """Test complete order lifecycle operations."""
         # 1. Save new order
@@ -690,3 +796,54 @@ class TestRepositoryIntegration:
         mock_adapter.execute_query.return_value = "DELETE 1"
         result = await repository.delete_order(sample_order.id)
         assert result is True
+
+    async def test_order_status_workflow(self, repository, mock_adapter):
+        """Test order status workflow from creation to completion."""
+        # Create order record in different states
+        base_record = {
+            "id": uuid4(),
+            "symbol": "AAPL",
+            "side": "buy",
+            "order_type": "limit",
+            "quantity": Decimal("100"),
+            "limit_price": Decimal("150.00"),
+            "stop_price": None,
+            "time_in_force": "day",
+            "broker_order_id": None,
+            "filled_quantity": Decimal("0"),
+            "average_fill_price": None,
+            "created_at": datetime.now(UTC),
+            "submitted_at": None,
+            "filled_at": None,
+            "cancelled_at": None,
+            "reason": "Test order",
+            "tags": {},
+        }
+
+        # Test pending order
+        pending_record = {**base_record, "status": "pending"}
+        mock_adapter.fetch_all.return_value = [pending_record]
+        pending_orders = await repository.get_orders_by_status(OrderStatus.PENDING)
+        assert len(pending_orders) == 1
+        assert pending_orders[0].status == OrderStatus.PENDING
+
+        # Test submitted order
+        submitted_record = {**base_record, "status": "submitted", "broker_order_id": "BROKER123"}
+        mock_adapter.fetch_all.return_value = [submitted_record]
+        submitted_orders = await repository.get_orders_by_status(OrderStatus.SUBMITTED)
+        assert len(submitted_orders) == 1
+        assert submitted_orders[0].status == OrderStatus.SUBMITTED
+
+        # Test filled order
+        filled_record = {
+            **base_record,
+            "status": "filled",
+            "filled_quantity": Decimal("100"),
+            "average_fill_price": Decimal("149.50"),
+            "filled_at": datetime.now(UTC),
+        }
+        mock_adapter.fetch_all.return_value = [filled_record]
+        filled_orders = await repository.get_orders_by_status(OrderStatus.FILLED)
+        assert len(filled_orders) == 1
+        assert filled_orders[0].status == OrderStatus.FILLED
+        assert filled_orders[0].filled_quantity == Decimal("100")

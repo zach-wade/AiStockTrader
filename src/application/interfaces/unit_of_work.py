@@ -8,6 +8,7 @@ Implements the Unit of Work pattern for atomic operations.
 # Standard library imports
 from abc import abstractmethod
 from collections.abc import Callable
+from types import TracebackType
 from typing import Any, Protocol
 
 from .repositories import IOrderRepository, IPortfolioRepository, IPositionRepository
@@ -87,7 +88,7 @@ class IUnitOfWork(Protocol):
         ...
 
     @abstractmethod
-    async def refresh(self, entity) -> None:
+    async def refresh(self, entity: Any) -> None:
         """
         Refresh an entity with the latest data from the database.
 
@@ -100,7 +101,7 @@ class IUnitOfWork(Protocol):
         ...
 
     @abstractmethod
-    async def __aenter__(self):
+    async def __aenter__(self) -> "IUnitOfWork":
         """
         Async context manager entry.
 
@@ -112,7 +113,12 @@ class IUnitOfWork(Protocol):
         ...
 
     @abstractmethod
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """
         Async context manager exit.
 

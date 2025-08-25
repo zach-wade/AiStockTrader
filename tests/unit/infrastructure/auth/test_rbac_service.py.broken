@@ -1,0 +1,541 @@
+"""
+Comprehensive tests for RBAC (Role-Based Access Control) service.
+
+This test suite covers:
+- Role management and hierarchy
+- Permission assignment and validation
+- Resource-based access control
+- Dynamic permission evaluation
+- Role inheritance
+- Permission caching
+- Audit logging
+"""
+
+import pytest
+from datetime import datetime, timedelta
+from typing import Set, List, Dict
+from unittest.mock import Mock, MagicMock, AsyncMock, patch
+
+from src.infrastructure.auth.rbac_service import (
+    RBACService,
+    Role,
+    Permission,
+    Resource,
+    Action,
+    RoleHierarchy,
+    AccessDecision,
+    PolicyRule,
+    PermissionDeniedException,
+    RoleNotFoundException,
+    InvalidPermissionException,
+    CircularRoleInheritanceException,
+)
+
+
+class TestRoleModel:
+    """Test Role model."""
+
+    def test_create_role(self):
+        """Test creating a role."""
+        role = Role(
+            name="trader",
+            description="Trading role",
+            permissions={"read:portfolio", "write:orders"},
+            parent_roles={"viewer"},
+            priority=10
+        )
+
+        assert role.name == "trader"
+        assert role.description == "Trading role"
+        assert "read:portfolio" in role.permissions
+        assert "viewer" in role.parent_roles
+        assert role.priority == 10
+
+    def test_role_inheritance(self):
+        """Test role inheritance structure."""
+        parent = Role(
+            name="viewer",
+            permissions={"read:portfolio", "read:market_data"}
+        )
+
+        child = Role(
+            name="trader",
+            permissions={"write:orders"},
+            parent_roles={parent.name}
+        )
+
+        # Child should have its own permissions plus inherited
+        all_permissions = child.get_all_permissions([parent])
+        assert "write:orders" in all_permissions
+        assert "read:portfolio" in all_permissions
+        assert "read:market_data" in all_permissions
+
+
+class TestPermission:
+    """Test Permission model."""
+
+    def test_create_permission(self):
+        """Test creating a permission."""
+        permission = Permission(
+            name="write:orders",
+            resource="orders",
+            action="write",
+            conditions={"max_amount": 10000}
+        )
+
+        assert permission.name == "write:orders"
+        assert permission.resource == "orders"
+        assert permission.action == "write"
+        assert permission.conditions["max_amount"] == 10000
+
+    def test_permission_matching(self):
+        """Test permission pattern matching."""
+        permission = Permission(
+            name="read:portfolio:*",
+            resource="portfolio",
+            action="read",
+            pattern="portfolio:*"
+        )
+
+        assert permission.matches("portfolio:123")
+        assert permission.matches("portfolio:abc")
+        assert not permission.matches("orders:123")
+
+
+class TestRBACService:
+    """Test RBAC service functionality."""
+
+    @pytest.fixture
+    def mock_database(self):
+        """Create mock database."""
+        mock = AsyncMock()
+        mock.get_role.return_value = None
+        mock.get_user_roles.return_value = []
+        mock.get_permissions.return_value = []
+        return mock
+
+    @pytest.fixture
+    def mock_cache(self):
+        """Create mock cache."""
+        mock = MagicMock()
+        mock.get.return_value = None
+        mock.set.return_value = True
+        return mock
+
+    @pytest.fixture
+    async def rbac_service(self, mock_database, mock_cache):
+        """Create RBAC service instance."""
+        service = RBACService(
+            database=mock_database,
+            cache=mock_cache
+        )
+        await service.initialize()
+        return service
+
+    @pytest.mark.asyncio
+    async def test_check_permission_allowed(self, rbac_service, mock_database):
+        """Test permission check when allowed."""
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.return_value = Role(
+            name="trader",
+            permissions={"write:orders", "read:portfolio"}
+        )
+
+        has_permission = await rbac_service.check_permission(
+            user_id="user123",
+            permission="write:orders"
+        )
+
+        assert has_permission is True
+
+    @pytest.mark.asyncio
+    async def test_check_permission_denied(self, rbac_service, mock_database):
+        """Test permission check when denied."""
+        mock_database.get_user_roles.return_value = ["viewer"]
+        mock_database.get_role.return_value = Role(
+            name="viewer",
+            permissions={"read:portfolio"}
+        )
+
+        has_permission = await rbac_service.check_permission(
+            user_id="user123",
+            permission="write:orders"
+        )
+
+        assert has_permission is False
+
+    @pytest.mark.asyncio
+    async def test_check_resource_permission(self, rbac_service, mock_database):
+        """Test resource-based permission check."""
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.return_value = Role(
+            name="trader",
+            permissions={"write:orders:own", "read:portfolio:*"}
+        )
+
+        # Check own resource
+        has_permission = await rbac_service.check_resource_permission(
+            user_id="user123",
+            resource="orders",
+            resource_id="order_456",
+            action="write",
+            resource_owner="user123"
+        )
+        assert has_permission is True
+
+        # Check other's resource
+        has_permission = await rbac_service.check_resource_permission(
+            user_id="user123",
+            resource="orders",
+            resource_id="order_789",
+            action="write",
+            resource_owner="user456"
+        )
+        assert has_permission is False
+
+    @pytest.mark.asyncio
+    async def test_wildcard_permissions(self, rbac_service, mock_database):
+        """Test wildcard permission matching."""
+        mock_database.get_user_roles.return_value = ["admin"]
+        mock_database.get_role.return_value = Role(
+            name="admin",
+            permissions={"*:*"}  # All permissions
+        )
+
+        # Should match any permission
+        assert await rbac_service.check_permission("user123", "write:orders") is True
+        assert await rbac_service.check_permission("user123", "delete:users") is True
+        assert await rbac_service.check_permission("user123", "admin:system") is True
+
+    @pytest.mark.asyncio
+    async def test_role_hierarchy(self, rbac_service, mock_database):
+        """Test role hierarchy and inheritance."""
+        # Setup role hierarchy
+        viewer_role = Role(
+            name="viewer",
+            permissions={"read:portfolio", "read:market_data"}
+        )
+
+        trader_role = Role(
+            name="trader",
+            permissions={"write:orders"},
+            parent_roles={"viewer"}
+        )
+
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.side_effect = lambda name: {
+            "viewer": viewer_role,
+            "trader": trader_role
+        }.get(name)
+
+        # Should have both trader and inherited viewer permissions
+        assert await rbac_service.check_permission("user123", "write:orders") is True
+        assert await rbac_service.check_permission("user123", "read:portfolio") is True
+        assert await rbac_service.check_permission("user123", "read:market_data") is True
+
+    @pytest.mark.asyncio
+    async def test_circular_role_inheritance_detection(self, rbac_service, mock_database):
+        """Test detection of circular role inheritance."""
+        role_a = Role(name="role_a", parent_roles={"role_b"})
+        role_b = Role(name="role_b", parent_roles={"role_c"})
+        role_c = Role(name="role_c", parent_roles={"role_a"})  # Circular!
+
+        mock_database.get_role.side_effect = lambda name: {
+            "role_a": role_a,
+            "role_b": role_b,
+            "role_c": role_c
+        }.get(name)
+
+        with pytest.raises(CircularRoleInheritanceException):
+            await rbac_service.validate_role_hierarchy("role_a")
+
+    @pytest.mark.asyncio
+    async def test_conditional_permissions(self, rbac_service, mock_database):
+        """Test permissions with conditions."""
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.return_value = Role(
+            name="trader",
+            permissions={"write:orders"},
+            permission_conditions={
+                "write:orders": {
+                    "max_amount": 10000,
+                    "trading_hours_only": True
+                }
+            }
+        )
+
+        # Check with valid conditions
+        context = {
+            "amount": 5000,
+            "is_trading_hours": True
+        }
+
+        has_permission = await rbac_service.check_permission_with_context(
+            user_id="user123",
+            permission="write:orders",
+            context=context
+        )
+        assert has_permission is True
+
+        # Check with invalid conditions (amount too high)
+        context["amount"] = 15000
+        has_permission = await rbac_service.check_permission_with_context(
+            user_id="user123",
+            permission="write:orders",
+            context=context
+        )
+        assert has_permission is False
+
+    @pytest.mark.asyncio
+    async def test_assign_role_to_user(self, rbac_service, mock_database):
+        """Test assigning role to user."""
+        success = await rbac_service.assign_role(
+            user_id="user123",
+            role_name="trader"
+        )
+
+        assert success is True
+        mock_database.assign_role.assert_called_once_with("user123", "trader")
+
+    @pytest.mark.asyncio
+    async def test_revoke_role_from_user(self, rbac_service, mock_database):
+        """Test revoking role from user."""
+        success = await rbac_service.revoke_role(
+            user_id="user123",
+            role_name="trader"
+        )
+
+        assert success is True
+        mock_database.revoke_role.assert_called_once_with("user123", "trader")
+
+    @pytest.mark.asyncio
+    async def test_get_user_permissions(self, rbac_service, mock_database):
+        """Test getting all user permissions."""
+        mock_database.get_user_roles.return_value = ["trader", "analyst"]
+        mock_database.get_role.side_effect = lambda name: {
+            "trader": Role(name="trader", permissions={"write:orders", "read:portfolio"}),
+            "analyst": Role(name="analyst", permissions={"read:analytics", "read:reports"})
+        }.get(name)
+
+        permissions = await rbac_service.get_user_permissions("user123")
+
+        assert "write:orders" in permissions
+        assert "read:portfolio" in permissions
+        assert "read:analytics" in permissions
+        assert "read:reports" in permissions
+
+    @pytest.mark.asyncio
+    async def test_permission_caching(self, rbac_service, mock_database, mock_cache):
+        """Test permission result caching."""
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.return_value = Role(
+            name="trader",
+            permissions={"write:orders"}
+        )
+
+        # First check - should hit database
+        await rbac_service.check_permission("user123", "write:orders")
+        mock_database.get_user_roles.assert_called_once()
+        mock_cache.set.assert_called()  # Result cached
+
+        # Second check - should use cache
+        mock_cache.get.return_value = True
+        mock_database.get_user_roles.reset_mock()
+
+        result = await rbac_service.check_permission("user123", "write:orders")
+        assert result is True
+        mock_database.get_user_roles.assert_not_called()  # Cache hit
+
+    @pytest.mark.asyncio
+    async def test_cache_invalidation_on_role_change(self, rbac_service, mock_cache):
+        """Test cache invalidation when roles change."""
+        await rbac_service.assign_role("user123", "admin")
+
+        # Cache should be invalidated for user
+        mock_cache.delete.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_policy_based_access_control(self, rbac_service, mock_database):
+        """Test policy-based access control rules."""
+        policy = PolicyRule(
+            name="trading_hours_only",
+            condition="context.is_trading_hours == True",
+            effect="allow",
+            resources=["orders", "trades"]
+        )
+
+        rbac_service.add_policy(policy)
+
+        # During trading hours
+        decision = await rbac_service.evaluate_policies(
+            user_id="user123",
+            resource="orders",
+            action="write",
+            context={"is_trading_hours": True}
+        )
+        assert decision == AccessDecision.ALLOW
+
+        # Outside trading hours
+        decision = await rbac_service.evaluate_policies(
+            user_id="user123",
+            resource="orders",
+            action="write",
+            context={"is_trading_hours": False}
+        )
+        assert decision == AccessDecision.DENY
+
+    @pytest.mark.asyncio
+    async def test_multi_factor_permission_check(self, rbac_service, mock_database):
+        """Test permission check with multiple factors."""
+        factors = {
+            "has_role": True,
+            "ip_whitelisted": True,
+            "mfa_verified": True,
+            "session_valid": True
+        }
+
+        # All factors pass
+        has_permission = await rbac_service.check_permission_multi_factor(
+            user_id="user123",
+            permission="admin:critical",
+            factors=factors
+        )
+        assert has_permission is True
+
+        # MFA not verified
+        factors["mfa_verified"] = False
+        has_permission = await rbac_service.check_permission_multi_factor(
+            user_id="user123",
+            permission="admin:critical",
+            factors=factors
+        )
+        assert has_permission is False
+
+    @pytest.mark.asyncio
+    async def test_permission_audit_logging(self, rbac_service, mock_database):
+        """Test audit logging of permission checks."""
+        mock_audit_log = AsyncMock()
+        rbac_service.audit_logger = mock_audit_log
+
+        await rbac_service.check_permission(
+            user_id="user123",
+            permission="write:orders",
+            audit=True
+        )
+
+        mock_audit_log.log.assert_called_once()
+        call_args = mock_audit_log.log.call_args[0][0]
+        assert call_args["user_id"] == "user123"
+        assert call_args["permission"] == "write:orders"
+        assert "timestamp" in call_args
+
+    @pytest.mark.asyncio
+    async def test_bulk_permission_check(self, rbac_service, mock_database):
+        """Test checking multiple permissions at once."""
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.return_value = Role(
+            name="trader",
+            permissions={"write:orders", "read:portfolio", "read:market_data"}
+        )
+
+        permissions_to_check = [
+            "write:orders",
+            "read:portfolio",
+            "delete:users",
+            "admin:system"
+        ]
+
+        results = await rbac_service.check_permissions_bulk(
+            user_id="user123",
+            permissions=permissions_to_check
+        )
+
+        assert results["write:orders"] is True
+        assert results["read:portfolio"] is True
+        assert results["delete:users"] is False
+        assert results["admin:system"] is False
+
+    @pytest.mark.asyncio
+    async def test_temporary_permission_grant(self, rbac_service):
+        """Test temporary permission grants."""
+        # Grant temporary permission
+        await rbac_service.grant_temporary_permission(
+            user_id="user123",
+            permission="admin:emergency",
+            duration_minutes=30
+        )
+
+        # Should have permission immediately
+        has_permission = await rbac_service.check_permission(
+            user_id="user123",
+            permission="admin:emergency"
+        )
+        assert has_permission is True
+
+        # Simulate time passing (31 minutes)
+        with patch('time.time', return_value=time.time() + 1860):
+            has_permission = await rbac_service.check_permission(
+                user_id="user123",
+                permission="admin:emergency"
+            )
+            assert has_permission is False
+
+    @pytest.mark.asyncio
+    async def test_role_activation_deactivation(self, rbac_service, mock_database):
+        """Test role activation and deactivation."""
+        # Deactivate role
+        await rbac_service.deactivate_role("dangerous_role")
+
+        # User with deactivated role shouldn't have its permissions
+        mock_database.get_user_roles.return_value = ["dangerous_role"]
+        mock_database.get_role.return_value = Role(
+            name="dangerous_role",
+            permissions={"delete:everything"},
+            active=False
+        )
+
+        has_permission = await rbac_service.check_permission(
+            user_id="user123",
+            permission="delete:everything"
+        )
+        assert has_permission is False
+
+    @pytest.mark.asyncio
+    async def test_permission_delegation(self, rbac_service, mock_database):
+        """Test permission delegation between users."""
+        # User delegates permission to another user
+        await rbac_service.delegate_permission(
+            from_user="user123",
+            to_user="user456",
+            permission="read:portfolio:user123",
+            expires_at=datetime.now() + timedelta(hours=1)
+        )
+
+        # Delegated user should have permission
+        has_permission = await rbac_service.check_delegated_permission(
+            user_id="user456",
+            permission="read:portfolio:user123"
+        )
+        assert has_permission is True
+
+    @pytest.mark.asyncio
+    async def test_concurrent_permission_checks(self, rbac_service, mock_database):
+        """Test concurrent permission checking."""
+        import asyncio
+
+        mock_database.get_user_roles.return_value = ["trader"]
+        mock_database.get_role.return_value = Role(
+            name="trader",
+            permissions={"write:orders"}
+        )
+
+        # Simulate concurrent checks
+        tasks = [
+            rbac_service.check_permission("user123", "write:orders")
+            for _ in range(20)
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+        # All should return same result
+        assert all(r is True for r in results)

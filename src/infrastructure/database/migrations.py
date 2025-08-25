@@ -7,7 +7,6 @@ Handles database schema evolution and rollback capabilities.
 
 # Standard library imports
 import logging
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +14,7 @@ from typing import Any
 
 # Local imports
 from src.application.interfaces.exceptions import RepositoryError
+from src.domain.services.validation_service import DatabaseIdentifierValidator, ValidationError
 
 from .adapter import PostgreSQLAdapter
 
@@ -51,7 +51,8 @@ class MigrationManager:
     Ensures database schema consistency across environments.
     """
 
-    # Migration table name is a constant - not user input
+    # SECURITY: Migration table name is a hardcoded constant - never accepts user input
+    # This is safe from SQL injection as it's not dynamically generated
     MIGRATIONS_TABLE = "schema_migrations"
 
     def __init__(self, adapter: PostgreSQLAdapter) -> None:
@@ -64,22 +65,6 @@ class MigrationManager:
         self.adapter = adapter
         self._migrations: list[Migration] = []
 
-    def _validate_identifier(self, identifier: str) -> None:
-        """
-        Simple validation to ensure identifier contains only safe characters.
-
-        Args:
-            identifier: The identifier to validate
-
-        Raises:
-            ValueError: If identifier contains unsafe characters
-        """
-        # Only allow alphanumeric, underscore, and not too long
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]{0,62}$", identifier):
-            raise ValueError(
-                f"Invalid identifier '{identifier}'. Only alphanumeric and underscore allowed."
-            )
-
     async def initialize(self) -> None:
         """
         Initialize migration system.
@@ -87,7 +72,9 @@ class MigrationManager:
         Creates the migrations tracking table if it doesn't exist.
         """
         # Use parameterized query for the table creation
-        # Since table name can't be parameterized, we use our constant
+        # SECURITY NOTE: Table name is a hardcoded class constant, not user input
+        # This is the ONLY safe use of string formatting for table names
+        # The MIGRATIONS_TABLE constant is never derived from user input
         create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS {self.MIGRATIONS_TABLE} (
             version VARCHAR(50) PRIMARY KEY,
@@ -177,8 +164,10 @@ class MigrationManager:
         Returns:
             List of applied migrations
         """
-        # Safe to use string formatting here - MIGRATIONS_TABLE is a constant
-        # and validated to contain only safe characters
+        # SECURITY: Safe to use string formatting here because:
+        # 1. MIGRATIONS_TABLE is a hardcoded class constant
+        # 2. It's never derived from user input
+        # 3. The value is statically defined as "schema_migrations"
         # nosec B608 - table name is a constant, not user input
         query = f"""
         SELECT version, name, applied_at
@@ -260,10 +249,12 @@ class MigrationManager:
 
             # Safe to use string formatting here - MIGRATIONS_TABLE is a constant
             # nosec B608 - table name is a constant, not user input
+            # SECURITY: Table name is a hardcoded constant, parameters use placeholders
+            # Note: Using %s placeholders for psycopg3 instead of $1, $2 syntax
             insert_query = f"""
             INSERT INTO {self.MIGRATIONS_TABLE}
             (version, name, applied_at, execution_time_ms)
-            VALUES ($1, $2, $3, $4)
+            VALUES (%s, %s, %s, %s)
             """
 
             await self.adapter.execute_query(
@@ -309,9 +300,10 @@ class MigrationManager:
             # Remove migration record
             # Safe to use string formatting here - MIGRATIONS_TABLE is a constant
             # nosec B608 - table name is a constant, not user input
+            # SECURITY: Table name is a hardcoded constant, version uses placeholder
             delete_query = f"""
             DELETE FROM {self.MIGRATIONS_TABLE}
-            WHERE version = $1
+            WHERE version = %s
             """
 
             await self.adapter.execute_query(delete_query, migration.version)
@@ -463,22 +455,6 @@ class SchemaManager:
         self.adapter = adapter
         self.schema_name = "public"  # Default schema
 
-    def _validate_schema_name(self, schema_name: str) -> None:
-        """
-        Simple validation to ensure schema name contains only safe characters.
-
-        Args:
-            schema_name: The schema name to validate
-
-        Raises:
-            ValueError: If schema name contains unsafe characters
-        """
-        # Only allow alphanumeric, underscore, and not too long
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]{0,62}$", schema_name):
-            raise ValueError(
-                f"Invalid schema name '{schema_name}'. Only alphanumeric and underscore allowed."
-            )
-
     async def create_schema(self, schema_name: str | None = None) -> None:
         """
         Create a database schema.
@@ -491,17 +467,20 @@ class SchemaManager:
         """
         schema = schema_name or self.schema_name
 
-        # Validate schema name to prevent SQL injection
-        self._validate_schema_name(schema)
+        # Validate schema name using domain validator
+        try:
+            validated_schema = DatabaseIdentifierValidator.validate_schema_name(schema)
+        except ValidationError as e:
+            raise MigrationError(f"Invalid schema name: {e}") from e
 
         try:
             # Use double quotes to properly escape the identifier
-            create_sql = f'CREATE SCHEMA IF NOT EXISTS "{schema}"'
+            create_sql = f'CREATE SCHEMA IF NOT EXISTS "{validated_schema}"'
             await self.adapter.execute_query(create_sql)
-            logger.info(f"Schema '{schema}' created successfully")
+            logger.info(f"Schema '{validated_schema}' created successfully")
         except Exception as e:
-            logger.error(f"Failed to create schema '{schema}': {e}")
-            raise MigrationError(f"Failed to create schema '{schema}': {e}") from e
+            logger.error(f"Failed to create schema '{validated_schema}': {e}")
+            raise MigrationError(f"Failed to create schema '{validated_schema}': {e}") from e
 
     async def drop_schema(self, schema_name: str | None = None, cascade: bool = False) -> None:
         """
@@ -520,17 +499,20 @@ class SchemaManager:
         if schema == "public" and not schema_name:
             raise MigrationError("Cannot drop public schema without explicit schema_name parameter")
 
-        # Validate schema name to prevent SQL injection
-        self._validate_schema_name(schema)
+        # Validate schema name using domain validator
+        try:
+            validated_schema = DatabaseIdentifierValidator.validate_schema_name(schema)
+        except ValidationError as e:
+            raise MigrationError(f"Invalid schema name: {e}") from e
 
         try:
             cascade_clause = "CASCADE" if cascade else "RESTRICT"
-            drop_sql = f'DROP SCHEMA IF EXISTS "{schema}" {cascade_clause}'
+            drop_sql = f'DROP SCHEMA IF EXISTS "{validated_schema}" {cascade_clause}'
             await self.adapter.execute_query(drop_sql)
-            logger.info(f"Schema '{schema}' dropped successfully")
+            logger.info(f"Schema '{validated_schema}' dropped successfully")
         except Exception as e:
-            logger.error(f"Failed to drop schema '{schema}': {e}")
-            raise MigrationError(f"Failed to drop schema '{schema}': {e}") from e
+            logger.error(f"Failed to drop schema '{validated_schema}': {e}")
+            raise MigrationError(f"Failed to drop schema '{validated_schema}': {e}") from e
 
     async def schema_exists(self, schema_name: str | None = None) -> bool:
         """
@@ -594,7 +576,7 @@ def get_initial_migrations() -> list[tuple[str, str, str, str]]:
         (
             "002",
             "create_orders_table",
-            Path(__file__).parent / "schemas.sql",  # Reference to the schema file
+            str(Path(__file__).parent / "schemas.sql"),  # Reference to the schema file
             """
             DROP TABLE IF EXISTS orders;
             """,

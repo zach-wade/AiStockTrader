@@ -5,9 +5,10 @@ Example usage of the broker implementations
 # Standard library imports
 import logging
 from decimal import Decimal
+from typing import Literal
 
 # Local imports
-from src.domain.entities.order import Order, OrderSide
+from src.domain.entities.order import Order, OrderRequest, OrderSide
 from src.infrastructure.brokers import BrokerFactory
 
 # Configure logging
@@ -16,20 +17,23 @@ logging.basicConfig(
 )
 
 
-def example_paper_trading():
+def example_paper_trading() -> None:
     """Example of using the paper trading broker"""
     print("\n=== Paper Trading Example ===\n")
 
     # Create paper broker
-    broker = BrokerFactory.create_broker(
+    factory = BrokerFactory()
+    broker = factory.create_broker(
         broker_type="paper",
         initial_capital=Decimal("10000"),
         slippage_pct=Decimal("0.001"),
     )
 
     # Set some market prices (in production, these would come from market data feed)
-    broker.set_market_price("AAPL", Decimal("150.00"))
-    broker.set_market_price("GOOGL", Decimal("2800.00"))
+    # Type assertion for paper broker methods
+    if hasattr(broker, "set_market_price"):
+        broker.set_market_price("AAPL", Decimal("150.00"))
+        broker.set_market_price("GOOGL", Decimal("2800.00"))
 
     # Get account info
     account = broker.get_account_info()
@@ -41,9 +45,10 @@ def example_paper_trading():
     print(f"\nMarket Status: {market_hours}")
 
     # Create and submit a market order
-    order1 = Order.create_market_order(
+    request1 = OrderRequest(
         symbol="AAPL", quantity=Decimal("10"), side=OrderSide.BUY, reason="Testing paper trading"
     )
+    order1 = Order.create_market_order(request1)
 
     print(f"\nSubmitting order: {order1}")
     order1 = broker.submit_order(order1)
@@ -54,166 +59,199 @@ def example_paper_trading():
     print(f"Order status: {status}")
 
     # Create and submit a limit order
-    order2 = Order.create_limit_order(
+    request2 = OrderRequest(
         symbol="GOOGL",
         quantity=Decimal("1"),
         side=OrderSide.BUY,
         limit_price=Decimal("2750.00"),
         reason="Limit order test",
     )
+    order2 = Order.create_limit_order(request2)
 
     print(f"\nSubmitting limit order: {order2}")
     order2 = broker.submit_order(order2)
+    print(f"Limit order submitted: {order2}")
 
-    # Simulate price movement that triggers the limit order
-    print("\nSimulating price drop to trigger limit order...")
-    broker.set_market_price("GOOGL", Decimal("2745.00"))
-
-    # Check positions
+    # Get all positions
     positions = broker.get_positions()
-    print(f"\nPositions ({len(positions)}):")
-    for pos in positions:
-        print(f"  {pos}")
+    print(f"\nPositions: {positions}")
 
-    # Get updated account info
+    # Get recent orders
+    recent_orders = broker.get_recent_orders(limit=5)
+    print(f"\nRecent orders: {recent_orders}")
+
+    # Cancel the limit order
+    print(f"\nCancelling order {order2.id}...")
+    cancelled = broker.cancel_order(order2.id)
+    print(f"Order cancelled: {cancelled}")
+
+    # Update account info
     account = broker.get_account_info()
-    print("\nUpdated Account:")
-    print(f"  Cash: ${account.cash:.2f}")
-    print(f"  Equity: ${account.equity:.2f}")
-    print(f"  Positions Value: ${account.positions_value:.2f}")
-    print(f"  Unrealized P&L: ${account.unrealized_pnl:.2f}")
+    print(f"\nFinal Balance: ${account.cash:.2f}")
+    print(f"Positions Value: ${account.positions_value:.2f}")
+
+
+def example_simulated_trading() -> None:
+    """Example of a simple trading simulation"""
+    print("\n=== Simulated Trading Example ===\n")
+
+    # Create paper broker for simulation
+    factory = BrokerFactory()
+    broker = factory.create_broker(
+        broker_type="paper",
+        initial_capital=Decimal("25000"),
+        slippage_pct=Decimal("0.0005"),
+        fill_delay_seconds=0,  # Instant fills for simulation
+    )
 
     # Simulate price changes and close a position
     print("\nSimulating price increase...")
-    broker.set_market_price("AAPL", Decimal("155.00"))
+    if hasattr(broker, "set_market_price"):
+        broker.set_market_price("AAPL", Decimal("155.00"))
 
     # Sell to close position
-    order3 = Order.create_market_order(
+    request3 = OrderRequest(
         symbol="AAPL", quantity=Decimal("10"), side=OrderSide.SELL, reason="Taking profits"
     )
+    order3 = Order.create_market_order(request3)
 
     print(f"\nClosing position: {order3}")
     order3 = broker.submit_order(order3)
+    print(f"Position closed: {order3}")
 
-    # Final account summary
+    # Check P&L
     account = broker.get_account_info()
-    positions = broker.get_positions()
-
-    print("\n=== Final Summary ===")
-    print(f"Cash: ${account.cash:.2f}")
-    print(f"Equity: ${account.equity:.2f}")
-    print(f"Realized P&L: ${account.realized_pnl:.2f}")
-    print(f"Open Positions: {len(positions)}")
-
-    # Get recent orders
-    recent_orders = broker.get_recent_orders(limit=10)
-    print(f"\nRecent Orders ({len(recent_orders)}):")
-    for order in recent_orders:
-        print(f"  {order}")
+    print(f"\nFinal Account Balance: ${account.cash:.2f}")
 
 
-def example_alpaca_paper():
-    """Example of using Alpaca paper trading (requires API credentials)"""
-    print("\n=== Alpaca Paper Trading Example ===\n")
+def example_alpaca_integration() -> None:
+    """Example of using the Alpaca broker integration"""
+    print("\n=== Alpaca Integration Example ===\n")
 
     try:
-        # Create Alpaca broker (will use environment variables for credentials)
-        broker = BrokerFactory.create_broker(
+        # Create Alpaca broker (paper trading by default)
+        factory = BrokerFactory()
+        broker = factory.create_broker(
             broker_type="alpaca",
             paper=True,  # Use paper trading
+            auto_connect=True,
         )
 
         # Get account info
         account = broker.get_account_info()
-        print(f"Alpaca Account: {account.account_id}")
-        print(f"  Type: {account.account_type}")
-        print(f"  Cash: ${account.cash:.2f}")
-        print(f"  Buying Power: ${account.buying_power:.2f}")
+        print(f"Account ID: {account.account_id}")
+        print(f"Equity: ${account.equity:.2f}")
+        print(f"Cash: ${account.cash:.2f}")
+        print(f"Buying Power: ${account.buying_power:.2f}")
 
-        # Check market status
-        market_hours = broker.get_market_hours()
-        print(f"\nMarket Status: {market_hours}")
+        # Check if market is open
+        is_open = broker.is_market_open()
+        print(f"\nMarket Open: {is_open}")
 
-        if broker.is_market_open():
-            # Create a small test order
-            order = Order.create_limit_order(
-                symbol="AAPL",
-                quantity=Decimal("1"),
-                side=OrderSide.BUY,
-                limit_price=Decimal("140.00"),  # Below market for safety
-                reason="API test order",
-            )
+        # Get market hours
+        hours = broker.get_market_hours()
+        print(f"Market Hours: {hours}")
 
-            print(f"\nSubmitting test order: {order}")
-            order = broker.submit_order(order)
-            print(f"Order submitted to Alpaca: {order.broker_order_id}")
-
-            # Check status
-            status = broker.get_order_status(order.id)
-            print(f"Order status: {status}")
-
-            # Cancel the order
-            print("\nCancelling test order...")
-            if broker.cancel_order(order.id):
-                print("Order cancelled successfully")
-            else:
-                print("Failed to cancel order")
-        else:
-            print("\nMarket is closed - skipping order submission")
-
-        # Get positions
+        # Get current positions
         positions = broker.get_positions()
-        print(f"\nCurrent Positions ({len(positions)}):")
-        for pos in positions:
-            print(f"  {pos.symbol}: {pos.quantity} @ ${pos.average_entry_price:.2f}")
+        print(f"\nPositions: {len(positions)}")
+        for pos in positions[:3]:  # Show first 3
+            print(f"  {pos.symbol}: {pos.quantity} shares @ ${pos.average_entry_price:.2f}")
 
         # Get recent orders
-        recent_orders = broker.get_recent_orders(limit=5)
-        print(f"\nRecent Orders ({len(recent_orders)}):")
-        for order in recent_orders:
-            print(f"  {order.symbol} {order.side.value} {order.quantity} - {order.status.value}")
+        orders = broker.get_recent_orders(limit=5)
+        print(f"\nRecent Orders: {len(orders)}")
+        for order in orders:
+            print(f"  {order.symbol}: {order.side} {order.quantity} shares")
+
+        # NOTE: To submit real orders, uncomment below (be careful with real money!)
+        # order = Order.create_market_order(
+        #     symbol="AAPL",
+        #     quantity=Decimal("1"),
+        #     side=OrderSide.BUY
+        # )
+        # submitted_order = broker.submit_order(order)
+        # print(f"Order submitted: {submitted_order}")
 
     except Exception as e:
         print(f"Error: {e}")
-        print("\nNote: Alpaca example requires API credentials.")
-        print("Set ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables.")
+        print("Make sure ALPACA_API_KEY and ALPACA_SECRET_KEY are set")
 
 
-def example_broker_factory():
-    """Example of using the broker factory with different configurations"""
-    print("\n=== Broker Factory Example ===\n")
+def example_backtest_mode() -> None:
+    """Example of using the backtest broker configuration"""
+    print("\n=== Backtest Mode Example ===\n")
 
-    # Create from environment variables
-    print("Creating broker from environment...")
-    broker = BrokerFactory.create_broker()  # Uses BROKER_TYPE env var
-    print(f"Created: {type(broker).__name__}")
+    # Create backtest broker (optimized for backtesting)
+    factory = BrokerFactory()
+    broker = factory.create_broker(
+        broker_type="backtest",
+        initial_capital=Decimal("50000"),
+    )
 
-    # Create from config dictionary
-    config = {
-        "type": "paper",
-        "initial_capital": "50000",
-        "slippage_pct": "0.002",
-        "auto_connect": True,
-    }
+    # In backtest mode:
+    # - No fill delays
+    # - Minimal slippage
+    # - No partial fills
 
-    print("\nCreating broker from config...")
-    broker = BrokerFactory.create_from_config(config)
-    account = broker.get_account_info()
-    print(f"Created paper broker with ${account.cash:.2f} capital")
+    print("Backtest broker created with optimized settings")
+
+    # Set historical prices
+    if hasattr(broker, "set_market_price"):
+        broker.set_market_price("SPY", Decimal("400.00"))
+
+    # Execute a strategy
+    request = OrderRequest(
+        symbol="SPY", quantity=Decimal("100"), side=OrderSide.BUY, reason="momentum strategy"
+    )
+    order = Order.create_market_order(request)
+    order.tags["strategy"] = "momentum"
+
+    order = broker.submit_order(order)
+    print(f"Backtest order: {order}")
+
+    # Check execution
+    print(f"Order status: {order.status}")
+    print(f"Fill price: ${order.average_fill_price:.2f}")
+
+
+def example_broker_factory_configs() -> None:
+    """Example of using broker factory configurations"""
+    print("\n=== Broker Factory Configurations ===\n")
 
     # Get default configurations
-    print("\nDefault configurations:")
-    for broker_type in ["paper", "alpaca", "backtest"]:
-        config = BrokerFactory.get_default_config(broker_type)
+    factory = BrokerFactory()
+    for broker_type_str in ["paper", "alpaca", "backtest"]:
+        broker_type: Literal["paper", "alpaca", "backtest"] = broker_type_str  # type: ignore
+        config = factory.get_default_config(broker_type)
         print(f"\n{broker_type.upper()}:")
         for key, value in config.items():
             print(f"  {key}: {value}")
 
+    # Create from configuration dictionary
+    config_dict = {
+        "type": "paper",
+        "initial_capital": "100000",
+        "slippage_pct": "0.002",
+        "commission_per_share": "0.005",
+    }
+
+    factory = BrokerFactory()
+    broker = factory.create_from_config(config_dict)
+    print(f"\nBroker created from config: {type(broker).__name__}")
+
+
+def main() -> None:
+    """Run all examples"""
+    # Choose which examples to run
+    example_paper_trading()
+    example_simulated_trading()
+    example_backtest_mode()
+    example_broker_factory_configs()
+
+    # Alpaca example requires API keys
+    # example_alpaca_integration()
+
 
 if __name__ == "__main__":
-    # Run examples
-    example_paper_trading()
-    example_broker_factory()
-
-    # Uncomment to test Alpaca (requires API credentials)
-    # example_alpaca_paper()
+    main()

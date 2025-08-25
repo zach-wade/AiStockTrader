@@ -9,20 +9,17 @@ Manages transactions across multiple repositories ensuring data consistency.
 import asyncio
 import logging
 from collections.abc import Callable
-from typing import Any
+from types import TracebackType
+from typing import Any, cast
 
 # Local imports
 from src.application.interfaces.exceptions import (
+    FactoryError,
     TransactionAlreadyActiveError,
     TransactionCommitError,
     TransactionError,
     TransactionNotActiveError,
     TransactionRollbackError,
-)
-from src.application.interfaces.repositories import (
-    IOrderRepository,
-    IPortfolioRepository,
-    IPositionRepository,
 )
 from src.application.interfaces.unit_of_work import (
     ITransactionManager,
@@ -55,24 +52,9 @@ class PostgreSQLUnitOfWork(IUnitOfWork):
             adapter: PostgreSQL database adapter
         """
         self.adapter = adapter
-        self._orders = PostgreSQLOrderRepository(adapter)
-        self._positions = PostgreSQLPositionRepository(adapter)
-        self._portfolios = PostgreSQLPortfolioRepository(adapter)
-
-    @property
-    def orders(self) -> IOrderRepository:
-        """Get the orders repository."""
-        return self._orders
-
-    @property
-    def positions(self) -> IPositionRepository:
-        """Get the positions repository."""
-        return self._positions
-
-    @property
-    def portfolios(self) -> IPortfolioRepository:
-        """Get the portfolios repository."""
-        return self._portfolios
+        self.orders = PostgreSQLOrderRepository(adapter)
+        self.positions = PostgreSQLPositionRepository(adapter)
+        self.portfolios = PostgreSQLPortfolioRepository(adapter)
 
     async def begin_transaction(self) -> None:
         """
@@ -173,7 +155,7 @@ class PostgreSQLUnitOfWork(IUnitOfWork):
             logger.error(f"Failed to flush transaction: {e}")
             raise TransactionError(f"Failed to flush transaction: {e}") from e
 
-    async def refresh(self, entity) -> None:
+    async def refresh(self, entity: Any) -> None:
         """
         Refresh an entity with the latest data from the database.
 
@@ -197,7 +179,7 @@ class PostgreSQLUnitOfWork(IUnitOfWork):
             logger.error(f"Failed to refresh entity: {e}")
             raise TransactionError(f"Failed to refresh entity: {e}") from e
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "PostgreSQLUnitOfWork":
         """
         Async context manager entry.
 
@@ -209,7 +191,12 @@ class PostgreSQLUnitOfWork(IUnitOfWork):
         await self.begin_transaction()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """
         Async context manager exit.
 
@@ -239,7 +226,7 @@ class PostgreSQLUnitOfWork(IUnitOfWork):
                 logger.error(f"Failed to rollback in context manager: {rollback_error}")
                 # Don't suppress the original exception
 
-        return False  # Don't suppress exceptions
+        # Don't suppress exceptions (return None implicitly)
 
 
 class PostgreSQLUnitOfWorkFactory(IUnitOfWorkFactory):
@@ -269,6 +256,10 @@ class PostgreSQLUnitOfWorkFactory(IUnitOfWorkFactory):
             connection = asyncio.run(self._connection_factory.get_connection())
 
             # Create adapter with the connection pool
+            if connection._pool is None:
+                raise FactoryError(
+                    "PostgreSQLUnitOfWorkFactory", "Database connection pool is not initialized"
+                )
             adapter = PostgreSQLAdapter(connection._pool)
 
             # Create and return Unit of Work
@@ -279,9 +270,6 @@ class PostgreSQLUnitOfWorkFactory(IUnitOfWorkFactory):
 
         except Exception as e:
             logger.error(f"Failed to create Unit of Work: {e}")
-            # Local imports
-            from src.application.interfaces.exceptions import FactoryError
-
             raise FactoryError(
                 "PostgreSQLUnitOfWorkFactory", f"Failed to create Unit of Work: {e}"
             ) from e
@@ -301,6 +289,10 @@ class PostgreSQLUnitOfWorkFactory(IUnitOfWorkFactory):
             connection = await self._connection_factory.get_connection()
 
             # Create adapter with the connection pool
+            if connection._pool is None:
+                raise FactoryError(
+                    "PostgreSQLUnitOfWorkFactory", "Database connection pool is not initialized"
+                )
             adapter = PostgreSQLAdapter(connection._pool)
 
             # Create and return Unit of Work
@@ -311,9 +303,6 @@ class PostgreSQLUnitOfWorkFactory(IUnitOfWorkFactory):
 
         except Exception as e:
             logger.error(f"Failed to create Unit of Work async: {e}")
-            # Local imports
-            from src.application.interfaces.exceptions import FactoryError
-
             raise FactoryError(
                 "PostgreSQLUnitOfWorkFactory", f"Failed to create Unit of Work: {e}"
             ) from e
@@ -433,4 +422,5 @@ class PostgreSQLTransactionManager(ITransactionManager):
                     raise TransactionError(f"Batch operation {i} failed: {e}") from e
             return results
 
-        return await self.execute_in_transaction(batch_operation)
+        result = await self.execute_in_transaction(batch_operation)
+        return cast(list[Any], result)

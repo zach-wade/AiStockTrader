@@ -68,7 +68,7 @@ class Position:
         if self.average_entry_price < 0:
             raise ValueError("Average entry price cannot be negative")
 
-        if self.quantity == 0 and not self.is_closed():
+        if self.quantity == 0 and self.closed_at is None:
             raise ValueError("Open position cannot have zero quantity")
 
     @classmethod
@@ -166,6 +166,7 @@ class Position:
         if self.is_closed():
             raise ValueError("Position is already closed")
 
+        # Reduce the full position
         self.reduce_position(
             self.quantity if self.is_long() else -self.quantity, exit_price, commission
         )
@@ -277,6 +278,30 @@ class Position:
             return self.current_price >= self.take_profit_price
         else:
             return self.current_price <= self.take_profit_price
+
+    def close(self, final_price: Decimal, close_time: datetime) -> None:
+        """
+        Close the position at the specified price and time.
+
+        Args:
+            final_price: The final price at which the position was closed
+            close_time: The time when the position was closed
+        """
+        if self.is_closed():
+            raise ValueError("Position is already closed")
+
+        # Calculate final P&L
+        if self.is_long():
+            final_pnl = self.quantity * (final_price - self.average_entry_price)
+        else:
+            final_pnl = abs(self.quantity) * (self.average_entry_price - final_price)
+
+        # Update position state
+        self.realized_pnl = final_pnl
+        self.current_price = final_price
+        self.closed_at = close_time
+        self.last_updated = close_time
+        self.quantity = Decimal("0")  # Mark as fully closed
 
     def __str__(self) -> str:
         """String representation"""

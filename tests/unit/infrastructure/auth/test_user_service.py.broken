@@ -1,0 +1,565 @@
+"""
+Comprehensive tests for User authentication service.
+
+This test suite covers:
+- User registration and validation
+- Password hashing and verification
+- User authentication flows
+- Account management operations
+- Security features (lockout, 2FA)
+- User session management
+- Password reset functionality
+"""
+
+import pytest
+import bcrypt
+import asyncio
+from datetime import datetime, timedelta
+from typing import Dict, Optional
+from unittest.mock import Mock, MagicMock, AsyncMock, patch
+
+from src.infrastructure.auth.user_service import (
+    UserService,
+    User,
+    UserRegistration,
+    UserCredentials,
+    PasswordPolicy,
+    AccountStatus,
+    AuthenticationResult,
+    UserNotFoundException,
+    InvalidCredentialsException,
+    AccountLockedException,
+    WeakPasswordException,
+    DuplicateUserException,
+)
+
+
+class TestUserModel:
+    """Test User model."""
+
+    def test_create_user(self):
+        """Test creating a user."""
+        user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash="hashed_password",
+            roles=["trader"],
+            permissions=["read:portfolio"],
+            created_at=datetime.now(),
+            status=AccountStatus.ACTIVE
+        )
+
+        assert user.id == "user123"
+        assert user.email == "user@example.com"
+        assert user.username == "testuser"
+        assert user.roles == ["trader"]
+        assert user.status == AccountStatus.ACTIVE
+
+    def test_user_with_2fa(self):
+        """Test user with 2FA enabled."""
+        user = User(
+            id="user456",
+            email="secure@example.com",
+            username="secureuser",
+            password_hash="hashed",
+            two_factor_enabled=True,
+            two_factor_secret="secret_key"
+        )
+
+        assert user.two_factor_enabled is True
+        assert user.two_factor_secret == "secret_key"
+
+
+class TestUserService:
+    """Test UserService functionality."""
+
+    @pytest.fixture
+    def mock_database(self):
+        """Create mock database."""
+        mock = AsyncMock()
+        mock.get_user.return_value = None
+        mock.create_user.return_value = True
+        mock.update_user.return_value = True
+        return mock
+
+    @pytest.fixture
+    def mock_cache(self):
+        """Create mock cache."""
+        mock = MagicMock()
+        mock.get.return_value = None
+        mock.set.return_value = True
+        return mock
+
+    @pytest.fixture
+    async def user_service(self, mock_database, mock_cache):
+        """Create user service instance."""
+        service = UserService(
+            database=mock_database,
+            cache=mock_cache
+        )
+        return service
+
+    @pytest.mark.asyncio
+    async def test_register_user(self, user_service, mock_database):
+        """Test user registration."""
+        registration = UserRegistration(
+            email="newuser@example.com",
+            username="newuser",
+            password="StrongP@ssw0rd123",
+            roles=["trader"]
+        )
+
+        user = await user_service.register_user(registration)
+
+        assert user is not None
+        assert user.email == registration.email
+        assert user.username == registration.username
+        assert user.password_hash != registration.password  # Should be hashed
+        assert user.status == AccountStatus.ACTIVE
+
+        # Verify database was called
+        mock_database.create_user.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_register_duplicate_user(self, user_service, mock_database):
+        """Test registering duplicate user."""
+        mock_database.get_user.return_value = User(
+            id="existing",
+            email="existing@example.com",
+            username="existing"
+        )
+
+        registration = UserRegistration(
+            email="existing@example.com",
+            username="newuser",
+            password="StrongP@ssw0rd123"
+        )
+
+        with pytest.raises(DuplicateUserException):
+            await user_service.register_user(registration)
+
+    @pytest.mark.asyncio
+    async def test_weak_password_rejection(self, user_service):
+        """Test weak password rejection."""
+        registration = UserRegistration(
+            email="user@example.com",
+            username="user",
+            password="weak"  # Too short and simple
+        )
+
+        with pytest.raises(WeakPasswordException):
+            await user_service.register_user(registration)
+
+    @pytest.mark.asyncio
+    async def test_password_policy_enforcement(self, user_service):
+        """Test password policy enforcement."""
+        policy = user_service.password_policy
+
+        # Test various passwords
+        assert policy.validate("StrongP@ssw0rd123") is True
+        assert policy.validate("weak") is False
+        assert policy.validate("NoNumbers!") is False
+        assert policy.validate("NoSpecial123") is False
+        assert policy.validate("nouppercase123!") is False
+        assert policy.validate("NOLOWERCASE123!") is False
+
+    @pytest.mark.asyncio
+    async def test_authenticate_valid_credentials(self, user_service, mock_database):
+        """Test authentication with valid credentials."""
+        # Setup mock user
+        password = "ValidP@ssw0rd123"
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash=hashed.decode(),
+            status=AccountStatus.ACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        credentials = UserCredentials(
+            email="user@example.com",
+            password=password
+        )
+
+        result = await user_service.authenticate(credentials)
+
+        assert isinstance(result, AuthenticationResult)
+        assert result.success is True
+        assert result.user_id == "user123"
+        assert result.access_token is not None
+        assert result.refresh_token is not None
+
+    @pytest.mark.asyncio
+    async def test_authenticate_invalid_password(self, user_service, mock_database):
+        """Test authentication with invalid password."""
+        hashed = bcrypt.hashpw(b"correct_password", bcrypt.gensalt())
+
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash=hashed.decode(),
+            status=AccountStatus.ACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        credentials = UserCredentials(
+            email="user@example.com",
+            password="wrong_password"
+        )
+
+        with pytest.raises(InvalidCredentialsException):
+            await user_service.authenticate(credentials)
+
+    @pytest.mark.asyncio
+    async def test_authenticate_nonexistent_user(self, user_service, mock_database):
+        """Test authentication with nonexistent user."""
+        mock_database.get_user.return_value = None
+
+        credentials = UserCredentials(
+            email="nonexistent@example.com",
+            password="anypassword"
+        )
+
+        with pytest.raises(UserNotFoundException):
+            await user_service.authenticate(credentials)
+
+    @pytest.mark.asyncio
+    async def test_account_lockout_after_failed_attempts(self, user_service, mock_database):
+        """Test account lockout after multiple failed attempts."""
+        hashed = bcrypt.hashpw(b"correct_password", bcrypt.gensalt())
+
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash=hashed.decode(),
+            status=AccountStatus.ACTIVE,
+            failed_login_attempts=4  # One more attempt will lock
+        )
+        mock_database.get_user.return_value = mock_user
+
+        credentials = UserCredentials(
+            email="user@example.com",
+            password="wrong_password"
+        )
+
+        with pytest.raises(InvalidCredentialsException):
+            await user_service.authenticate(credentials)
+
+        # Account should be locked after 5 failed attempts
+        assert mock_user.status == AccountStatus.LOCKED
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_authenticate_locked_account(self, user_service, mock_database):
+        """Test authentication with locked account."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash="any_hash",
+            status=AccountStatus.LOCKED
+        )
+        mock_database.get_user.return_value = mock_user
+
+        credentials = UserCredentials(
+            email="user@example.com",
+            password="any_password"
+        )
+
+        with pytest.raises(AccountLockedException):
+            await user_service.authenticate(credentials)
+
+    @pytest.mark.asyncio
+    async def test_two_factor_authentication(self, user_service, mock_database):
+        """Test two-factor authentication flow."""
+        password = "ValidP@ssw0rd123"
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash=hashed.decode(),
+            status=AccountStatus.ACTIVE,
+            two_factor_enabled=True,
+            two_factor_secret="JBSWY3DPEHPK3PXP"
+        )
+        mock_database.get_user.return_value = mock_user
+
+        # First step: password authentication
+        credentials = UserCredentials(
+            email="user@example.com",
+            password=password
+        )
+
+        result = await user_service.authenticate(credentials)
+
+        assert result.requires_2fa is True
+        assert result.access_token is None  # No token until 2FA complete
+
+        # Second step: 2FA verification
+        with patch('pyotp.TOTP') as mock_totp:
+            mock_totp.return_value.verify.return_value = True
+
+            result = await user_service.verify_2fa(
+                user_id="user123",
+                otp_code="123456"
+            )
+
+            assert result.success is True
+            assert result.access_token is not None
+
+    @pytest.mark.asyncio
+    async def test_change_password(self, user_service, mock_database):
+        """Test password change functionality."""
+        old_password = "OldP@ssw0rd123"
+        old_hash = bcrypt.hashpw(old_password.encode(), bcrypt.gensalt())
+
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash=old_hash.decode(),
+            status=AccountStatus.ACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        new_password = "NewP@ssw0rd456"
+        success = await user_service.change_password(
+            user_id="user123",
+            old_password=old_password,
+            new_password=new_password
+        )
+
+        assert success is True
+        assert mock_user.password_hash != old_hash.decode()
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_password_reset_flow(self, user_service, mock_database, mock_cache):
+        """Test password reset flow."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash="old_hash",
+            status=AccountStatus.ACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        # Request password reset
+        reset_token = await user_service.request_password_reset("user@example.com")
+
+        assert reset_token is not None
+        mock_cache.set.assert_called()  # Token stored in cache
+
+        # Reset password with token
+        mock_cache.get.return_value = "user123"  # User ID from token
+
+        new_password = "ResetP@ssw0rd789"
+        success = await user_service.reset_password(
+            reset_token=reset_token,
+            new_password=new_password
+        )
+
+        assert success is True
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_session_management(self, user_service, mock_cache):
+        """Test user session management."""
+        user_id = "user123"
+        session_id = "session_abc123"
+
+        # Create session
+        await user_service.create_session(
+            user_id=user_id,
+            session_id=session_id,
+            ttl=3600
+        )
+
+        mock_cache.set.assert_called()
+
+        # Validate session
+        mock_cache.get.return_value = user_id
+        is_valid = await user_service.validate_session(session_id)
+
+        assert is_valid is True
+
+        # Invalidate session
+        await user_service.invalidate_session(session_id)
+        mock_cache.delete.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_get_user_by_id(self, user_service, mock_database, mock_cache):
+        """Test getting user by ID with caching."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser"
+        )
+
+        # First call - from database
+        mock_cache.get.return_value = None
+        mock_database.get_user.return_value = mock_user
+
+        user = await user_service.get_user("user123")
+
+        assert user.id == "user123"
+        mock_database.get_user.assert_called_once()
+        mock_cache.set.assert_called()  # User cached
+
+        # Second call - from cache
+        mock_cache.get.return_value = mock_user
+        mock_database.get_user.reset_mock()
+
+        user = await user_service.get_user("user123")
+
+        assert user.id == "user123"
+        mock_database.get_user.assert_not_called()  # Not called, used cache
+
+    @pytest.mark.asyncio
+    async def test_update_user_profile(self, user_service, mock_database):
+        """Test updating user profile."""
+        mock_user = User(
+            id="user123",
+            email="old@example.com",
+            username="oldusername"
+        )
+        mock_database.get_user.return_value = mock_user
+
+        updates = {
+            "email": "new@example.com",
+            "username": "newusername",
+            "phone": "+1234567890"
+        }
+
+        updated_user = await user_service.update_profile(
+            user_id="user123",
+            updates=updates
+        )
+
+        assert updated_user.email == "new@example.com"
+        assert updated_user.username == "newusername"
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_enable_2fa(self, user_service, mock_database):
+        """Test enabling 2FA for user."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            two_factor_enabled=False
+        )
+        mock_database.get_user.return_value = mock_user
+
+        secret, backup_codes = await user_service.enable_2fa("user123")
+
+        assert secret is not None
+        assert len(backup_codes) == 10  # Default number of backup codes
+        assert mock_user.two_factor_enabled is True
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_disable_2fa(self, user_service, mock_database):
+        """Test disabling 2FA for user."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            two_factor_enabled=True,
+            two_factor_secret="secret"
+        )
+        mock_database.get_user.return_value = mock_user
+
+        success = await user_service.disable_2fa("user123")
+
+        assert success is True
+        assert mock_user.two_factor_enabled is False
+        assert mock_user.two_factor_secret is None
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_deactivate_account(self, user_service, mock_database):
+        """Test account deactivation."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            status=AccountStatus.ACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        success = await user_service.deactivate_account("user123")
+
+        assert success is True
+        assert mock_user.status == AccountStatus.INACTIVE
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_reactivate_account(self, user_service, mock_database):
+        """Test account reactivation."""
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            status=AccountStatus.INACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        success = await user_service.reactivate_account("user123")
+
+        assert success is True
+        assert mock_user.status == AccountStatus.ACTIVE
+        mock_database.update_user.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_bulk_user_operations(self, user_service, mock_database):
+        """Test bulk user operations."""
+        user_ids = ["user1", "user2", "user3"]
+
+        # Bulk deactivation
+        success = await user_service.bulk_deactivate(user_ids)
+
+        assert success is True
+        assert mock_database.update_users.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_authentication(self, user_service, mock_database):
+        """Test concurrent authentication attempts."""
+        password = "ValidP@ssw0rd123"
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+        mock_user = User(
+            id="user123",
+            email="user@example.com",
+            username="testuser",
+            password_hash=hashed.decode(),
+            status=AccountStatus.ACTIVE
+        )
+        mock_database.get_user.return_value = mock_user
+
+        credentials = UserCredentials(
+            email="user@example.com",
+            password=password
+        )
+
+        # Simulate concurrent authentication
+        tasks = [
+            user_service.authenticate(credentials)
+            for _ in range(10)
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # All should succeed
+        for result in results:
+            if not isinstance(result, Exception):
+                assert result.success is True

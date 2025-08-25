@@ -8,10 +8,8 @@ Handles position persistence, retrieval, and mapping between domain entities and
 # Standard library imports
 import logging
 from datetime import datetime
+from typing import Any
 from uuid import UUID
-
-# Third-party imports
-from psycopg.rows import Row
 
 # Local imports
 from src.application.interfaces.exceptions import PositionNotFoundError, RepositoryError
@@ -39,7 +37,7 @@ class PostgreSQLPositionRepository(IPositionRepository):
         """
         self.adapter = adapter
 
-    async def save_position(self, position: Position) -> Position:
+    async def persist_position(self, position: Position) -> Position:
         """
         Save a new position or update an existing position.
 
@@ -441,7 +439,7 @@ class PostgreSQLPositionRepository(IPositionRepository):
             logger.error(f"Failed to delete position {position_id}: {e}")
             raise RepositoryError(f"Failed to delete position: {e}") from e
 
-    def _map_record_to_position(self, record: Row) -> Position:
+    def _map_record_to_position(self, record: dict[str, Any]) -> Position:
         """
         Map database record to Position entity.
 

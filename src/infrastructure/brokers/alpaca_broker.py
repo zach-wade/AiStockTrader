@@ -1,57 +1,47 @@
 """
-Alpaca Broker Implementation - Integration with Alpaca Trading API
+Alpaca Broker - Thin adapter for Alpaca Trading API
 """
 
-# Standard library imports
 import logging
 import os
-from datetime import UTC, datetime, timedelta
+import threading
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-# Third-party imports
 from alpaca.common.exceptions import APIError
-from alpaca.trading import (
-    GetOrdersRequest,
-    LimitOrderRequest,
-    MarketOrderRequest,
-    PositionSide,
-    StopLimitOrderRequest,
-    StopOrderRequest,
-    TradingClient,
-)
+from alpaca.trading import GetOrdersRequest, LimitOrderRequest, MarketOrderRequest
 from alpaca.trading import OrderSide as AlpacaOrderSide
 from alpaca.trading import OrderStatus as AlpacaOrderStatus
 from alpaca.trading import OrderType as AlpacaOrderType
+from alpaca.trading import QueryOrderStatus
 from alpaca.trading import TimeInForce as AlpacaTimeInForce
+from alpaca.trading import TradingClient
 from alpaca.trading.models import Order as AlpacaOrder
 
-# Local imports
 from src.application.interfaces.broker import (
     AccountInfo,
     BrokerConnectionError,
-    InsufficientFundsError,
+    BrokerError,
+    IBroker,
     InvalidCredentialsError,
-    InvalidOrderError,
-    MarketClosedError,
     MarketHours,
     OrderNotFoundError,
-    RateLimitError,
 )
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType, TimeInForce
 from src.domain.entities.position import Position
 
-from .constants import HTTP_NOT_FOUND, HTTP_UNAUTHORIZED
-
 logger = logging.getLogger(__name__)
 
 
-class AlpacaBroker:
+class AlpacaBroker(IBroker):
     """
-    Alpaca broker implementation for both paper and live trading.
+    Thin Alpaca broker adapter with thread safety.
 
-    Uses the alpaca-py SDK for API integration.
+    This is a minimal implementation that only handles API communication.
+    All business logic is delegated to use cases via BrokerCoordinator.
+    Thread-safe for concurrent access.
     """
 
     def __init__(
@@ -59,480 +49,422 @@ class AlpacaBroker:
         api_key: str | None = None,
         secret_key: str | None = None,
         paper: bool = True,
-        base_url: str | None = None,
     ):
-        """
-        Initialize Alpaca broker.
-
-        Args:
-            api_key: Alpaca API key (defaults to ALPACA_API_KEY env var)
-            secret_key: Alpaca secret key (defaults to ALPACA_SECRET_KEY env var)
-            paper: Whether to use paper trading (defaults to True)
-            base_url: Optional base URL override
-        """
+        """Initialize Alpaca API client with thread safety."""
         self.api_key = api_key or os.getenv("ALPACA_API_KEY")
         self.secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
 
+        # Strip whitespace and check if credentials are valid
+        if self.api_key:
+            self.api_key = self.api_key.strip()
+        if self.secret_key:
+            self.secret_key = self.secret_key.strip()
+
         if not self.api_key or not self.secret_key:
-            raise InvalidCredentialsError(
-                "Alpaca API credentials not provided. "
-                "Set ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables."
-            )
+            raise InvalidCredentialsError("Alpaca API credentials not provided")
 
         self.paper = paper
-        self.base_url = base_url
         self.client: TradingClient | None = None
-        self._order_map: dict[UUID, str] = {}  # Maps internal UUID to Alpaca order ID
+        self._order_map: dict[UUID, str] = {}  # Internal UUID to Alpaca ID
+        self._order_map_lock = threading.Lock()  # Lock for thread-safe order map access
         self._connected = False
 
-        # Rate limiting tracking
-        self._last_request_time = datetime.now(UTC)
-        self._request_count = 0
-        self._rate_limit_window = timedelta(minutes=1)
-        self._max_requests_per_minute = 200  # Alpaca's rate limit
-
-        logger.info(f"Initialized Alpaca broker (paper={paper})")
+        logger.info(f"Initialized thread-safe Alpaca broker ({'paper' if paper else 'live'})")
 
     def connect(self) -> None:
-        """Establish connection to Alpaca"""
-        try:
-            self.client = TradingClient(
-                api_key=self.api_key,
-                secret_key=self.secret_key,
-                paper=self.paper,
-                url_override=self.base_url,
-            )
-
-            # Test connection by getting account info
-            account = self.client.get_account()
-            self._connected = True
-
-            logger.info(
-                f"Connected to Alpaca ({'paper' if self.paper else 'live'} trading), "
-                f"Account: {account.account_number}"
-            )
-
-        except APIError as e:
-            if e.code == HTTP_UNAUTHORIZED:
-                raise InvalidCredentialsError(f"Invalid Alpaca credentials: {e}") from e
-            else:
-                raise BrokerConnectionError(f"Failed to connect to Alpaca: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to connect to Alpaca: {e}") from e
+        """Connect to Alpaca API."""
+        self.client = TradingClient(
+            api_key=self.api_key,
+            secret_key=self.secret_key,
+            paper=self.paper,
+        )
+        self._connected = True
+        logger.info("Connected to Alpaca API")
 
     def disconnect(self) -> None:
-        """Close connection to Alpaca"""
+        """Disconnect from Alpaca API."""
         self.client = None
         self._connected = False
-        logger.info("Disconnected from Alpaca")
+        logger.info("Disconnected from Alpaca API")
 
     def is_connected(self) -> bool:
-        """Check if connected to Alpaca"""
+        """Check connection status."""
         return self._connected and self.client is not None
 
     def _check_connection(self) -> None:
-        """Ensure broker is connected"""
+        """Ensure broker is connected."""
         if not self.is_connected():
-            raise BrokerConnectionError("Not connected to Alpaca. Call connect() first.")
+            raise BrokerConnectionError("Not connected to Alpaca")
 
-    def _check_rate_limit(self) -> None:
-        """Check and enforce rate limiting"""
-        now = datetime.now(UTC)
+    def submit_order(self, order: Order) -> Order:
+        """Submit order to Alpaca - validation delegated to use cases."""
+        self._check_connection()
 
-        # Reset counter if window has passed
-        if now - self._last_request_time > self._rate_limit_window:
-            self._request_count = 0
-            self._last_request_time = now
-
-        # Check if limit exceeded
-        if self._request_count >= self._max_requests_per_minute:
-            wait_time = self._rate_limit_window - (now - self._last_request_time)
-            raise RateLimitError(
-                f"Rate limit exceeded. Please wait {wait_time.total_seconds():.1f} seconds."
-            )
-
-        self._request_count += 1
-
-    def _convert_order_side(self, side: OrderSide) -> AlpacaOrderSide:
-        """Convert domain OrderSide to Alpaca OrderSide"""
-        if side == OrderSide.BUY:
-            return AlpacaOrderSide.BUY
-        else:
-            return AlpacaOrderSide.SELL
-
-    def _convert_time_in_force(self, tif: TimeInForce) -> AlpacaTimeInForce:
-        """Convert domain TimeInForce to Alpaca TimeInForce"""
-        mapping = {
+        # Map time in force from domain to Alpaca
+        time_in_force_map = {
             TimeInForce.DAY: AlpacaTimeInForce.DAY,
             TimeInForce.GTC: AlpacaTimeInForce.GTC,
             TimeInForce.IOC: AlpacaTimeInForce.IOC,
             TimeInForce.FOK: AlpacaTimeInForce.FOK,
         }
-        return mapping[tif]
+        alpaca_tif = time_in_force_map.get(order.time_in_force, AlpacaTimeInForce.DAY)
 
-    def _convert_order_status(self, status: AlpacaOrderStatus) -> OrderStatus:
-        """Convert Alpaca OrderStatus to domain OrderStatus"""
-        mapping = {
-            AlpacaOrderStatus.PENDING_NEW: OrderStatus.PENDING,
-            AlpacaOrderStatus.NEW: OrderStatus.SUBMITTED,
-            AlpacaOrderStatus.ACCEPTED: OrderStatus.SUBMITTED,
-            AlpacaOrderStatus.PARTIALLY_FILLED: OrderStatus.PARTIALLY_FILLED,
-            AlpacaOrderStatus.FILLED: OrderStatus.FILLED,
-            AlpacaOrderStatus.CANCELED: OrderStatus.CANCELLED,
-            AlpacaOrderStatus.REJECTED: OrderStatus.REJECTED,
-            AlpacaOrderStatus.EXPIRED: OrderStatus.EXPIRED,
-            AlpacaOrderStatus.PENDING_CANCEL: OrderStatus.SUBMITTED,
-            AlpacaOrderStatus.PENDING_REPLACE: OrderStatus.SUBMITTED,
-        }
-        return mapping.get(status, OrderStatus.PENDING)
-
-    def _create_order_request(self, order: Order) -> Any:
-        """Create Alpaca order request from domain order"""
-        side = self._convert_order_side(order.side)
-        tif = self._convert_time_in_force(order.time_in_force)
-
-        # Convert quantity to float for Alpaca
-        qty = float(order.quantity)
-
+        # Create Alpaca order request
+        # Create order request based on type
+        order_request: MarketOrderRequest | LimitOrderRequest
         if order.order_type == OrderType.MARKET:
-            return MarketOrderRequest(
+            order_request = MarketOrderRequest(
                 symbol=order.symbol,
-                qty=qty,
-                side=side,
-                time_in_force=tif,
+                qty=float(order.quantity),
+                side=AlpacaOrderSide.BUY if order.side == OrderSide.BUY else AlpacaOrderSide.SELL,
+                time_in_force=alpaca_tif,
             )
-
-        elif order.order_type == OrderType.LIMIT:
-            if order.limit_price is None:
-                raise InvalidOrderError("Limit order requires limit_price")
-
-            return LimitOrderRequest(
-                symbol=order.symbol,
-                qty=qty,
-                side=side,
-                time_in_force=tif,
-                limit_price=float(order.limit_price),
-            )
-
-        elif order.order_type == OrderType.STOP:
-            if order.stop_price is None:
-                raise InvalidOrderError("Stop order requires stop_price")
-
-            return StopOrderRequest(
-                symbol=order.symbol,
-                qty=qty,
-                side=side,
-                time_in_force=tif,
-                stop_price=float(order.stop_price),
-            )
-
-        elif order.order_type == OrderType.STOP_LIMIT:
-            if order.stop_price is None or order.limit_price is None:
-                raise InvalidOrderError("Stop-limit order requires both stop_price and limit_price")
-
-            return StopLimitOrderRequest(
-                symbol=order.symbol,
-                qty=qty,
-                side=side,
-                time_in_force=tif,
-                stop_price=float(order.stop_price),
-                limit_price=float(order.limit_price),
-            )
-
         else:
-            raise InvalidOrderError(f"Unsupported order type: {order.order_type}")
+            order_request = LimitOrderRequest(
+                symbol=order.symbol,
+                qty=float(order.quantity),
+                side=AlpacaOrderSide.BUY if order.side == OrderSide.BUY else AlpacaOrderSide.SELL,
+                time_in_force=alpaca_tif,
+                limit_price=float(order.limit_price) if order.limit_price else None,
+            )
 
-    def _update_order_from_alpaca(self, order: Order, alpaca_order: AlpacaOrder) -> Order:
-        """Update domain order with data from Alpaca order"""
-        order.broker_order_id = alpaca_order.id
-        order.status = self._convert_order_status(alpaca_order.status)
+        # Submit to Alpaca
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
 
-        if alpaca_order.filled_qty:
-            order.filled_quantity = Decimal(str(alpaca_order.filled_qty))
+        try:
+            alpaca_order = self.client.submit_order(order_data=order_request)
+        except APIError as e:
+            raise BrokerError(f"Failed to submit order: {e!s}") from e
 
-        if alpaca_order.filled_avg_price:
-            order.average_fill_price = Decimal(str(alpaca_order.filled_avg_price))
+        # Thread-safe order map update
+        alpaca_id = str(alpaca_order.id if hasattr(alpaca_order, "id") else alpaca_order)
+        with self._order_map_lock:
+            self._order_map[order.id] = alpaca_id
 
-        if alpaca_order.submitted_at:
-            order.submitted_at = alpaca_order.submitted_at
+        # Update order with broker ID
+        order.submit(alpaca_id)
+        logger.info(f"Submitted order {order.id} to Alpaca as {alpaca_id}")
+        return order
 
-        if alpaca_order.filled_at:
-            order.filled_at = alpaca_order.filled_at
+    def cancel_order(self, order_id: UUID) -> bool:
+        """Cancel order on Alpaca. Thread-safe."""
+        self._check_connection()
 
-        if alpaca_order.canceled_at:
-            order.cancelled_at = alpaca_order.canceled_at
+        with self._order_map_lock:
+            alpaca_id = self._order_map.get(order_id)
+        if not alpaca_id:
+            raise OrderNotFoundError(f"Order {order_id} not found")
+
+        try:
+            if self.client is None:
+                raise RuntimeError("Alpaca client not initialized")
+            self.client.cancel_order_by_id(alpaca_id)
+            logger.info(f"Cancelled order {order_id}")
+            return True
+        except APIError:
+            return False
+
+    def get_order(self, order_id: UUID) -> Order:
+        """Get order from Alpaca. Thread-safe."""
+        self._check_connection()
+
+        with self._order_map_lock:
+            alpaca_id = self._order_map.get(order_id)
+        if not alpaca_id:
+            raise OrderNotFoundError(f"Order {order_id} not found")
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
+
+        try:
+            alpaca_order = self.client.get_order_by_id(alpaca_id)
+            return self._map_alpaca_to_domain_order(alpaca_order)
+        except APIError as e:
+            if "not found" in str(e).lower():
+                raise OrderNotFoundError(f"Order {order_id} not found") from e
+            raise BrokerError(f"Failed to get order: {e!s}") from e
+
+    def get_order_status(self, order_id: UUID) -> OrderStatus:
+        """Get order status from Alpaca. Thread-safe."""
+        self._check_connection()
+
+        with self._order_map_lock:
+            alpaca_id = self._order_map.get(order_id)
+        if not alpaca_id:
+            raise OrderNotFoundError(f"Order {order_id} not found")
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
+        alpaca_order = self.client.get_order_by_id(alpaca_id)
+        status = alpaca_order.status if hasattr(alpaca_order, "status") else str(alpaca_order)
+        return self._map_status(status)  # type: ignore[arg-type]
+
+    def update_order(self, order: Order) -> Order:
+        """Update order from Alpaca status. Thread-safe."""
+        self._check_connection()
+
+        with self._order_map_lock:
+            alpaca_id = self._order_map.get(order.id)
+        if not alpaca_id:
+            return order
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
+        alpaca_order = self.client.get_order_by_id(alpaca_id)
+        status = alpaca_order.status if hasattr(alpaca_order, "status") else str(alpaca_order)
+        order.status = self._map_status(status)  # type: ignore[arg-type]
+        return order
+
+    def get_recent_orders(self, limit: int = 100) -> list[Order]:
+        """Get recent orders from Alpaca. Simple mapping from Alpaca to domain orders."""
+        self._check_connection()
+
+        # Get recent orders from Alpaca
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
+        request = GetOrdersRequest(status=QueryOrderStatus.ALL, limit=limit)
+        alpaca_orders = self.client.get_orders(filter=request)
+
+        # Simple mapping to domain orders
+        domain_orders = []
+        for alpaca_order in alpaca_orders:
+            # Map Alpaca order to domain order
+            if isinstance(alpaca_order, AlpacaOrder):
+                order = self._map_alpaca_to_domain_order(alpaca_order)
+                domain_orders.append(order)
+
+        return domain_orders
+
+    def _map_alpaca_to_domain_order(self, alpaca_order: AlpacaOrder) -> Order:
+        """Simple direct mapping from Alpaca order to domain order."""
+        # Direct field mapping
+        order = Order(
+            symbol=alpaca_order.symbol if alpaca_order.symbol else "",
+            side=self._map_side(alpaca_order.side) if alpaca_order.side else OrderSide.BUY,
+            quantity=Decimal(str(alpaca_order.qty)) if alpaca_order.qty else Decimal("0"),
+            order_type=(
+                self._map_order_type(alpaca_order.order_type)
+                if alpaca_order.order_type
+                else OrderType.MARKET
+            ),
+            limit_price=self._safe_decimal(alpaca_order.limit_price),
+            stop_price=self._safe_decimal(alpaca_order.stop_price),
+        )
+
+        # Direct assignment
+        order.status = (
+            self._map_status(alpaca_order.status)
+            if hasattr(alpaca_order, "status")
+            else OrderStatus.PENDING
+        )
+        order.broker_order_id = str(alpaca_order.id) if hasattr(alpaca_order, "id") else None
+        order.created_at = getattr(alpaca_order, "created_at", datetime.now(UTC))
+        order.filled_at = getattr(alpaca_order, "filled_at", None)
+        filled_qty = self._safe_decimal(getattr(alpaca_order, "filled_qty", None))
+        if filled_qty is not None:
+            order.filled_quantity = filled_qty
+        avg_price = self._safe_decimal(getattr(alpaca_order, "filled_avg_price", None))
+        if avg_price is not None:
+            order.average_fill_price = avg_price
 
         return order
 
-    def submit_order(self, order: Order) -> Order:
-        """Submit an order to Alpaca"""
+    def _map_side(self, alpaca_side: AlpacaOrderSide) -> OrderSide:
+        """Simple side mapper."""
+        return OrderSide.BUY if alpaca_side == AlpacaOrderSide.BUY else OrderSide.SELL
+
+    def _map_order_type(self, alpaca_type: AlpacaOrderType) -> OrderType:
+        """Simple order type mapper."""
+        return OrderType.LIMIT if alpaca_type == AlpacaOrderType.LIMIT else OrderType.MARKET
+
+    def _safe_decimal(self, value: Any) -> Decimal | None:
+        """Safe conversion to Decimal."""
+        return Decimal(str(value)) if value is not None else None
+
+    def get_position(self, symbol: str) -> Position | None:
+        """Get position by symbol from Alpaca."""
         self._check_connection()
-        self._check_rate_limit()
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
 
         try:
-            # Check if market is open for market orders
-            if order.order_type == OrderType.MARKET and not self.is_market_open():
-                raise MarketClosedError("Cannot submit market order while market is closed")
+            alpaca_pos = self.client.get_position(symbol)
 
-            # Create and submit order
-            order_request = self._create_order_request(order)
-            alpaca_order = self.client.submit_order(order_request)
+            # Check for zero quantity positions
+            qty = Decimal(str(getattr(alpaca_pos, "qty", 0)))
+            if qty == 0:
+                return None
 
-            # Update order with broker information
-            order.submit(alpaca_order.id)
-            self._order_map[order.id] = alpaca_order.id
+            # Create domain position from Alpaca position
+            position = Position(
+                symbol=getattr(alpaca_pos, "symbol", ""),
+                quantity=qty,
+                average_entry_price=Decimal(str(getattr(alpaca_pos, "avg_entry_price", 0))),
+                current_price=(
+                    Decimal(str(getattr(alpaca_pos, "current_price", 0)))
+                    if hasattr(alpaca_pos, "current_price")
+                    else None
+                ),
+            )
 
-            # Update with any immediate fills
-            order = self._update_order_from_alpaca(order, alpaca_order)
+            # Set P&L if available
+            if hasattr(alpaca_pos, "realized_pl") and alpaca_pos.realized_pl is not None:
+                position.realized_pnl = Decimal(str(alpaca_pos.realized_pl))
 
-            logger.info(f"Submitted order {order.id} to Alpaca: {alpaca_order.id}")
-            return order
+            return position
+        except APIError:
+            return None
 
-        except APIError as e:
-            if "insufficient" in str(e).lower():
-                raise InsufficientFundsError(f"Insufficient funds for order: {e}") from e
-            elif "invalid" in str(e).lower():
-                raise InvalidOrderError(f"Invalid order: {e}") from e
-            else:
-                raise BrokerConnectionError(f"Failed to submit order: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to submit order: {e}") from e
-
-    def cancel_order(self, order_id: UUID) -> bool:
-        """Cancel an order at Alpaca"""
+    def close_position(self, symbol: str) -> bool:
+        """Close a position by symbol."""
         self._check_connection()
-        self._check_rate_limit()
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
 
         try:
-            # Get Alpaca order ID
-            alpaca_order_id = self._order_map.get(order_id)
-            if not alpaca_order_id:
-                # Try to find by searching recent orders
-                orders = self.get_recent_orders(limit=100)
-                for o in orders:
-                    if o.id == order_id:
-                        alpaca_order_id = o.broker_order_id
-                        break
-
-            if not alpaca_order_id:
-                raise OrderNotFoundError(f"Order {order_id} not found")
-
-            # Cancel the order
-            self.client.cancel_order_by_id(alpaca_order_id)
-            logger.info(f"Cancelled order {order_id} (Alpaca: {alpaca_order_id})")
+            self.client.close_position(symbol)
             return True
-
-        except APIError as e:
-            if e.code == HTTP_NOT_FOUND:
-                raise OrderNotFoundError(f"Order {order_id} not found at Alpaca") from e
-            else:
-                logger.error(f"Failed to cancel order {order_id}: {e}")
-                return False
-        except Exception as e:
-            logger.error(f"Failed to cancel order {order_id}: {e}")
+        except APIError:
             return False
 
-    def get_order_status(self, order_id: UUID) -> OrderStatus:
-        """Get current status of an order"""
+    def close_all_positions(self) -> bool:
+        """Close all positions."""
         self._check_connection()
-        self._check_rate_limit()
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
 
         try:
-            # Get Alpaca order ID
-            alpaca_order_id = self._order_map.get(order_id)
-            if not alpaca_order_id:
-                raise OrderNotFoundError(f"Order {order_id} not found")
-
-            # Get order from Alpaca
-            alpaca_order = self.client.get_order_by_id(alpaca_order_id)
-            return self._convert_order_status(alpaca_order.status)
-
-        except APIError as e:
-            if e.code == HTTP_NOT_FOUND:
-                raise OrderNotFoundError(f"Order {order_id} not found at Alpaca") from e
-            else:
-                raise BrokerConnectionError(f"Failed to get order status: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to get order status: {e}") from e
-
-    def update_order(self, order: Order) -> Order:
-        """Update order with latest status from Alpaca"""
-        self._check_connection()
-        self._check_rate_limit()
-
-        try:
-            alpaca_order_id = order.broker_order_id or self._order_map.get(order.id)
-            if not alpaca_order_id:
-                raise OrderNotFoundError(f"Order {order.id} not found")
-
-            # Get latest order data from Alpaca
-            alpaca_order = self.client.get_order_by_id(alpaca_order_id)
-
-            # Update order
-            return self._update_order_from_alpaca(order, alpaca_order)
-
-        except APIError as e:
-            if e.code == HTTP_NOT_FOUND:
-                raise OrderNotFoundError(f"Order {order.id} not found at Alpaca") from e
-            else:
-                raise BrokerConnectionError(f"Failed to update order: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to update order: {e}") from e
-
-    def get_recent_orders(self, limit: int = 100) -> list[Order]:
-        """Get recent orders from Alpaca"""
-        self._check_connection()
-        self._check_rate_limit()
-
-        try:
-            # Get orders from Alpaca
-            request = GetOrdersRequest(
-                status="all",
-                limit=limit,
-            )
-            alpaca_orders = self.client.get_orders(filter=request)
-
-            # Convert to domain orders
-            orders = []
-            for alpaca_order in alpaca_orders:
-                # Create basic order
-                order = Order(
-                    symbol=alpaca_order.symbol,
-                    quantity=Decimal(str(alpaca_order.qty)),
-                    side=(
-                        OrderSide.BUY
-                        if alpaca_order.side == AlpacaOrderSide.BUY
-                        else OrderSide.SELL
-                    ),
-                    order_type=self._get_order_type(alpaca_order),
-                )
-
-                # Update with Alpaca data
-                order = self._update_order_from_alpaca(order, alpaca_order)
-                orders.append(order)
-
-            return orders
-
-        except APIError as e:
-            raise BrokerConnectionError(f"Failed to get recent orders: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to get recent orders: {e}") from e
-
-    def _get_order_type(self, alpaca_order: AlpacaOrder) -> OrderType:
-        """Determine order type from Alpaca order"""
-        if alpaca_order.order_type == AlpacaOrderType.MARKET:
-            return OrderType.MARKET
-        elif alpaca_order.order_type == AlpacaOrderType.LIMIT:
-            return OrderType.LIMIT
-        elif alpaca_order.order_type == AlpacaOrderType.STOP:
-            return OrderType.STOP
-        elif alpaca_order.order_type == AlpacaOrderType.STOP_LIMIT:
-            return OrderType.STOP_LIMIT
-        else:
-            return OrderType.MARKET
+            self.client.close_all_positions()
+            return True
+        except APIError:
+            return False
 
     def get_positions(self) -> list[Position]:
-        """Get all current positions from Alpaca"""
+        """Get positions from Alpaca. Maps Alpaca positions to domain positions."""
         self._check_connection()
-        self._check_rate_limit()
 
-        try:
-            alpaca_positions = self.client.get_all_positions()
+        # Get positions from Alpaca
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
+        alpaca_positions = self.client.get_all_positions()
 
-            positions = []
-            for alpaca_pos in alpaca_positions:
-                # Determine if long or short
-                qty = Decimal(str(alpaca_pos.qty))
-                if alpaca_pos.side == PositionSide.SHORT:
-                    qty = -qty
+        # Map to domain positions
+        domain_positions = []
+        for alpaca_pos in alpaca_positions:
+            # Create domain position from Alpaca position
+            if not hasattr(alpaca_pos, "symbol"):
+                continue
+            # Get current price safely
+            current_price_value = getattr(alpaca_pos, "current_price", None)
+            current_price = (
+                Decimal(str(current_price_value)) if current_price_value is not None else None
+            )
 
-                position = Position(
-                    symbol=alpaca_pos.symbol,
-                    quantity=qty,
-                    average_entry_price=Decimal(str(alpaca_pos.avg_entry_price)),
-                    current_price=(
-                        Decimal(str(alpaca_pos.current_price)) if alpaca_pos.current_price else None
-                    ),
-                    realized_pnl=Decimal("0"),  # Alpaca doesn't track this per position
-                )
+            position = Position(
+                symbol=getattr(alpaca_pos, "symbol", ""),
+                quantity=Decimal(str(getattr(alpaca_pos, "qty", 0))),
+                average_entry_price=Decimal(str(getattr(alpaca_pos, "avg_entry_price", 0))),
+                current_price=current_price,
+            )
 
-                # Update market value if available
-                if alpaca_pos.current_price:
-                    position.update_market_price(Decimal(str(alpaca_pos.current_price)))
+            # Set P&L if available
+            if hasattr(alpaca_pos, "realized_pl") and alpaca_pos.realized_pl is not None:
+                position.realized_pnl = Decimal(str(alpaca_pos.realized_pl))
 
-                positions.append(position)
+            domain_positions.append(position)
 
-            return positions
-
-        except APIError as e:
-            raise BrokerConnectionError(f"Failed to get positions: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to get positions: {e}") from e
+        return domain_positions
 
     def get_account_info(self) -> AccountInfo:
-        """Get account information from Alpaca"""
+        """Get account info from Alpaca."""
         self._check_connection()
-        self._check_rate_limit()
+
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
 
         try:
             account = self.client.get_account()
-
-            return AccountInfo(
-                account_id=account.account_number,
-                account_type="paper" if self.paper else "live",
-                equity=Decimal(str(account.equity)),
-                cash=Decimal(str(account.cash)),
-                buying_power=Decimal(str(account.buying_power)),
-                positions_value=Decimal(str(account.long_market_value))
-                + Decimal(str(account.short_market_value)),
-                unrealized_pnl=Decimal("0"),  # Calculate from positions if needed
-                realized_pnl=Decimal("0"),  # Not directly available from Alpaca
-                margin_used=(
-                    Decimal(str(account.initial_margin)) if account.initial_margin else None
-                ),
-                margin_available=(
-                    Decimal(str(account.regt_buying_power)) if account.regt_buying_power else None
-                ),
-                pattern_day_trader=account.pattern_day_trader,
-                trades_today=account.daytrade_count if account.daytrade_count else 0,
-                trades_remaining=None,  # Calculate based on PDT rules if needed
-                last_updated=datetime.now(UTC),
-            )
-
         except APIError as e:
-            raise BrokerConnectionError(f"Failed to get account info: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to get account info: {e}") from e
+            raise BrokerConnectionError(f"Failed to get account info: {e!s}") from e
+
+        return AccountInfo(
+            account_id=getattr(account, "account_number", ""),
+            account_type="paper" if self.paper else "live",
+            equity=Decimal(str(getattr(account, "equity", 0))),
+            cash=Decimal(str(getattr(account, "cash", 0))),
+            buying_power=Decimal(str(getattr(account, "buying_power", 0))),
+            positions_value=Decimal(str(getattr(account, "long_market_value", 0))),
+            unrealized_pnl=Decimal("0"),
+            realized_pnl=Decimal("0"),
+            margin_used=Decimal("0"),
+            margin_available=Decimal(str(getattr(account, "buying_power", 0))),
+            pattern_day_trader=bool(getattr(account, "pattern_day_trader", False)),
+            trades_today=0,
+            trades_remaining=None,
+            last_updated=datetime.now(UTC),
+        )
 
     def is_market_open(self) -> bool:
-        """Check if the market is currently open"""
+        """Check if market is open."""
         self._check_connection()
-        self._check_rate_limit()
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
+        clock = self.client.get_clock()
+        return bool(getattr(clock, "is_open", False))
+
+    def get_market_hours(self, date: datetime | None = None) -> MarketHours:
+        """Get market hours from Alpaca for a specific date or today."""
+        self._check_connection()
+        if self.client is None:
+            raise RuntimeError("Alpaca client not initialized")
 
         try:
-            clock = self.client.get_clock()
-            return clock.is_open
+            if date is None:
+                # Get current market hours
+                clock = self.client.get_clock()
+                return MarketHours(
+                    is_open=bool(getattr(clock, "is_open", False)),
+                    next_open=getattr(clock, "next_open", None),
+                    next_close=getattr(clock, "next_close", None),
+                )
+            else:
+                # Get calendar for specific date
+                from alpaca.trading import GetCalendarRequest
 
+                # Convert datetime to date for the calendar request
+                date_only = date.date()
+                request = GetCalendarRequest(start=date_only, end=date_only)
+                calendar = self.client.get_calendar(filters=request)
+
+                if calendar:
+                    cal_day = calendar[0]
+                    return MarketHours(
+                        is_open=True,
+                        next_open=getattr(cal_day, "open", None),
+                        next_close=getattr(cal_day, "close", None),
+                    )
+                else:
+                    # Market is closed on this date
+                    return MarketHours(
+                        is_open=False,
+                        next_open=None,
+                        next_close=None,
+                    )
         except APIError as e:
-            raise BrokerConnectionError(f"Failed to check market status: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to check market status: {e}") from e
+            raise BrokerConnectionError(f"Failed to get market hours: {e!s}") from e
 
-    def get_market_hours(self) -> MarketHours:
-        """Get detailed market hours information"""
-        self._check_connection()
-        self._check_rate_limit()
-
-        try:
-            clock = self.client.get_clock()
-
-            return MarketHours(
-                is_open=clock.is_open,
-                next_open=clock.next_open if clock.next_open else None,
-                next_close=clock.next_close if clock.next_close else None,
-            )
-
-        except APIError as e:
-            raise BrokerConnectionError(f"Failed to get market hours: {e}") from e
-        except Exception as e:
-            raise BrokerConnectionError(f"Failed to get market hours: {e}") from e
+    def _map_status(self, alpaca_status: AlpacaOrderStatus) -> OrderStatus:
+        """Map Alpaca status to domain status."""
+        mapping = {
+            AlpacaOrderStatus.NEW: OrderStatus.SUBMITTED,
+            AlpacaOrderStatus.PARTIALLY_FILLED: OrderStatus.PARTIALLY_FILLED,
+            AlpacaOrderStatus.FILLED: OrderStatus.FILLED,
+            AlpacaOrderStatus.CANCELED: OrderStatus.CANCELLED,
+            AlpacaOrderStatus.EXPIRED: OrderStatus.EXPIRED,
+            AlpacaOrderStatus.REJECTED: OrderStatus.REJECTED,
+        }
+        return mapping.get(alpaca_status, OrderStatus.PENDING)

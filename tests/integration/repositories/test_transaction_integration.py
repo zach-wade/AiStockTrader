@@ -16,7 +16,7 @@ from uuid import uuid4
 import pytest
 
 # Local imports
-from src.domain.entities.order import Order, OrderSide, OrderStatus
+from src.domain.entities.order import Order, OrderRequest, OrderSide, OrderStatus
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position, PositionSide
 from src.infrastructure.database.connection import ConnectionFactory, DatabaseConfig
@@ -91,19 +91,21 @@ class TestTransactionACIDProperties:
 
     async def test_atomicity_all_or_nothing(self, unit_of_work):
         """Test atomicity - all operations succeed or all fail."""
-        order1 = Order.create_limit_order(
+        request1 = OrderRequest(
             symbol="TX_ATOMICITY_1",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order1 = Order.create_limit_order(request1)
 
-        order2 = Order.create_limit_order(
+        request2 = OrderRequest(
             symbol="TX_ATOMICITY_2",
             quantity=Decimal("50"),
             side=OrderSide.SELL,
             limit_price=Decimal("155.00"),
         )
+        order2 = Order.create_limit_order(request2)
 
         # Test successful transaction - all operations should succeed
         async with unit_of_work as uow:
@@ -117,12 +119,13 @@ class TestTransactionACIDProperties:
         assert retrieved_order2 is not None
 
         # Test failed transaction - no operations should persist
-        order3 = Order.create_limit_order(
+        request3 = OrderRequest(
             symbol="TX_ATOMICITY_3",
             quantity=Decimal("75"),
             side=OrderSide.BUY,
             limit_price=Decimal("160.00"),
         )
+        order3 = Order.create_limit_order(request3)
 
         try:
             async with unit_of_work as uow:
@@ -160,7 +163,7 @@ class TestTransactionACIDProperties:
         # Save related entities in transaction
         async with unit_of_work as uow:
             await uow.portfolios.save_portfolio(portfolio)
-            await uow.positions.save_position(position)
+            await uow.positions.persist_position(position)
 
         # Verify both entities exist and are consistent
         retrieved_portfolio = await unit_of_work.portfolios.get_portfolio_by_id(portfolio.id)
@@ -190,7 +193,7 @@ class TestTransactionACIDProperties:
             strategy="isolation_test",
         )
 
-        await uow1.positions.save_position(initial_position)
+        await uow1.positions.persist_position(initial_position)
 
         async def transaction1():
             """First transaction - update position price."""
@@ -227,12 +230,13 @@ class TestTransactionACIDProperties:
 
     async def test_durability_data_persists(self, unit_of_work):
         """Test durability - committed data persists across connections."""
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TX_DURABILITY",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         # Save in transaction and commit
         async with unit_of_work as uow:
@@ -267,12 +271,13 @@ class TestComplexTransactionScenarios:
             created_at=datetime.now(UTC),
         )
 
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TX_MULTI_SUCCESS",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         position = Position(
             id=uuid4(),
@@ -296,7 +301,7 @@ class TestComplexTransactionScenarios:
             await uow.orders.update_order(order)
 
             # Save position
-            await uow.positions.save_position(position)
+            await uow.positions.persist_position(position)
 
             # Update portfolio balance
             portfolio.cash_balance -= Decimal("15000.00")  # Order cost
@@ -327,12 +332,13 @@ class TestComplexTransactionScenarios:
             created_at=datetime.now(UTC),
         )
 
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TX_MULTI_ROLLBACK",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         try:
             async with unit_of_work as uow:
@@ -359,19 +365,21 @@ class TestComplexTransactionScenarios:
         # This test demonstrates how nested operations behave
         # Note: PostgreSQL adapter may not implement actual savepoints
 
-        order1 = Order.create_limit_order(
+        request1 = OrderRequest(
             symbol="TX_SAVEPOINT_1",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order1 = Order.create_limit_order(request1)
 
-        order2 = Order.create_limit_order(
+        request2 = OrderRequest(
             symbol="TX_SAVEPOINT_2",
             quantity=Decimal("50"),
             side=OrderSide.SELL,
             limit_price=Decimal("155.00"),
         )
+        order2 = Order.create_limit_order(request2)
 
         async with unit_of_work as uow:
             # Save first order
@@ -409,7 +417,7 @@ class TestTransactionPerformance:
 
         orders = [
             Order.create_market_order(
-                symbol=f"TX_PERF_{i}", quantity=Decimal("100"), side=OrderSide.BUY
+                OrderRequest(symbol=f"TX_PERF_{i}", quantity=Decimal("100"), side=OrderSide.BUY)
             )
             for i in range(10)
         ]
@@ -428,7 +436,9 @@ class TestTransactionPerformance:
 
         individual_orders = [
             Order.create_market_order(
-                symbol=f"TX_INDIVIDUAL_{i}", quantity=Decimal("100"), side=OrderSide.BUY
+                OrderRequest(
+                    symbol=f"TX_INDIVIDUAL_{i}", quantity=Decimal("100"), side=OrderSide.BUY
+                )
             )
             for i in range(10)
         ]
@@ -449,12 +459,13 @@ class TestTransactionPerformance:
 
     async def test_long_running_transaction(self, unit_of_work):
         """Test behavior of long-running transactions."""
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TX_LONG_RUNNING",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         async with unit_of_work as uow:
             # Start transaction
@@ -481,7 +492,7 @@ class TestTransactionPerformance:
                 opened_at=datetime.now(UTC),
                 strategy="long_running_test",
             )
-            await uow.positions.save_position(position)
+            await uow.positions.persist_position(position)
 
         # Verify transaction completed successfully despite duration
         retrieved_order = await unit_of_work.orders.get_order_by_id(order.id)
@@ -501,12 +512,13 @@ class TestTransactionErrorScenarios:
         # This test is conceptual - actual connection failure simulation
         # would require more sophisticated test setup
 
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TX_CONNECTION_FAIL",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         async with unit_of_work as uow:
             await uow.orders.save_order(order)
@@ -524,19 +536,21 @@ class TestTransactionErrorScenarios:
         uow2 = PostgreSQLUnitOfWork(database_connection)
 
         # Create orders that might cause deadlocks if accessed in different orders
-        order1 = Order.create_limit_order(
+        request1 = OrderRequest(
             symbol="TX_DEADLOCK_1",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order1 = Order.create_limit_order(request1)
 
-        order2 = Order.create_limit_order(
+        request2 = OrderRequest(
             symbol="TX_DEADLOCK_2",
             quantity=Decimal("50"),
             side=OrderSide.SELL,
             limit_price=Decimal("155.00"),
         )
+        order2 = Order.create_limit_order(request2)
 
         # Save initial orders
         await uow1.orders.save_order(order1)
@@ -599,12 +613,13 @@ class TestTransactionErrorScenarios:
         # This test would require configuration of transaction timeouts
         # For now, we test that very long transactions can complete
 
-        order = Order.create_limit_order(
+        request = OrderRequest(
             symbol="TX_TIMEOUT_TEST",
             quantity=Decimal("100"),
             side=OrderSide.BUY,
             limit_price=Decimal("150.00"),
         )
+        order = Order.create_limit_order(request)
 
         async with unit_of_work as uow:
             await uow.orders.save_order(order)

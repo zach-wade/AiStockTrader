@@ -1,40 +1,45 @@
 """
-Broker Factory - Creates appropriate broker instances based on configuration
+Broker Factory - Creates broker instances based on configuration.
+
+This is a simplified factory that creates thin broker adapters.
+Business logic has been moved to domain services.
 """
 
-# Standard library imports
 import logging
 import os
 from decimal import Decimal
-from typing import Literal
+from typing import Any
 
-# Local imports
 from src.application.interfaces.broker import IBroker
+from src.domain.services.broker_configuration_service import BrokerConfigurationService, BrokerType
+from src.domain.services.trading_calendar import Exchange
 
 from .alpaca_broker import AlpacaBroker
 from .paper_broker import PaperBroker
 
 logger = logging.getLogger(__name__)
 
-BrokerType = Literal["alpaca", "paper", "backtest"]
-
 
 class BrokerFactory:
     """
-    Factory for creating broker instances.
+    Simple factory for creating broker instances.
 
-    Supports multiple broker types and configurations.
+    This factory creates thin broker adapters using domain services for business logic.
+    Complex configuration logic is handled by BrokerConfigurationService.
     """
 
-    @staticmethod
-    def create_broker(broker_type: BrokerType | None = None, **kwargs) -> IBroker:
+    def __init__(self, config_service: BrokerConfigurationService | None = None) -> None:
+        """Initialize with optional configuration service."""
+        self.config_service = config_service or BrokerConfigurationService()
+
+    def create_broker(self, broker_type: str | None = None, **kwargs: Any) -> IBroker:
         """
-        Create a broker instance based on type and configuration.
+        Create a broker instance based on type.
 
         Args:
             broker_type: Type of broker to create ("alpaca", "paper", "backtest")
                         If None, will check BROKER_TYPE environment variable
-            **kwargs: Additional broker-specific configuration
+            **kwargs: Broker-specific configuration
 
         Returns:
             Configured broker instance
@@ -42,127 +47,81 @@ class BrokerFactory:
         Raises:
             ValueError: If broker type is not supported
         """
-        # Determine broker type
-        if broker_type is None:
-            broker_type = os.getenv("BROKER_TYPE", "paper").lower()
+        # Use domain service to determine broker type
+        type_str = broker_type or os.getenv("BROKER_TYPE")
+        broker_enum = self.config_service.determine_broker_type(type_str, "paper")
 
-        broker_type = broker_type.lower()
+        logger.info(f"Creating {broker_enum.value} broker")
 
-        logger.info(f"Creating {broker_type} broker")
-
-        if broker_type == "alpaca":
-            return BrokerFactory._create_alpaca_broker(**kwargs)
-        elif broker_type == "paper":
-            return BrokerFactory._create_paper_broker(**kwargs)
-        elif broker_type == "backtest":
-            return BrokerFactory._create_backtest_broker(**kwargs)
+        # Simple switch based on type - no complex logic
+        if broker_enum == BrokerType.ALPACA:
+            return self._create_alpaca_broker(**kwargs)
+        elif broker_enum == BrokerType.PAPER:
+            return self._create_paper_broker(**kwargs)
+        elif broker_enum == BrokerType.BACKTEST:
+            return self._create_backtest_broker(**kwargs)
         else:
-            raise ValueError(
-                f"Unsupported broker type: {broker_type}. "
-                f"Supported types: alpaca, paper, backtest"
-            )
+            # This should never happen due to enum validation
+            raise ValueError(f"Unexpected broker type: {broker_enum}")
 
-    @staticmethod
-    def _create_alpaca_broker(**kwargs) -> AlpacaBroker:
-        """Create Alpaca broker instance"""
+    def _create_alpaca_broker(self, **kwargs: Any) -> AlpacaBroker:
+        """Create Alpaca broker instance - simple factory method."""
         # Get configuration from environment or kwargs
         api_key = kwargs.get("api_key") or os.getenv("ALPACA_API_KEY")
         secret_key = kwargs.get("secret_key") or os.getenv("ALPACA_SECRET_KEY")
 
-        # Determine if paper trading
-        paper = kwargs.get("paper")
-        if paper is None:
-            # Default to paper trading unless explicitly set to live
-            paper = os.getenv("ALPACA_PAPER", "true").lower() == "true"
-
-        base_url = kwargs.get("base_url") or os.getenv("ALPACA_BASE_URL")
+        # Use domain service for paper mode determination
+        paper = self.config_service.determine_paper_mode(
+            kwargs.get("paper"), default_paper=os.getenv("ALPACA_PAPER", "true").lower() == "true"
+        )
 
         broker = AlpacaBroker(
             api_key=api_key,
             secret_key=secret_key,
             paper=paper,
-            base_url=base_url,
         )
 
-        # Auto-connect if requested
+        # Simple auto-connect check
         if kwargs.get("auto_connect", True):
             broker.connect()
 
         return broker
 
-    @staticmethod
-    def _create_paper_broker(**kwargs) -> PaperBroker:
-        """Create paper trading broker instance"""
-        # Get configuration
-        initial_capital = kwargs.get("initial_capital")
-        if initial_capital is None:
-            initial_capital = Decimal(os.getenv("PAPER_INITIAL_CAPITAL", "100000"))
-        elif not isinstance(initial_capital, Decimal):
-            initial_capital = Decimal(str(initial_capital))
+    def _create_paper_broker(self, **kwargs: Any) -> PaperBroker:
+        """Create paper trading broker instance - simple factory method."""
+        # Use domain service for capital normalization
+        initial_capital = self.config_service.normalize_initial_capital(
+            kwargs.get("initial_capital") or os.getenv("PAPER_INITIAL_CAPITAL")
+        )
 
-        slippage_pct = kwargs.get("slippage_pct")
-        if slippage_pct is None:
-            slippage_pct = Decimal(os.getenv("PAPER_SLIPPAGE_PCT", "0.001"))
-        elif not isinstance(slippage_pct, Decimal):
-            slippage_pct = Decimal(str(slippage_pct))
-
-        fill_delay = kwargs.get("fill_delay_seconds")
-        if fill_delay is None:
-            fill_delay = int(os.getenv("PAPER_FILL_DELAY", "1"))
-
-        commission_per_share = kwargs.get("commission_per_share")
-        if commission_per_share is None:
-            commission_per_share = Decimal(os.getenv("PAPER_COMMISSION_PER_SHARE", "0.01"))
-        elif not isinstance(commission_per_share, Decimal):
-            commission_per_share = Decimal(str(commission_per_share))
-
-        min_commission = kwargs.get("min_commission")
-        if min_commission is None:
-            min_commission = Decimal(os.getenv("PAPER_MIN_COMMISSION", "1.0"))
-        elif not isinstance(min_commission, Decimal):
-            min_commission = Decimal(str(min_commission))
-
-        simulate_partial_fills = kwargs.get("simulate_partial_fills")
-        if simulate_partial_fills is None:
-            simulate_partial_fills = os.getenv("PAPER_PARTIAL_FILLS", "false").lower() == "true"
+        # Get exchange for trading calendar
+        exchange = kwargs.get("exchange", Exchange.NYSE)
 
         broker = PaperBroker(
             initial_capital=initial_capital,
-            slippage_pct=slippage_pct,
-            fill_delay_seconds=fill_delay,
-            commission_per_share=commission_per_share,
-            min_commission=min_commission,
-            simulate_partial_fills=simulate_partial_fills,
+            exchange=exchange,
         )
 
-        # Auto-connect if requested
+        # Simple auto-connect check
         if kwargs.get("auto_connect", True):
             broker.connect()
 
         return broker
 
-    @staticmethod
-    def _create_backtest_broker(**kwargs) -> PaperBroker:
-        """
-        Create backtesting broker instance.
+    def _create_backtest_broker(self, **kwargs: Any) -> PaperBroker:
+        """Create backtesting broker instance - delegates to paper broker."""
+        # Set defaults for backtesting
+        kwargs.setdefault("initial_capital", Decimal("100000"))
+        kwargs.setdefault("exchange", Exchange.NYSE)
 
-        For now, this is similar to paper broker but with different defaults
-        optimized for backtesting (no delays, minimal slippage).
-        """
-        # Override defaults for backtesting
-        kwargs.setdefault("fill_delay_seconds", 0)  # No delay in backtesting
-        kwargs.setdefault("slippage_pct", Decimal("0.0005"))  # Minimal slippage
-        kwargs.setdefault("simulate_partial_fills", False)  # Simpler for backtesting
+        # Create paper broker for backtesting
+        broker = self._create_paper_broker(**kwargs)
 
-        broker = BrokerFactory._create_paper_broker(**kwargs)
-
-        # Mark as backtest mode (could be used for special behavior)
-        broker.portfolio.tags["mode"] = "backtest"
+        logger.info("Created backtest broker (using paper broker)")
 
         return broker
 
-    @staticmethod
-    def create_from_config(config: dict) -> IBroker:
+    def create_from_config(self, config: dict[str, Any]) -> IBroker:
         """
         Create broker from configuration dictionary.
 
@@ -181,11 +140,12 @@ class BrokerFactory:
                 "secret_key": "..."
             }
         """
-        broker_type = config.pop("type", None)
-        return BrokerFactory.create_broker(broker_type, **config)
+        # Use domain service to process configuration
+        processed_config = self.config_service.process_broker_config(config)
+        broker_type = processed_config.pop("type", None)
+        return self.create_broker(broker_type, **processed_config)
 
-    @staticmethod
-    def get_default_config(broker_type: BrokerType) -> dict:
+    def get_default_config(self, broker_type: str) -> dict[str, Any]:
         """
         Get default configuration for a broker type.
 
@@ -195,35 +155,6 @@ class BrokerFactory:
         Returns:
             Default configuration dictionary
         """
-        if broker_type == "alpaca":
-            return {
-                "type": "alpaca",
-                "paper": True,
-                "auto_connect": True,
-                "api_key": None,  # Must be provided
-                "secret_key": None,  # Must be provided
-            }
-        elif broker_type == "paper":
-            return {
-                "type": "paper",
-                "auto_connect": True,
-                "initial_capital": "100000",
-                "slippage_pct": "0.001",
-                "fill_delay_seconds": 1,
-                "commission_per_share": "0.01",
-                "min_commission": "1.0",
-                "simulate_partial_fills": False,
-            }
-        elif broker_type == "backtest":
-            return {
-                "type": "backtest",
-                "auto_connect": True,
-                "initial_capital": "100000",
-                "slippage_pct": "0.0005",
-                "fill_delay_seconds": 0,
-                "commission_per_share": "0.01",
-                "min_commission": "1.0",
-                "simulate_partial_fills": False,
-            }
-        else:
-            raise ValueError(f"Unknown broker type: {broker_type}")
+        # Delegate to domain service
+        broker_enum = self.config_service.determine_broker_type(broker_type)
+        return self.config_service.get_default_config(broker_enum)

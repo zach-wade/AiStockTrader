@@ -181,7 +181,7 @@ class IPositionRepository(Protocol):
     """
 
     @abstractmethod
-    async def save_position(self, position: Position) -> Position:
+    async def persist_position(self, position: Position) -> Position:
         """
         Save a new position or update an existing position.
 
@@ -448,12 +448,13 @@ class IMarketDataRepository(Protocol):
         ...
 
     @abstractmethod
-    async def delete_bars_before(self, timestamp: datetime) -> int:
+    async def delete_bars_before(self, timestamp: datetime, symbol: str | None = None) -> int:
         """
         Delete bars older than a specified timestamp.
 
         Args:
             timestamp: Delete bars before this time
+            symbol: Optional - only delete bars for this symbol (safety feature)
 
         Returns:
             Number of bars deleted

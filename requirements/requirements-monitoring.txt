@@ -1,0 +1,15 @@
+# OpenTelemetry dependencies for monitoring infrastructure
+opentelemetry-api==1.24.0
+opentelemetry-sdk==1.24.0
+opentelemetry-exporter-otlp-proto-grpc==1.24.0
+opentelemetry-exporter-prometheus==1.12.0rc1
+opentelemetry-instrumentation==0.45b0
+opentelemetry-instrumentation-httpx==0.45b0
+opentelemetry-instrumentation-psycopg2==0.45b0
+opentelemetry-instrumentation-asyncio==0.45b0
+
+# Additional monitoring dependencies
+prometheus_client==0.22.1  # Already in requirements.txt
+psutil==7.0.0  # Already in requirements.txt
+httpx==0.28.1  # Already in requirements.txt
+pytz==2025.2  # Already in requirements.txt
