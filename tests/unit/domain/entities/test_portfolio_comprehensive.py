@@ -17,6 +17,7 @@ import pytest
 
 from src.domain.entities.portfolio import Portfolio, PositionRequest
 from src.domain.entities.position import Position
+from src.domain.value_objects import Money
 
 
 class TestPortfolioInitialization:
@@ -27,15 +28,15 @@ class TestPortfolioInitialization:
         portfolio = Portfolio()
 
         assert portfolio.name == "Default Portfolio"
-        assert portfolio.initial_capital == Decimal("100000")
-        assert portfolio.cash_balance == Decimal("100000")
+        assert portfolio.initial_capital == Money(Decimal("100000"))
+        assert portfolio.cash_balance == Money(Decimal("100000"))
         assert len(portfolio.positions) == 0
-        assert portfolio.max_position_size == Decimal("10000")
+        assert portfolio.max_position_size == Money(Decimal("10000"))
         assert portfolio.max_portfolio_risk == Decimal("0.02")
         assert portfolio.max_positions == 10
         assert portfolio.max_leverage == Decimal("1.0")
-        assert portfolio.total_realized_pnl == Decimal("0")
-        assert portfolio.total_commission_paid == Decimal("0")
+        assert portfolio.total_realized_pnl == Money(Decimal("0"))
+        assert portfolio.total_commission_paid == Money(Decimal("0"))
         assert portfolio.trades_count == 0
         assert portfolio.winning_trades == 0
         assert portfolio.losing_trades == 0
@@ -48,9 +49,9 @@ class TestPortfolioInitialization:
         """Test portfolio with custom values."""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("50000"),
-            cash_balance=Decimal("45000"),
-            max_position_size=Decimal("5000"),
+            initial_capital=Money(Decimal("50000")),
+            cash_balance=Money(Decimal("45000")),
+            max_position_size=Money(Decimal("5000")),
             max_portfolio_risk=Decimal("0.01"),
             max_positions=5,
             max_leverage=Decimal("2.0"),
@@ -59,9 +60,9 @@ class TestPortfolioInitialization:
         )
 
         assert portfolio.name == "Test Portfolio"
-        assert portfolio.initial_capital == Decimal("50000")
-        assert portfolio.cash_balance == Decimal("45000")
-        assert portfolio.max_position_size == Decimal("5000")
+        assert portfolio.initial_capital == Money(Decimal("50000"))
+        assert portfolio.cash_balance == Money(Decimal("45000"))
+        assert portfolio.max_position_size == Money(Decimal("5000"))
         assert portfolio.max_portfolio_risk == Decimal("0.01")
         assert portfolio.max_positions == 5
         assert portfolio.max_leverage == Decimal("2.0")

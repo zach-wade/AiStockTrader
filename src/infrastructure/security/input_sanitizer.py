@@ -28,13 +28,8 @@ class InputSanitizer:
     Business validation is handled by domain services.
     """
 
-    # SQL injection patterns to block
-    SQL_INJECTION_PATTERNS = [
-        r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|FROM|WHERE)\b)",
-        r"(--|\||;|\/\*|\*\/|xp_|sp_|0x)",
-        r"(\bOR\b\s*\d+\s*=\s*\d+)",
-        r"(\bAND\b\s*\d+\s*=\s*\d+)",
-    ]
+    # SECURITY WARNING: SQL injection prevention should ONLY use parameterized queries!
+    # Manual SQL escaping creates false security and should never be used.
 
     # XSS patterns to block
     XSS_PATTERNS = [
@@ -64,10 +59,10 @@ class InputSanitizer:
         # Basic cleanup
         str_value = str_value.strip()
 
-        # Simple security check - check against known patterns
-        if cls._contains_dangerous_pattern(str_value):
-            logger.warning(f"Dangerous pattern detected: {str_value[:50]}...")
-            raise SanitizationError("Input contains potentially dangerous patterns")
+        # XSS security check only - SQL injection prevention uses parameterized queries
+        if cls._contains_xss_pattern(str_value):
+            logger.warning(f"XSS pattern detected: {str_value[:50]}...")
+            raise SanitizationError("Input contains potentially dangerous XSS patterns")
 
         # HTML escape for safety
         str_value = html.escape(str_value)
@@ -79,67 +74,141 @@ class InputSanitizer:
         return str_value
 
     @classmethod
-    def _contains_dangerous_pattern(cls, value: str) -> bool:
-        """Simple check for dangerous patterns - no business logic."""
-        # Check SQL injection patterns
-        for pattern in cls.SQL_INJECTION_PATTERNS:
-            if re.search(pattern, value, re.IGNORECASE):
-                return True
-
-        # Check XSS patterns
+    def _contains_xss_pattern(cls, value: str) -> bool:
+        """Check for XSS patterns only - SQL injection prevention uses parameterized queries."""
+        # Only check XSS patterns - SQL injection is prevented by parameterized queries
         for pattern in cls.XSS_PATTERNS:
             if re.search(pattern, value, re.IGNORECASE):
                 return True
-
         return False
 
     @classmethod
     def sanitize_sql_identifier(cls, identifier: str) -> str:
         """
-        Sanitize a SQL identifier (table/column name).
+        Validate a SQL identifier (table/column name) using allowlist approach.
+
+        WARNING: This only validates identifiers, not values. Use parameterized queries for values!
 
         Args:
-            identifier: SQL identifier to sanitize
+            identifier: SQL identifier to validate
 
         Returns:
-            Sanitized identifier
+            Validated identifier
 
         Raises:
             SanitizationError: If identifier is unsafe
         """
-        # Only allow alphanumeric and underscore
+        # Strict allowlist: only alphanumeric and underscore, must start with letter
         if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", identifier):
-            raise SanitizationError(f"Invalid SQL identifier: {identifier}")
+            raise SanitizationError(f"Invalid SQL identifier format: {identifier}")
 
-        # Check against reserved words (simplified list)
-        reserved_words = {"SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER"}
+        # Length limit for security
+        if len(identifier) > 64:  # Common database limit
+            raise SanitizationError(f"SQL identifier too long: {identifier}")
+
+        # Comprehensive reserved words list
+        reserved_words = {
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "CREATE",
+            "ALTER",
+            "TABLE",
+            "DATABASE",
+            "INDEX",
+            "VIEW",
+            "PROCEDURE",
+            "FUNCTION",
+            "TRIGGER",
+            "SCHEMA",
+            "CONSTRAINT",
+            "PRIMARY",
+            "FOREIGN",
+            "KEY",
+            "UNIQUE",
+            "CHECK",
+            "DEFAULT",
+            "NULL",
+            "NOT",
+            "AND",
+            "OR",
+            "WHERE",
+            "ORDER",
+            "GROUP",
+            "HAVING",
+            "UNION",
+            "JOIN",
+            "INNER",
+            "OUTER",
+            "LEFT",
+            "RIGHT",
+            "FULL",
+            "CROSS",
+            "ON",
+            "AS",
+            "FROM",
+            "INTO",
+            "VALUES",
+            "SET",
+            "EXEC",
+            "EXECUTE",
+            "GRANT",
+            "REVOKE",
+            "COMMIT",
+            "ROLLBACK",
+            "TRANSACTION",
+            "BEGIN",
+            "END",
+            "IF",
+            "ELSE",
+            "CASE",
+            "WHEN",
+            "THEN",
+            "WHILE",
+            "FOR",
+            "DECLARE",
+            "CURSOR",
+            "OPEN",
+            "CLOSE",
+            "FETCH",
+            "DEALLOCATE",
+        }
+
         if identifier.upper() in reserved_words:
-            raise SanitizationError(f"Reserved SQL word: {identifier}")
+            raise SanitizationError(f"Reserved SQL word not allowed: {identifier}")
 
         return identifier
 
+    # DANGEROUS METHOD REMOVED: sanitize_sql_value()
+    #
+    # This method created false security by trying to manually escape SQL values.
+    # Manual SQL escaping is inherently unsafe and can be bypassed.
+    #
+    # SECURITY REQUIREMENT: Always use parameterized queries for SQL values!
+    #
+    # Example of CORRECT approach:
+    #   cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+    #
+    # Example of INCORRECT approach (vulnerable to SQL injection):
+    #   cursor.execute(f"SELECT * FROM users WHERE id = {sanitize_sql_value(user_id)}")
+    #
+    # If you need this method, your code architecture needs to be fixed to use
+    # parameterized queries instead.
+
     @classmethod
-    def sanitize_sql_value(cls, value: Any) -> str:
+    def _removed_sanitize_sql_value(cls, value: Any) -> None:
         """
-        Sanitize a value for SQL queries.
+        This method has been removed for security reasons.
 
-        Note: This is a fallback. Use parameterized queries whenever possible.
-
-        Args:
-            value: Value to sanitize
-
-        Returns:
-            Sanitized value as string
+        Use parameterized queries instead!
         """
-        if value is None:
-            return "NULL"
-
-        # Convert to string and escape quotes
-        str_value = str(value)
-        str_value = str_value.replace("'", "''")
-        str_value = str_value.replace("\\", "\\\\")
-
-        return f"'{str_value}'"
+        raise NotImplementedError(
+            "sanitize_sql_value() has been removed for security reasons. "
+            "Use parameterized queries instead of manual SQL escaping. "
+            "Example: cursor.execute('SELECT * FROM table WHERE id = %s', (value,))"
+        )
 
     @classmethod
     def sanitize_filename(cls, filename: str) -> str:
@@ -214,9 +283,9 @@ class InputSanitizer:
         if len(symbol) > 20:
             raise SanitizationError(f"Symbol too long: {symbol}")
 
-        # Check for SQL injection patterns
-        if cls._contains_dangerous_pattern(symbol):
-            raise SanitizationError(f"Symbol contains dangerous patterns: {symbol}")
+        # Check for XSS patterns only (SQL injection prevented by parameterized queries)
+        if cls._contains_xss_pattern(symbol):
+            raise SanitizationError(f"Symbol contains XSS patterns: {symbol}")
 
         return symbol.upper()
 
@@ -242,9 +311,9 @@ class InputSanitizer:
         if len(identifier) > 50:
             raise SanitizationError(f"Identifier too long: {identifier}")
 
-        # Check for SQL injection patterns
-        if cls._contains_dangerous_pattern(identifier):
-            raise SanitizationError(f"Identifier contains dangerous patterns: {identifier}")
+        # Check for XSS patterns only (SQL injection prevented by parameterized queries)
+        if cls._contains_xss_pattern(identifier):
+            raise SanitizationError(f"Identifier contains XSS patterns: {identifier}")
 
         return identifier
 

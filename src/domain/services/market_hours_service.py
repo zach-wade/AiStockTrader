@@ -10,7 +10,7 @@ from datetime import date, datetime, time, timedelta
 from enum import Enum
 from typing import Any, ClassVar
 
-import pytz
+from src.domain.interfaces.time_service import LocalizedDatetime, TimeService
 
 
 class MarketStatus(Enum):
@@ -76,6 +76,7 @@ class MarketHoursService:
 
     def __init__(
         self,
+        time_service: TimeService,
         timezone: str | None = None,
         holidays: set[str] | None = None,
         pre_market_open: time | None = None,
@@ -87,6 +88,7 @@ class MarketHoursService:
         Initialize market hours service with configurable parameters.
 
         Args:
+            time_service: Service for timezone and datetime operations
             timezone: Market timezone (defaults to NYSE timezone)
             holidays: Set of holiday dates in YYYY-MM-DD format
             pre_market_open: Pre-market session open time
@@ -94,8 +96,9 @@ class MarketHoursService:
             regular_close: Regular market session close time
             after_market_close: After-market session close time
         """
+        self._time_service = time_service
         self.timezone_str = timezone or self.DEFAULT_TIMEZONE
-        self.timezone = pytz.timezone(self.timezone_str)
+        self.timezone = self._time_service.get_timezone(self.timezone_str)
         self.holidays = holidays or self.DEFAULT_HOLIDAYS.copy()
 
         # Market hours configuration
@@ -122,11 +125,18 @@ class MarketHoursService:
         """
         # Use provided time or current time
         if current_time is None:
-            now = datetime.now(self.timezone)
-        elif current_time.tzinfo is None:
-            now = self.timezone.localize(current_time)
+            now = self._time_service.get_current_time(self.timezone)
+        elif not self._time_service.is_timezone_aware(current_time):
+            now = self._time_service.localize_naive_datetime(current_time, self.timezone)
         else:
-            now = current_time.astimezone(self.timezone)
+            # Convert to proper adapter and then convert timezone
+            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
+
+            if not hasattr(current_time, "native_datetime"):
+                adapter = LocalizedDatetimeAdapter(current_time)
+            else:
+                adapter = current_time
+            now = self._time_service.convert_timezone(adapter, self.timezone)
 
         # Business rule: Check if today is a holiday
         if self.is_holiday(now):
@@ -155,43 +165,59 @@ class MarketHoursService:
         else:
             return MarketStatus.CLOSED
 
-    def is_holiday(self, date: datetime) -> bool:
+    def is_holiday(self, dt: LocalizedDatetime) -> bool:
         """
         Check if a given date is a market holiday.
 
         Args:
-            date: Date to check
+            dt: Datetime to check
 
         Returns:
             True if the date is a holiday, False otherwise
         """
-        date_str = date.strftime("%Y-%m-%d")
+        date_str = self._time_service.format_datetime(dt, "%Y-%m-%d")
         return date_str in self.holidays
 
-    def is_weekend(self, date: datetime) -> bool:
+    def is_weekend(self, dt: LocalizedDatetime) -> bool:
         """
         Check if a given date is a weekend.
 
         Args:
-            date: Date to check
+            dt: Datetime to check
 
         Returns:
             True if the date is Saturday or Sunday, False otherwise
         """
         # Business rule: Saturday = 5, Sunday = 6
-        return date.weekday() >= 5
+        return dt.weekday() >= 5
 
-    def is_trading_day(self, date: datetime) -> bool:
+    def is_trading_day(self, dt: datetime | date) -> bool:
         """
         Check if a given date is a trading day.
 
         Args:
-            date: Date to check
+            dt: Date or datetime to check
 
         Returns:
             True if markets are open on this date, False otherwise
         """
-        return not (self.is_weekend(date) or self.is_holiday(date))
+        # Convert to localized datetime if needed
+        if isinstance(dt, date):
+            # Convert date to datetime at noon
+            check_dt = self._time_service.combine_date_time_timezone(dt, time(12, 0), self.timezone)
+        elif not self._time_service.is_timezone_aware(dt):
+            check_dt = self._time_service.localize_naive_datetime(dt, self.timezone)
+        else:
+            # Convert to proper adapter if needed
+            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
+
+            if hasattr(dt, "native_datetime"):
+                check_dt = dt
+            else:
+                adapter = LocalizedDatetimeAdapter(dt)
+                check_dt = self._time_service.convert_timezone(adapter, self.timezone)
+
+        return not (self.is_weekend(check_dt) or self.is_holiday(check_dt))
 
     def is_market_open(self, current_time: datetime | None = None) -> bool:
         """

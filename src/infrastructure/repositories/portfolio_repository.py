@@ -10,22 +10,26 @@ Implements optimistic locking for concurrent operations safety.
 import asyncio
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 # Local imports
-from src.application.interfaces.exceptions import PortfolioNotFoundError, RepositoryError
+from src.application.interfaces.exceptions import (
+    ConcurrencyError,
+    PortfolioNotFoundError,
+    RepositoryError,
+)
 from src.application.interfaces.repositories import IPortfolioRepository
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
+from src.domain.exceptions import DeadlockException, OptimisticLockException, StaleDataException
+from src.domain.services.concurrency_service import ConcurrencyService
 from src.infrastructure.database.adapter import PostgreSQLAdapter, Row
 
 logger = logging.getLogger(__name__)
 
 
-class OptimisticLockException(Exception):
-    """Raised when an optimistic lock conflict occurs during concurrent updates."""
-
-    pass
+# OptimisticLockException is now imported from domain.exceptions
 
 
 class PostgreSQLPortfolioRepository(IPortfolioRepository):
@@ -38,17 +42,26 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
     Note: Positions are stored separately and loaded as needed.
     """
 
-    def __init__(self, adapter: PostgreSQLAdapter, max_retries: int = 3) -> None:
+    def __init__(
+        self,
+        adapter: PostgreSQLAdapter,
+        max_retries: int = 3,
+        concurrency_service: ConcurrencyService | None = None,
+    ) -> None:
         """
         Initialize repository with database adapter.
 
         Args:
             adapter: PostgreSQL database adapter
             max_retries: Maximum retries for optimistic lock conflicts
+            concurrency_service: Optional concurrency service for advanced locking
         """
         self.adapter = adapter
         self.max_retries = max_retries
         self._version_lock = asyncio.Lock()
+        self.concurrency_service = concurrency_service or ConcurrencyService(
+            max_retries=max_retries
+        )
 
     async def save_portfolio(self, portfolio: Portfolio) -> Portfolio:
         """
@@ -369,86 +382,131 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
             PortfolioNotFoundError: If portfolio doesn't exist
             OptimisticLockException: If version conflict occurs
         """
-        retries = 0
-        while retries < self.max_retries:
-            try:
-                async with self._version_lock:
-                    # Get current version
-                    current_version = getattr(portfolio, "version", 1)
-                    new_version = current_version + 1
 
-                    # Update with version check
-                    update_query = """
-                    UPDATE portfolios SET
-                        name = %s, initial_capital = %s, cash_balance = %s,
-                        max_position_size = %s, max_portfolio_risk = %s, max_positions = %s,
-                        max_leverage = %s, total_realized_pnl = %s, total_commission_paid = %s,
-                        trades_count = %s, winning_trades = %s, losing_trades = %s,
-                        last_updated = %s, strategy = %s, tags = %s, version = %s
-                    WHERE id = %s AND version = %s
-                    RETURNING version
-                    """
+        async def _do_update() -> Portfolio:
+            async with self._version_lock:
+                # Get current version from portfolio
+                current_version = getattr(portfolio, "version", 1)
 
-                    result = await self.adapter.execute_query(
-                        update_query,
-                        portfolio.name,
-                        portfolio.initial_capital,
-                        portfolio.cash_balance,
-                        portfolio.max_position_size,
-                        portfolio.max_portfolio_risk,
-                        portfolio.max_positions,
-                        portfolio.max_leverage,
-                        portfolio.total_realized_pnl,
-                        portfolio.total_commission_paid,
-                        portfolio.trades_count,
-                        portfolio.winning_trades,
-                        portfolio.losing_trades,
-                        portfolio.last_updated or datetime.now(UTC),
-                        portfolio.strategy,
-                        portfolio.tags,
-                        new_version,  # New version
-                        portfolio.id,
-                        current_version,  # Check current version
+                # Note: The portfolio entity should have already incremented its version
+                # via _increment_version() when its state was modified
+                expected_new_version = current_version
+
+                # For backward compatibility, if version wasn't incremented, do it now
+                if portfolio.last_updated and portfolio.last_updated > (
+                    portfolio.created_at
+                    if hasattr(portfolio, "created_at")
+                    else datetime.min.replace(tzinfo=UTC)
+                ):
+                    # Portfolio was modified but version might not have been incremented
+                    if not hasattr(portfolio, "_version_incremented"):
+                        expected_new_version = current_version + 1
+                else:
+                    expected_new_version = current_version
+
+                # Update with version check using SELECT FOR UPDATE for pessimistic locking
+                # This prevents other transactions from modifying the row
+                lock_query = """
+                SELECT version FROM portfolios
+                WHERE id = %s
+                FOR UPDATE NOWAIT
+                """
+
+                try:
+                    lock_result = await self.adapter.fetch_one(lock_query, portfolio.id)
+                except Exception as e:
+                    if "could not obtain lock" in str(e).lower():
+                        # Another transaction has the lock
+                        raise StaleDataException(
+                            entity_type="Portfolio",
+                            entity_id=portfolio.id,
+                            expected_version=current_version,
+                            actual_version=None,
+                        )
+                    raise
+
+                if lock_result is None:
+                    raise PortfolioNotFoundError(portfolio.id)
+
+                db_version = lock_result["version"]
+
+                # Check if the database version matches what we expect
+                if db_version != current_version:
+                    raise StaleDataException(
+                        entity_type="Portfolio",
+                        entity_id=portfolio.id,
+                        expected_version=current_version,
+                        actual_version=db_version,
                     )
 
-                    if "UPDATE 0" in result:
-                        # Check if portfolio exists
-                        check_query = "SELECT version FROM portfolios WHERE id = %s"
-                        check_result = await self.adapter.fetch_one(check_query, portfolio.id)
+                # Now perform the update
+                update_query = """
+                UPDATE portfolios SET
+                    name = %s, initial_capital = %s, cash_balance = %s,
+                    max_position_size = %s, max_portfolio_risk = %s, max_positions = %s,
+                    max_leverage = %s, total_realized_pnl = %s, total_commission_paid = %s,
+                    trades_count = %s, winning_trades = %s, losing_trades = %s,
+                    last_updated = %s, strategy = %s, tags = %s, version = %s
+                WHERE id = %s AND version = %s
+                RETURNING version
+                """
 
-                        if check_result is None:
-                            raise PortfolioNotFoundError(portfolio.id)
-                        else:
-                            # Version conflict - retry
-                            retries += 1
-                            if retries >= self.max_retries:
-                                raise OptimisticLockException(
-                                    f"Failed to update portfolio {portfolio.id} after {self.max_retries} retries due to version conflicts"
-                                )
+                result = await self.adapter.execute_query(
+                    update_query,
+                    portfolio.name,
+                    portfolio.initial_capital,
+                    portfolio.cash_balance,
+                    portfolio.max_position_size,
+                    portfolio.max_portfolio_risk,
+                    portfolio.max_positions,
+                    portfolio.max_leverage,
+                    portfolio.total_realized_pnl,
+                    portfolio.total_commission_paid,
+                    portfolio.trades_count,
+                    portfolio.winning_trades,
+                    portfolio.losing_trades,
+                    portfolio.last_updated or datetime.now(UTC),
+                    portfolio.strategy,
+                    portfolio.tags,
+                    expected_new_version,  # New version
+                    portfolio.id,
+                    current_version,  # Check current version
+                )
 
-                            # Reload portfolio with new version
-                            reloaded = await self.get_portfolio_by_id(portfolio.id)
-                            if reloaded:
-                                portfolio.version = getattr(reloaded, "version", 1)
+                if "UPDATE 0" in result:
+                    # This shouldn't happen due to our lock, but handle it anyway
+                    raise StaleDataException(
+                        entity_type="Portfolio",
+                        entity_id=portfolio.id,
+                        expected_version=current_version,
+                        actual_version=None,
+                    )
 
-                            # Small delay before retry
-                            await asyncio.sleep(0.1 * retries)
-                            continue
+                # Update successful
+                portfolio.version = expected_new_version
+                logger.debug(f"Updated portfolio {portfolio.id} to version {expected_new_version}")
+                return portfolio
 
-                    # Update successful
-                    portfolio.version = new_version
-                    logger.debug(f"Updated portfolio {portfolio.id} to version {new_version}")
-                    return portfolio
-
-            except (PortfolioNotFoundError, OptimisticLockException):
-                raise
-            except Exception as e:
-                logger.error(f"Failed to update portfolio {portfolio.id}: {e}")
-                raise RepositoryError(f"Failed to update portfolio: {e}") from e
-
-        raise OptimisticLockException(
-            f"Failed to update portfolio {portfolio.id} after {self.max_retries} retries"
-        )
+        # Use the concurrency service for retry logic
+        try:
+            return await self.concurrency_service.async_retry_on_version_conflict(
+                _do_update,
+                entity_type="Portfolio",
+                entity_id=portfolio.id,
+            )
+        except OptimisticLockException:
+            raise
+        except (PortfolioNotFoundError, StaleDataException):
+            raise
+        except Exception as e:
+            # Check if it's a deadlock
+            if self.concurrency_service.detect_deadlock(e):
+                raise DeadlockException(
+                    message=f"Deadlock detected updating portfolio {portfolio.id}",
+                    entities=[("Portfolio", portfolio.id)],
+                )
+            logger.error(f"Failed to update portfolio {portfolio.id}: {e}")
+            raise RepositoryError(f"Failed to update portfolio: {e}") from e
 
     async def delete_portfolio(self, portfolio_id: UUID) -> bool:
         """
@@ -479,6 +537,162 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
         except Exception as e:
             logger.error(f"Failed to delete portfolio {portfolio_id}: {e}")
             raise RepositoryError(f"Failed to delete portfolio: {e}") from e
+
+    async def get_portfolio_for_update(self, portfolio_id: UUID) -> Portfolio | None:
+        """
+        Retrieve a portfolio with pessimistic locking (SELECT FOR UPDATE).
+
+        This method acquires a row-level lock on the portfolio, preventing
+        other transactions from modifying it until the current transaction
+        completes.
+
+        Args:
+            portfolio_id: The unique identifier of the portfolio
+
+        Returns:
+            The locked portfolio entity if found, None otherwise
+
+        Raises:
+            RepositoryError: If retrieval operation fails
+            ConcurrencyError: If unable to acquire lock
+        """
+        try:
+            # Use SELECT FOR UPDATE to lock the row
+            query = """
+            SELECT id, name, initial_capital, cash_balance, max_position_size,
+                   max_portfolio_risk, max_positions, max_leverage, total_realized_pnl,
+                   total_commission_paid, trades_count, winning_trades, losing_trades,
+                   created_at, last_updated, strategy, tags, COALESCE(version, 1) as version
+            FROM portfolios
+            WHERE id = %s
+            FOR UPDATE NOWAIT
+            """
+
+            try:
+                record = await self.adapter.fetch_one(query, portfolio_id)
+            except Exception as e:
+                if "could not obtain lock" in str(e).lower():
+                    raise ConcurrencyError(
+                        entity_type="Portfolio",
+                        identifier=portfolio_id,
+                    )
+                raise
+
+            if record is None:
+                return None
+
+            portfolio = self._map_record_to_portfolio(record)
+
+            # Load positions for this portfolio
+            await self._load_positions(portfolio)
+
+            return portfolio
+
+        except ConcurrencyError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get portfolio {portfolio_id} for update: {e}")
+            raise RepositoryError(f"Failed to retrieve portfolio for update: {e}") from e
+
+    async def update_portfolio_atomic(
+        self,
+        portfolio_id: UUID,
+        updates: dict[str, Any],
+        expected_version: int | None = None,
+    ) -> Portfolio:
+        """
+        Atomically update specific fields of a portfolio.
+
+        This method allows updating only specific fields without loading
+        the entire portfolio, reducing the chance of conflicts.
+
+        Args:
+            portfolio_id: The portfolio to update
+            updates: Dictionary of field names to new values
+            expected_version: If provided, ensures version matches before update
+
+        Returns:
+            The updated portfolio
+
+        Raises:
+            PortfolioNotFoundError: If portfolio doesn't exist
+            StaleDataException: If version mismatch
+            RepositoryError: If update fails
+        """
+        try:
+            async with self._version_lock:
+                # Build the UPDATE query dynamically
+                update_fields = []
+                params = []
+
+                # Add each field to update
+                for field, value in updates.items():
+                    if field not in ["id", "version", "created_at"]:
+                        update_fields.append(f"{field} = %s")
+                        params.append(value)
+
+                if not update_fields:
+                    raise ValueError("No fields to update")
+
+                # Always update version and last_updated
+                update_fields.append("version = version + 1")
+                update_fields.append("last_updated = %s")
+                params.append(datetime.now(UTC))
+
+                # Build WHERE clause
+                where_clause = "WHERE id = %s"
+                params.append(portfolio_id)
+
+                if expected_version is not None:
+                    where_clause += " AND version = %s"
+                    params.append(expected_version)
+
+                # Execute the update
+                query = f"""
+                UPDATE portfolios
+                SET {', '.join(update_fields)}
+                {where_clause}
+                RETURNING *
+                """
+
+                record = await self.adapter.fetch_one(query, *params)
+
+                if record is None:
+                    # Check if portfolio exists
+                    check_query = "SELECT id, version FROM portfolios WHERE id = %s"
+                    check_result = await self.adapter.fetch_one(check_query, portfolio_id)
+
+                    if check_result is None:
+                        raise PortfolioNotFoundError(portfolio_id)
+                    else:
+                        # Version mismatch
+                        raise StaleDataException(
+                            entity_type="Portfolio",
+                            entity_id=portfolio_id,
+                            expected_version=expected_version,
+                            actual_version=check_result["version"],
+                        )
+
+                portfolio = self._map_record_to_portfolio(record)
+                await self._load_positions(portfolio)
+
+                logger.debug(
+                    f"Atomically updated portfolio {portfolio_id} "
+                    f"to version {portfolio.version}"
+                )
+
+                return portfolio
+
+        except (PortfolioNotFoundError, StaleDataException):
+            raise
+        except Exception as e:
+            if self.concurrency_service.detect_deadlock(e):
+                raise DeadlockException(
+                    message=f"Deadlock detected updating portfolio {portfolio_id}",
+                    entities=[("Portfolio", portfolio_id)],
+                )
+            logger.error(f"Failed to atomically update portfolio {portfolio_id}: {e}")
+            raise RepositoryError(f"Failed to atomically update portfolio: {e}") from e
 
     async def create_portfolio_snapshot(self, portfolio: Portfolio) -> Portfolio:
         """

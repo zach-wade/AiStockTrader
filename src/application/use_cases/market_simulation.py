@@ -219,39 +219,39 @@ class UpdateMarketPriceUseCase(
 
         # Limit orders
         if order.order_type == OrderType.LIMIT and order.limit_price:
-            if order.side == OrderSide.BUY and current_price.value <= order.limit_price:
+            if order.side == OrderSide.BUY and current_price.value <= order.limit_price.value:
                 return (
                     True,
-                    f"Buy limit triggered: price {current_price.value} <= limit {order.limit_price}",
+                    f"Buy limit triggered: price {current_price.value} <= limit {order.limit_price.value}",
                 )
-            elif order.side == OrderSide.SELL and current_price.value >= order.limit_price:
+            elif order.side == OrderSide.SELL and current_price.value >= order.limit_price.value:
                 return (
                     True,
-                    f"Sell limit triggered: price {current_price.value} >= limit {order.limit_price}",
+                    f"Sell limit triggered: price {current_price.value} >= limit {order.limit_price.value}",
                 )
 
         # Stop orders
         if order.order_type == OrderType.STOP and order.stop_price:
-            if order.side == OrderSide.BUY and current_price.value >= order.stop_price:
+            if order.side == OrderSide.BUY and current_price.value >= order.stop_price.value:
                 return (
                     True,
-                    f"Buy stop triggered: price {current_price.value} >= stop {order.stop_price}",
+                    f"Buy stop triggered: price {current_price.value} >= stop {order.stop_price.value}",
                 )
-            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price:
+            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price.value:
                 return (
                     True,
-                    f"Sell stop triggered: price {current_price.value} <= stop {order.stop_price}",
+                    f"Sell stop triggered: price {current_price.value} <= stop {order.stop_price.value}",
                 )
 
         # Stop-limit orders
         if order.order_type == OrderType.STOP_LIMIT and order.stop_price:
             # First check if stop is triggered
-            if order.side == OrderSide.BUY and current_price.value >= order.stop_price:
+            if order.side == OrderSide.BUY and current_price.value >= order.stop_price.value:
                 # Then check if limit allows execution
-                if order.limit_price and current_price.value <= order.limit_price:
+                if order.limit_price and current_price.value <= order.limit_price.value:
                     return True, "Buy stop-limit triggered: stop hit and price within limit"
-            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price:
-                if order.limit_price and current_price.value >= order.limit_price:
+            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price.value:
+                if order.limit_price and current_price.value >= order.limit_price.value:
                     return True, "Sell stop-limit triggered: stop hit and price within limit"
 
         return False, None
@@ -349,15 +349,15 @@ class ProcessPendingOrdersUseCase(
             return True, "Market order"
 
         if order.order_type == OrderType.LIMIT and order.limit_price:
-            if order.side == OrderSide.BUY and current_price.value <= order.limit_price:
+            if order.side == OrderSide.BUY and current_price.value <= order.limit_price.value:
                 return True, "Buy limit triggered"
-            elif order.side == OrderSide.SELL and current_price.value >= order.limit_price:
+            elif order.side == OrderSide.SELL and current_price.value >= order.limit_price.value:
                 return True, "Sell limit triggered"
 
         if order.order_type == OrderType.STOP and order.stop_price:
-            if order.side == OrderSide.BUY and current_price.value >= order.stop_price:
+            if order.side == OrderSide.BUY and current_price.value >= order.stop_price.value:
                 return True, "Buy stop triggered"
-            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price:
+            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price.value:
                 return True, "Sell stop triggered"
 
         return False, None

@@ -50,9 +50,10 @@ Note:
 """
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from enum import Enum
-from zoneinfo import ZoneInfo
+
+from src.domain.interfaces.time_service import TimeService, TimezoneInfo
 
 
 class Exchange(Enum):
@@ -87,6 +88,7 @@ class MarketHours:
         open_time: Time when the session opens (in market timezone).
         close_time: Time when the session closes (in market timezone).
         timezone: Timezone for the market (e.g., America/New_York for NYSE).
+        time_service: Service for timezone operations.
         is_open: Whether this session is active (default True).
 
     Note:
@@ -96,7 +98,8 @@ class MarketHours:
 
     open_time: time
     close_time: time
-    timezone: ZoneInfo
+    timezone: TimezoneInfo
+    time_service: TimeService
     is_open: bool = True
 
     def is_time_in_session(self, check_time: datetime) -> bool:
@@ -112,20 +115,31 @@ class MarketHours:
             bool: True if the time is within session hours, False otherwise.
 
         Example:
+            >>> from src.infrastructure.time import PythonTimeService
+            >>> time_service = PythonTimeService()
+            >>> tz = time_service.get_timezone("America/New_York")
             >>> market_hours = MarketHours(
             ...     open_time=time(9, 30),
             ...     close_time=time(16, 0),
-            ...     timezone=ZoneInfo("America/New_York")
+            ...     timezone=tz,
+            ...     time_service=time_service
             ... )
-            >>> check_time = datetime.now(UTC)
-            >>> if market_hours.is_time_in_session(check_time):
+            >>> check_time = time_service.get_utc_now()
+            >>> if market_hours.is_time_in_session(check_time.as_datetime()):
             ...     print("Market is in session")
         """
         if not self.is_open:
             return False
 
         # Convert to market timezone
-        market_time = check_time.astimezone(self.timezone)
+        if self.time_service.is_timezone_aware(check_time):
+            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
+
+            adapter = LocalizedDatetimeAdapter(check_time)
+            market_time = self.time_service.convert_timezone(adapter, self.timezone)
+        else:
+            market_time = self.time_service.localize_naive_datetime(check_time, self.timezone)
+
         current_time = market_time.time()
 
         # Handle regular hours
@@ -234,56 +248,72 @@ class TradingCalendar:
         date(2025, 12, 25),  # Christmas
     }
 
-    # Exchange configurations
-    EXCHANGE_SESSIONS = {
-        Exchange.NYSE: TradingSession(
-            regular_hours=MarketHours(
-                open_time=time(9, 30), close_time=time(16, 0), timezone=ZoneInfo("America/New_York")
-            ),
-            pre_market=MarketHours(
-                open_time=time(4, 0), close_time=time(9, 30), timezone=ZoneInfo("America/New_York")
-            ),
-            after_hours=MarketHours(
-                open_time=time(16, 0), close_time=time(20, 0), timezone=ZoneInfo("America/New_York")
-            ),
-        ),
-        Exchange.NASDAQ: TradingSession(
-            regular_hours=MarketHours(
-                open_time=time(9, 30), close_time=time(16, 0), timezone=ZoneInfo("America/New_York")
-            ),
-            pre_market=MarketHours(
-                open_time=time(4, 0), close_time=time(9, 30), timezone=ZoneInfo("America/New_York")
-            ),
-            after_hours=MarketHours(
-                open_time=time(16, 0), close_time=time(20, 0), timezone=ZoneInfo("America/New_York")
-            ),
-        ),
-        Exchange.FOREX: TradingSession(
-            regular_hours=MarketHours(
-                open_time=time(17, 0),  # Sunday 5PM ET
-                close_time=time(17, 0),  # Friday 5PM ET (handled specially)
-                timezone=ZoneInfo("America/New_York"),
-            )
-        ),
-        Exchange.CRYPTO: TradingSession(
-            regular_hours=MarketHours(
-                open_time=time(0, 0), close_time=time(23, 59, 59), timezone=ZoneInfo("UTC")
-            )
-        ),
-    }
+    # Note: Exchange sessions are now created dynamically in _create_exchange_session()
+    # to properly inject the time service dependency
 
-    def __init__(self, exchange: Exchange = Exchange.NYSE) -> None:
+    def __init__(self, time_service: TimeService, exchange: Exchange = Exchange.NYSE) -> None:
         """Initialize calendar for specific exchange.
 
         Args:
+            time_service: Service for timezone and datetime operations
             exchange: Exchange to create calendar for (default NYSE).
 
         Example:
-            >>> nyse_calendar = TradingCalendar(Exchange.NYSE)
-            >>> forex_calendar = TradingCalendar(Exchange.FOREX)
+            >>> from src.infrastructure.time import PythonTimeService
+            >>> time_service = PythonTimeService()
+            >>> nyse_calendar = TradingCalendar(time_service, Exchange.NYSE)
+            >>> forex_calendar = TradingCalendar(time_service, Exchange.FOREX)
         """
+        self._time_service = time_service
         self.exchange = exchange
-        self.session = self.EXCHANGE_SESSIONS[exchange]
+        self.session = self._create_exchange_session(exchange)
+
+    def _create_exchange_session(self, exchange: Exchange) -> TradingSession:
+        """Create a trading session with proper time service injection."""
+        ny_tz = self._time_service.get_timezone("America/New_York")
+        utc_tz = self._time_service.get_timezone("UTC")
+
+        if exchange == Exchange.NYSE or exchange == Exchange.NASDAQ:
+            return TradingSession(
+                regular_hours=MarketHours(
+                    open_time=time(9, 30),
+                    close_time=time(16, 0),
+                    timezone=ny_tz,
+                    time_service=self._time_service,
+                ),
+                pre_market=MarketHours(
+                    open_time=time(4, 0),
+                    close_time=time(9, 30),
+                    timezone=ny_tz,
+                    time_service=self._time_service,
+                ),
+                after_hours=MarketHours(
+                    open_time=time(16, 0),
+                    close_time=time(20, 0),
+                    timezone=ny_tz,
+                    time_service=self._time_service,
+                ),
+            )
+        elif exchange == Exchange.FOREX:
+            return TradingSession(
+                regular_hours=MarketHours(
+                    open_time=time(17, 0),
+                    close_time=time(17, 0),
+                    timezone=ny_tz,
+                    time_service=self._time_service,
+                )
+            )
+        elif exchange == Exchange.CRYPTO:
+            return TradingSession(
+                regular_hours=MarketHours(
+                    open_time=time(0, 0),
+                    close_time=time(23, 59, 59),
+                    timezone=utc_tz,
+                    time_service=self._time_service,
+                )
+            )
+        else:
+            raise ValueError(f"Unsupported exchange: {exchange}")
 
     def is_trading_day(self, check_date: date) -> bool:
         """Check if given date is a trading day.
@@ -352,7 +382,7 @@ class TradingCalendar:
             Forex markets have special handling for their Sunday-Friday schedule.
         """
         if check_time is None:
-            check_time = datetime.now(UTC)
+            check_time = self._time_service.get_utc_now().as_datetime()
 
         # Check if it's a trading day
         if not self.is_trading_day(check_time.date()):
@@ -383,7 +413,16 @@ class TradingCalendar:
             - Friday: Closes at 5PM ET
             - Saturday: Closed all day
         """
-        ny_time = check_time.astimezone(ZoneInfo("America/New_York"))
+        ny_tz = self._time_service.get_timezone("America/New_York")
+
+        if self._time_service.is_timezone_aware(check_time):
+            from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
+
+            adapter = LocalizedDatetimeAdapter(check_time)
+            ny_time = self._time_service.convert_timezone(adapter, ny_tz)
+        else:
+            ny_time = self._time_service.localize_naive_datetime(check_time, ny_tz)
+
         weekday = ny_time.weekday()
         current_time = ny_time.time()
 
@@ -424,7 +463,7 @@ class TradingCalendar:
             Returns UTC time for consistency. Convert to local timezone as needed.
         """
         if from_time is None:
-            from_time = datetime.now(UTC)
+            from_time = self._time_service.get_utc_now().as_datetime()
 
         # If currently open, return current time
         if self.is_market_open(from_time):
@@ -441,9 +480,11 @@ class TradingCalendar:
 
         # Get market open time for that day
         market_tz = self.session.regular_hours.timezone
-        open_time = datetime.combine(next_day, self.session.regular_hours.open_time, market_tz)
+        open_time = self._time_service.combine_date_time_timezone(
+            next_day, self.session.regular_hours.open_time, market_tz
+        )
 
-        return open_time.astimezone(UTC)
+        return self._time_service.to_utc(open_time).as_datetime()
 
     def next_market_close(self, from_time: datetime | None = None) -> datetime:
         """Get next market close time.
@@ -469,7 +510,7 @@ class TradingCalendar:
             >>> print(f"Market closes: {next_close.isoformat()}")
         """
         if from_time is None:
-            from_time = datetime.now(UTC)
+            from_time = self._time_service.get_utc_now().as_datetime()
 
         # Crypto never closes
         if self.exchange == Exchange.CRYPTO:
@@ -478,19 +519,28 @@ class TradingCalendar:
         # If market is open, return today's close
         if self.is_market_open(from_time):
             market_tz = self.session.regular_hours.timezone
-            close_time = datetime.combine(
+            close_time = self._time_service.combine_date_time_timezone(
                 from_time.date(), self.session.regular_hours.close_time, market_tz
             )
 
             # Handle Forex Friday close
             if self.exchange == Exchange.FOREX:
-                ny_time = from_time.astimezone(ZoneInfo("America/New_York"))
+                ny_tz = self._time_service.get_timezone("America/New_York")
+
+                if self._time_service.is_timezone_aware(from_time):
+                    from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter
+
+                    adapter = LocalizedDatetimeAdapter(from_time)
+                else:
+                    adapter = self._time_service.localize_naive_datetime(from_time, ny_tz)
+
+                ny_time = self._time_service.convert_timezone(adapter, ny_tz)
                 if ny_time.weekday() == 4:  # Friday
-                    close_time = datetime.combine(
-                        ny_time.date(), time(17, 0), ZoneInfo("America/New_York")
+                    close_time = self._time_service.combine_date_time_timezone(
+                        ny_time.date(), time(17, 0), ny_tz
                     )
 
-            return close_time.astimezone(UTC)
+            return self._time_service.to_utc(close_time).as_datetime()
 
         # Market is closed, find next open then close
         next_open = self.next_market_open(from_time)

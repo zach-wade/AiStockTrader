@@ -27,6 +27,7 @@ from .jwt_service import (
     TokenRevokedException,
 )
 from .models import AuthAuditLog, UserSession
+from .permissions import PermissionMatrix
 from .rbac_service import RBACService
 
 logger = logging.getLogger(__name__)
@@ -630,3 +631,300 @@ def get_current_user_roles(
 ) -> list[str]:
     """Get current user roles."""
     return request.state.roles  # type: ignore[no-any-return]
+
+
+class AuthenticationMiddleware(BaseHTTPMiddleware):
+    """
+    Comprehensive authentication middleware for the trading system.
+
+    Handles:
+    - JWT token validation
+    - API key authentication
+    - Session management
+    - Rate limiting
+    - Audit logging
+    - Security headers
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        jwt_service: JWTService,
+        rbac_service: RBACService,
+        db_session: Session,
+        redis_client: redis.Redis | None = None,
+        excluded_paths: list[str] | None = None,
+        require_auth: bool = True,
+    ):
+        """
+        Initialize authentication middleware.
+
+        Args:
+            app: ASGI application
+            jwt_service: JWT service instance
+            rbac_service: RBAC service instance
+            db_session: Database session
+            redis_client: Redis client for caching
+            excluded_paths: Paths that don't require authentication
+            require_auth: Whether to require authentication by default
+        """
+        super().__init__(app)
+        self.jwt_service = jwt_service
+        self.rbac_service = rbac_service
+        self.db = db_session
+        self.redis = redis_client
+        self.excluded_paths = excluded_paths or [
+            "/auth/register",
+            "/auth/login",
+            "/auth/password/reset",
+            "/auth/email/verify",
+            "/health",
+            "/metrics",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+        ]
+        self.require_auth = require_auth
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        """Process request through authentication pipeline."""
+        start_time = time.time()
+
+        # Check if path is excluded from authentication
+        if self._is_excluded_path(request.url.path):
+            return await call_next(request)
+
+        # Try to authenticate request
+        auth_result = await self._authenticate_request(request)
+
+        if self.require_auth and not auth_result:
+            return Response(
+                content="Authentication required",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Process request
+        response = await call_next(request)
+
+        # Log audit event if authenticated
+        if auth_result:
+            await self._log_request(request, response, time.time() - start_time)
+
+        return response
+
+    async def _authenticate_request(self, request: Request) -> bool:
+        """
+        Authenticate request using JWT or API key.
+
+        Returns:
+            True if authenticated, False otherwise
+        """
+        # Check for Bearer token
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            return await self._validate_jwt_token(request, token)
+
+        # Check for API key
+        api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+        if api_key:
+            return await self._validate_api_key(request, api_key)
+
+        return False
+
+    async def _validate_jwt_token(self, request: Request, token: str) -> bool:
+        """Validate JWT token and set request context."""
+        try:
+            payload = self.jwt_service.verify_access_token(token)
+
+            # Validate session if present
+            session_id = payload.get("sid")
+            if session_id:
+                session = (
+                    self.db.query(UserSession).filter_by(id=session_id, is_active=True).first()
+                )
+
+                if not session or not session.is_valid():
+                    return False
+
+                # Update session activity
+                session.update_activity()
+                self.db.commit()
+
+            # Set request context
+            request.state.authenticated = True
+            request.state.auth_type = "jwt"
+            request.state.user_id = payload["sub"]
+            request.state.email = payload.get("email")
+            request.state.username = payload.get("username")
+            request.state.roles = payload.get("roles", [])
+            request.state.permissions = payload.get("permissions", [])
+            request.state.session_id = session_id
+            request.state.device_id = payload.get("device_id")
+            request.state.mfa_verified = payload.get("mfa_verified", False)
+
+            return True
+
+        except (TokenExpiredException, TokenRevokedException, InvalidTokenException) as e:
+            logger.debug(f"Token validation failed: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error during token validation: {e}")
+            return False
+
+    async def _validate_api_key(self, request: Request, api_key: str) -> bool:
+        """Validate API key and set request context."""
+        try:
+            key_info = await self.rbac_service.validate_api_key(api_key)
+
+            if not key_info:
+                return False
+
+            # Check rate limit
+            if self.redis and not await self._check_api_key_rate_limit(
+                key_info.id, key_info.rate_limit
+            ):
+                return False
+
+            # Set request context
+            request.state.authenticated = True
+            request.state.auth_type = "api_key"
+            request.state.user_id = key_info.user_id
+            request.state.api_key_id = key_info.id
+            request.state.permissions = key_info.permissions
+            request.state.roles = []  # API keys don't have roles
+
+            # Update last used
+            client_ip = request.client.host if request.client else None
+            await self.rbac_service.update_api_key_last_used(key_info.id, client_ip)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"API key validation failed: {e}")
+            return False
+
+    async def _check_api_key_rate_limit(self, key_id: str, limit: int) -> bool:
+        """Check API key rate limit."""
+        now = time.time()
+        window_start = now - 3600  # 1 hour window
+        key = f"rate_limit:api_key:{key_id}"
+
+        # Remove old entries
+        self.redis.zremrangebyscore(key, 0, window_start)
+
+        # Count requests in window
+        request_count = self.redis.zcard(key)
+
+        if request_count >= limit:
+            return False
+
+        # Add current request
+        self.redis.zadd(key, {str(now): now})
+        self.redis.expire(key, 3600)
+
+        return True
+
+    def _is_excluded_path(self, path: str) -> bool:
+        """Check if path is excluded from authentication."""
+        for excluded in self.excluded_paths:
+            if path.startswith(excluded):
+                return True
+        return False
+
+    async def _log_request(self, request: Request, response: Response, duration: float) -> None:
+        """Log authenticated request for audit."""
+        if not hasattr(request.state, "user_id"):
+            return
+
+        # Check if operation should be audited
+        path_parts = request.url.path.strip("/").split("/")
+        if len(path_parts) >= 2:
+            resource = path_parts[0]
+            action = request.method.lower()
+            permission = f"{resource}:{action}"
+
+            if PermissionMatrix.is_auditable_operation(permission):
+                audit_log = AuthAuditLog(
+                    user_id=request.state.user_id,
+                    event_type="api_request",
+                    event_data={
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status_code": response.status_code,
+                        "duration": duration,
+                        "auth_type": getattr(request.state, "auth_type", "unknown"),
+                        "permission": permission,
+                    },
+                    ip_address=request.client.host if request.client else None,
+                    user_agent=request.headers.get("User-Agent"),
+                    success=response.status_code < 400,
+                )
+
+                self.db.add(audit_log)
+                await self.db.commit()
+
+
+class CORSMiddleware(BaseHTTPMiddleware):
+    """
+    CORS middleware for handling cross-origin requests.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        allow_origins: list[str] | None = None,
+        allow_methods: list[str] | None = None,
+        allow_headers: list[str] | None = None,
+        allow_credentials: bool = True,
+        max_age: int = 3600,
+    ):
+        """Initialize CORS middleware."""
+        super().__init__(app)
+        self.allow_origins = allow_origins or ["*"]
+        self.allow_methods = allow_methods or ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+        self.allow_headers = allow_headers or ["*"]
+        self.allow_credentials = allow_credentials
+        self.max_age = max_age
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        """Handle CORS headers."""
+        # Handle preflight requests
+        if request.method == "OPTIONS":
+            return self._create_preflight_response(request)
+
+        # Process request
+        response = await call_next(request)
+
+        # Add CORS headers
+        origin = request.headers.get("Origin")
+        if origin and self._is_allowed_origin(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = str(
+                self.allow_credentials
+            ).lower()
+            response.headers["Vary"] = "Origin"
+
+        return response
+
+    def _create_preflight_response(self, request: Request) -> Response:
+        """Create preflight response for OPTIONS requests."""
+        headers = {
+            "Access-Control-Allow-Methods": ", ".join(self.allow_methods),
+            "Access-Control-Allow-Headers": ", ".join(self.allow_headers),
+            "Access-Control-Max-Age": str(self.max_age),
+        }
+
+        origin = request.headers.get("Origin")
+        if origin and self._is_allowed_origin(origin):
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = str(self.allow_credentials).lower()
+
+        return Response(status_code=200, headers=headers)
+
+    def _is_allowed_origin(self, origin: str) -> bool:
+        """Check if origin is allowed."""
+        if "*" in self.allow_origins:
+            return True
+        return origin in self.allow_origins

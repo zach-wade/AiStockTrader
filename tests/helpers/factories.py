@@ -1,14 +1,12 @@
 """Factory functions for creating test entities."""
 
-from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
 
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
 from src.domain.entities.portfolio import Portfolio
-from src.domain.entities.position import Position, PositionStatus
-from src.domain.value_objects import Money, Price, Quantity, Symbol
+from src.domain.entities.position import Position
+from src.domain.value_objects import Money, Price, Quantity
 
 
 class OrderFactory:
@@ -16,7 +14,6 @@ class OrderFactory:
 
     @staticmethod
     def create(
-        order_id: str | None = None,
         symbol: str = "AAPL",
         side: OrderSide = OrderSide.BUY,
         quantity: int | Decimal = 100,
@@ -27,16 +24,12 @@ class OrderFactory:
         **kwargs: Any,
     ) -> Order:
         """Create a test Order with sensible defaults."""
-        order_id = order_id or str(uuid4())
-
         order_data = {
-            "order_id": order_id,
-            "symbol": Symbol(symbol),
+            "symbol": symbol,
             "side": side,
             "quantity": Quantity(Decimal(str(quantity))),
             "order_type": order_type,
             "status": status,
-            "created_at": kwargs.get("created_at", datetime.now(UTC)),
         }
 
         if limit_price is not None:
@@ -55,23 +48,16 @@ class PositionFactory:
 
     @staticmethod
     def create(
-        position_id: str | None = None,
         symbol: str = "AAPL",
         quantity: int | Decimal = 100,
-        entry_price: Decimal = "150.00",
-        status: PositionStatus = PositionStatus.OPEN,
+        entry_price: Decimal = Decimal("150.00"),
         **kwargs: Any,
     ) -> Position:
         """Create a test Position with sensible defaults."""
-        position_id = position_id or str(uuid4())
-
         position_data = {
-            "position_id": position_id,
-            "symbol": Symbol(symbol),
+            "symbol": symbol,
             "quantity": Quantity(Decimal(str(quantity))),
-            "entry_price": Price(Decimal(str(entry_price))),
-            "status": status,
-            "opened_at": kwargs.get("opened_at", datetime.now(UTC)),
+            "average_entry_price": Price(Decimal(str(entry_price))),
         }
 
         # Add any additional kwargs
@@ -85,19 +71,16 @@ class PortfolioFactory:
 
     @staticmethod
     def create(
-        portfolio_id: str | None = None,
         name: str = "Test Portfolio",
-        cash_balance: Decimal = "100000.00",
+        cash_balance: Decimal = Decimal("100000.00"),
+        initial_capital: Decimal = Decimal("100000.00"),
         **kwargs: Any,
     ) -> Portfolio:
         """Create a test Portfolio with sensible defaults."""
-        portfolio_id = portfolio_id or str(uuid4())
-
         portfolio_data = {
-            "portfolio_id": portfolio_id,
             "name": name,
             "cash_balance": Money(Decimal(str(cash_balance))),
-            "created_at": kwargs.get("created_at", datetime.now(UTC)),
+            "initial_capital": Money(Decimal(str(initial_capital))),
         }
 
         # Add any additional kwargs

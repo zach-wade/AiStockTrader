@@ -9,6 +9,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
+from ..exceptions import StaleDataException
+from ..value_objects import Money, Price, Quantity
 from .position import Position
 
 
@@ -17,9 +19,9 @@ class PositionRequest:
     """Request parameters for opening a position."""
 
     symbol: str
-    quantity: Decimal
-    entry_price: Decimal
-    commission: Decimal = Decimal("0")
+    quantity: Quantity
+    entry_price: Price
+    commission: Money = Money(Decimal("0"))
     strategy: str | None = None
 
 
@@ -37,21 +39,21 @@ class Portfolio:
     name: str = "Default Portfolio"
 
     # Capital
-    initial_capital: Decimal = Decimal("100000")
-    cash_balance: Decimal = Decimal("100000")
+    initial_capital: Money = Money(Decimal("100000"))
+    cash_balance: Money = Money(Decimal("100000"))
 
     # Positions
     positions: dict[str, Position] = field(default_factory=dict)
 
     # Risk limits
-    max_position_size: Decimal = Decimal("10000")  # Max $ per position
+    max_position_size: Money = Money(Decimal("10000"))  # Max $ per position
     max_portfolio_risk: Decimal = Decimal("0.02")  # Max 2% portfolio risk
     max_positions: int = 10
     max_leverage: Decimal = Decimal("1.0")  # No leverage by default
 
     # Performance tracking
-    total_realized_pnl: Decimal = Decimal("0")
-    total_commission_paid: Decimal = Decimal("0")
+    total_realized_pnl: Money = Money(Decimal("0"))
+    total_commission_paid: Money = Money(Decimal("0"))
     trades_count: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
@@ -68,25 +70,44 @@ class Portfolio:
     def __post_init__(self) -> None:
         """Validate portfolio after initialization"""
         self._validate()
+        # Ensure version is initialized
+        if not hasattr(self, "version") or self.version is None:
+            self.version = 1
+
+    def _increment_version(self) -> None:
+        """Increment the version number for optimistic locking."""
+        self.version = getattr(self, "version", 1) + 1
+        self.last_updated = datetime.now(UTC)
+
+    def _check_version(self, expected_version: int | None = None) -> None:
+        """Check version for optimistic locking.
+
+        Args:
+            expected_version: The expected version number. If provided, will raise
+                            StaleDataException if current version doesn't match.
+        """
+        if expected_version is not None:
+            current_version = getattr(self, "version", 1)
+            if current_version != expected_version:
+                raise StaleDataException(
+                    entity_type="Portfolio",
+                    entity_id=self.id,
+                    expected_version=expected_version,
+                    actual_version=current_version,
+                )
 
     def _validate(self) -> None:
         """Validate portfolio attributes"""
-        # Handle both Money and Decimal types for initial_capital
-        if hasattr(self.initial_capital, "amount"):
-            if self.initial_capital.amount <= 0:
-                raise ValueError("Initial capital must be positive")
-        elif self.initial_capital <= 0:
+        # Validate initial capital (Money)
+        if self.initial_capital.amount <= 0:
             raise ValueError("Initial capital must be positive")
 
-        # Handle both Money and Decimal types for cash_balance
-        if hasattr(self.cash_balance, "amount"):
-            if self.cash_balance.amount < 0:
-                raise ValueError("Cash balance cannot be negative")
-        elif self.cash_balance < 0:
+        # Validate cash balance (Money)
+        if self.cash_balance.amount < 0:
             raise ValueError("Cash balance cannot be negative")
 
-        # max_position_size is Decimal
-        if self.max_position_size and self.max_position_size <= 0:
+        # Validate max position size (Money)
+        if self.max_position_size and self.max_position_size.amount <= 0:
             raise ValueError("Max position size must be positive")
 
         if self.max_portfolio_risk is not None and (
@@ -101,7 +122,7 @@ class Portfolio:
             raise ValueError("Max leverage must be at least 1.0")
 
     def can_open_position(
-        self, symbol: str, quantity: Decimal, price: Decimal
+        self, symbol: str, quantity: Quantity, price: Price
     ) -> tuple[bool, str | None]:
         """
         Check if a new position can be opened.
@@ -119,11 +140,11 @@ class Portfolio:
             return False, f"Maximum positions limit reached ({self.max_positions})"
 
         # Check position size limit
-        position_value = abs(quantity) * price
+        position_value = Money(abs(quantity.value) * price.value)
         if position_value > self.max_position_size:
             return (
                 False,
-                f"Position size ${position_value:.2f} exceeds limit ${self.max_position_size:.2f}",
+                f"Position size {position_value} exceeds limit {self.max_position_size}",
             )
 
         # Check available cash
@@ -131,14 +152,14 @@ class Portfolio:
         if required_capital > self.cash_balance:
             return (
                 False,
-                f"Insufficient cash: ${self.cash_balance:.2f} available, ${required_capital:.2f} required",
+                f"Insufficient cash: {self.cash_balance} available, {required_capital} required",
             )
 
         # Check portfolio risk limit
         portfolio_value = self.get_total_value()
-        if portfolio_value > 0:
+        if portfolio_value.amount > 0:
             risk_amount = position_value
-            risk_ratio = risk_amount / portfolio_value
+            risk_ratio = risk_amount.amount / portfolio_value.amount
             if risk_ratio > self.max_portfolio_risk:
                 return (
                     False,
@@ -174,10 +195,11 @@ class Portfolio:
             raise ValueError(f"Position already exists for {request.symbol}")
 
         # Check cash availability
-        required_cash = abs(request.quantity) * request.entry_price + request.commission
+        position_cost = Money(abs(request.quantity.value) * request.entry_price.value)
+        required_cash = position_cost + request.commission
         if required_cash > self.cash_balance:
             raise ValueError(
-                f"Insufficient cash: ${self.cash_balance:.2f} available, ${required_cash:.2f} required"
+                f"Insufficient cash: {self.cash_balance} available, {required_cash} required"
             )
 
         # Create position object
@@ -190,17 +212,17 @@ class Portfolio:
         )
 
         # Update portfolio state
-        self.cash_balance -= required_cash
-        self.total_commission_paid += request.commission
+        self.cash_balance = self.cash_balance - required_cash
+        self.total_commission_paid = self.total_commission_paid + request.commission
         self.trades_count += 1
-        self.last_updated = datetime.now(UTC)
         self.positions[request.symbol] = position
+        self._increment_version()
 
         return position
 
     def close_position(
-        self, symbol: str, exit_price: Decimal, commission: Decimal = Decimal("0")
-    ) -> Decimal:
+        self, symbol: str, exit_price: Price, commission: Money = Money(Decimal("0"))
+    ) -> Money:
         """
         Close a position and update portfolio.
 
@@ -215,39 +237,42 @@ class Portfolio:
             raise ValueError(f"Position for {symbol} is already closed")
 
         # Close position and get P&L
-        position_value = abs(position.quantity) * exit_price
+        position_proceeds = Money(abs(position.quantity.value) * exit_price.value)
         pnl = position.close_position(exit_price, commission)
 
         # Update portfolio state
-        self.cash_balance += position_value - commission
-        self.total_realized_pnl += pnl
-        self.total_commission_paid += commission
+        self.cash_balance = self.cash_balance + position_proceeds - commission
+        self.total_realized_pnl = self.total_realized_pnl + pnl
+        self.total_commission_paid = self.total_commission_paid + commission
 
         # Track win/loss
-        if pnl > 0:
+        if pnl.amount > 0:
             self.winning_trades += 1
-        elif pnl < 0:
+        elif pnl.amount < 0:
             self.losing_trades += 1
 
-        self.last_updated = datetime.now(UTC)
+        self._increment_version()
 
         return pnl
 
-    def update_position_price(self, symbol: str, price: Decimal) -> None:
+    def update_position_price(self, symbol: str, price: Price) -> None:
         """Update market price for a position"""
         if symbol not in self.positions:
             raise ValueError(f"No position found for {symbol}")
 
         self.positions[symbol].update_market_price(price)
-        self.last_updated = datetime.now(UTC)
+        self._increment_version()
 
-    def update_all_prices(self, prices: dict[str, Decimal]) -> None:
+    def update_all_prices(self, prices: dict[str, Price]) -> None:
         """Update market prices for multiple positions"""
+        updated = False
         for symbol, price in prices.items():
             if symbol in self.positions and not self.positions[symbol].is_closed():
                 self.positions[symbol].update_market_price(price)
+                updated = True
 
-        self.last_updated = datetime.now(UTC)
+        if updated:
+            self._increment_version()
 
     def get_position(self, symbol: str) -> Position | None:
         """Get position for a symbol"""
@@ -261,65 +286,52 @@ class Portfolio:
         """Get all closed positions"""
         return [p for p in self.positions.values() if p.is_closed()]
 
-    def get_total_value(self) -> Decimal:
+    def get_total_value(self) -> Money:
         """Calculate total portfolio value (cash + positions)"""
-        # Convert Money to Decimal if needed
-        if hasattr(self.cash_balance, "amount"):
-            total: Decimal = self.cash_balance.amount
-        else:
-            total = Decimal(str(self.cash_balance))
+        total = self.cash_balance
 
         for position in self.get_open_positions():
             position_value = position.get_position_value()
             if position_value is not None:
-                total += position_value
+                total = total + position_value
 
         return total
 
-    def get_positions_value(self) -> Decimal:
+    def get_positions_value(self) -> Money:
         """Calculate total value of all open positions"""
-        total = Decimal("0")
+        total = Money(Decimal("0"))
 
         for position in self.get_open_positions():
             position_value = position.get_position_value()
             if position_value is not None:
-                total += position_value
+                total = total + position_value
 
         return total
 
-    def get_unrealized_pnl(self) -> Decimal:
+    def get_unrealized_pnl(self) -> Money:
         """Calculate total unrealized P&L"""
-        total = Decimal("0")
+        total = Money(Decimal("0"))
 
         for position in self.get_open_positions():
             unrealized = position.get_unrealized_pnl()
             if unrealized is not None:
-                total += unrealized
+                total = total + unrealized
 
         return total
 
-    def get_total_pnl(self) -> Decimal:
+    def get_total_pnl(self) -> Money:
         """Calculate total P&L (realized + unrealized)"""
-        # Convert Money to Decimal if needed
-        if hasattr(self.total_realized_pnl, "amount"):
-            realized: Decimal = self.total_realized_pnl.amount
-        else:
-            realized = Decimal(str(self.total_realized_pnl))
-        return realized + self.get_unrealized_pnl()
+        return self.total_realized_pnl + self.get_unrealized_pnl()
 
     def get_return_percentage(self) -> Decimal:
         """Calculate portfolio return percentage"""
-        # Convert Money to Decimal if needed
-        if hasattr(self.initial_capital, "amount"):
-            initial: Decimal = self.initial_capital.amount
-        else:
-            initial = Decimal(str(self.initial_capital))
-
-        if initial == 0:
+        if self.initial_capital.amount == 0:
             return Decimal("0")
 
         current_value = self.get_total_value()
-        return ((current_value - initial) / initial) * Decimal("100")
+        return (
+            (current_value.amount - self.initial_capital.amount) / self.initial_capital.amount
+        ) * Decimal("100")
 
     def get_win_rate(self) -> Decimal | None:
         """Calculate win rate percentage"""
@@ -329,45 +341,45 @@ class Portfolio:
 
         return (Decimal(self.winning_trades) / Decimal(total_closed)) * Decimal("100")
 
-    def get_average_win(self) -> Decimal | None:
+    def get_average_win(self) -> Money | None:
         """Calculate average winning trade"""
         if self.winning_trades == 0:
             return None
 
-        total_wins = Decimal("0")
+        total_wins = Money(Decimal("0"))
         for position in self.get_closed_positions():
-            if position.realized_pnl > 0:
-                total_wins += position.realized_pnl
+            if position.realized_pnl.amount > 0:
+                total_wins = total_wins + position.realized_pnl
 
         return total_wins / Decimal(self.winning_trades)
 
-    def get_average_loss(self) -> Decimal | None:
+    def get_average_loss(self) -> Money | None:
         """Calculate average losing trade"""
         if self.losing_trades == 0:
             return None
 
-        total_losses = Decimal("0")
+        total_losses = Money(Decimal("0"))
         for position in self.get_closed_positions():
-            if position.realized_pnl < 0:
-                total_losses += abs(position.realized_pnl)
+            if position.realized_pnl.amount < 0:
+                total_losses = total_losses + abs(position.realized_pnl)
 
         return total_losses / Decimal(self.losing_trades)
 
     def get_profit_factor(self) -> Decimal | None:
         """Calculate profit factor (gross profit / gross loss)"""
-        gross_profit = Decimal("0")
-        gross_loss = Decimal("0")
+        gross_profit = Money(Decimal("0"))
+        gross_loss = Money(Decimal("0"))
 
         for position in self.get_closed_positions():
-            if position.realized_pnl > 0:
-                gross_profit += position.realized_pnl
-            elif position.realized_pnl < 0:
-                gross_loss += abs(position.realized_pnl)
+            if position.realized_pnl.amount > 0:
+                gross_profit = gross_profit + position.realized_pnl
+            elif position.realized_pnl.amount < 0:
+                gross_loss = gross_loss + abs(position.realized_pnl)
 
-        if gross_loss == 0:
-            return None if gross_profit == 0 else Decimal("999.99")  # Cap at 999.99
+        if gross_loss.amount == 0:
+            return None if gross_profit.amount == 0 else Decimal("999.99")  # Cap at 999.99
 
-        return gross_profit / gross_loss
+        return gross_profit.amount / gross_loss.amount
 
     def get_sharpe_ratio(self, _risk_free_rate: Decimal = Decimal("0.02")) -> Decimal | None:
         """
@@ -394,25 +406,25 @@ class Portfolio:
         return {
             "id": str(self.id),
             "name": self.name,
-            "cash_balance": float(self.cash_balance),
-            "total_value": float(self.get_total_value()),
-            "positions_value": float(self.get_positions_value()),
-            "unrealized_pnl": float(self.get_unrealized_pnl()),
-            "realized_pnl": float(self.total_realized_pnl),
-            "total_pnl": float(self.get_total_pnl()),
+            "cash_balance": float(self.cash_balance.amount),
+            "total_value": float(self.get_total_value().amount),
+            "positions_value": float(self.get_positions_value().amount),
+            "unrealized_pnl": float(self.get_unrealized_pnl().amount),
+            "realized_pnl": float(self.total_realized_pnl.amount),
+            "total_pnl": float(self.get_total_pnl().amount),
             "return_pct": float(self.get_return_percentage()),
             "open_positions": len(self.get_open_positions()),
             "total_trades": self.trades_count,
             "winning_trades": self.winning_trades,
             "losing_trades": self.losing_trades,
             "win_rate": float(win_rate) if (win_rate := self.get_win_rate()) is not None else None,
-            "commission_paid": float(self.total_commission_paid),
+            "commission_paid": float(self.total_commission_paid.amount),
         }
 
     def __str__(self) -> str:
         """String representation"""
         return (
-            f"Portfolio({self.name}: Value=${self.get_total_value():.2f}, "
-            f"Cash=${self.cash_balance:.2f}, Positions={len(self.get_open_positions())}, "
-            f"P&L=${self.get_total_pnl():.2f}, Return={self.get_return_percentage():.2f}%)"
+            f"Portfolio({self.name}: Value={self.get_total_value()}, "
+            f"Cash={self.cash_balance}, Positions={len(self.get_open_positions())}, "
+            f"P&L={self.get_total_pnl()}, Return={self.get_return_percentage():.2f}%)"
         )

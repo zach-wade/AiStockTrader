@@ -74,7 +74,7 @@ class RiskCalculator:
 
     def calculate_position_risk(
         self, position: Position, current_price: Price
-    ) -> dict[str, Decimal]:
+    ) -> dict[str, Money | Decimal]:
         """Calculate comprehensive risk metrics for a single position.
 
         Computes various risk and performance metrics for an individual position,
@@ -85,39 +85,39 @@ class RiskCalculator:
             current_price: Current market price for the position's symbol.
 
         Returns:
-            dict[str, Decimal]: Dictionary containing risk metrics:
-                - position_value: Current market value of the position
-                - unrealized_pnl: Unrealized profit/loss (open positions only)
-                - realized_pnl: Realized profit/loss from closed portions
-                - total_pnl: Sum of realized and unrealized P&L
-                - return_pct: Percentage return on the position
-                - risk_amount: Dollar amount at risk if stop loss is hit
+            dict[str, Money | Decimal]: Dictionary containing risk metrics:
+                - position_value: Current market value of the position (Money)
+                - unrealized_pnl: Unrealized profit/loss (Money, open positions only)
+                - realized_pnl: Realized profit/loss from closed portions (Money)
+                - total_pnl: Sum of realized and unrealized P&L (Money)
+                - return_pct: Percentage return on the position (Decimal)
+                - risk_amount: Dollar amount at risk if stop loss is hit (Money)
 
         Behavior:
             - For closed positions: Only realized_pnl and total_pnl are non-zero
             - For open positions: All metrics are calculated based on current price
-            - Metrics default to Decimal("0") when not applicable
+            - Metrics default to Money(0) or Decimal("0") when not applicable
 
         Example:
-            >>> position = Position(symbol="AAPL", quantity=100, average_entry_price=Decimal("150"))
-            >>> position.stop_loss_price = Decimal("145")
-            >>> metrics = calculator.calculate_position_risk(position, Price(Decimal("155")))
-            >>> print(f"Unrealized P&L: ${metrics['unrealized_pnl']}")
-            >>> print(f"Risk if stop hit: ${metrics['risk_amount']}")
+            >>> position = Position(symbol="AAPL", quantity=Quantity(100), average_entry_price=Price(150))
+            >>> position.stop_loss_price = Price(145)
+            >>> metrics = calculator.calculate_position_risk(position, Price(155))
+            >>> print(f"Unrealized P&L: {metrics['unrealized_pnl']}")
+            >>> print(f"Risk if stop hit: {metrics['risk_amount']}")
 
         Note:
             This method updates the position's market price as a side effect
             to ensure consistent calculations.
         """
-        position.update_market_price(current_price.value)
+        position.update_market_price(current_price)
 
         metrics = {
-            "position_value": Decimal("0"),
-            "unrealized_pnl": Decimal("0"),
+            "position_value": Money(Decimal("0")),
+            "unrealized_pnl": Money(Decimal("0")),
             "realized_pnl": position.realized_pnl,
-            "total_pnl": Decimal("0"),
+            "total_pnl": Money(Decimal("0")),
             "return_pct": Decimal("0"),
-            "risk_amount": Decimal("0"),
+            "risk_amount": Money(Decimal("0")),
         }
 
         if position.is_closed():
@@ -141,8 +141,8 @@ class RiskCalculator:
 
             # Risk amount (distance to stop loss)
             if position.stop_loss_price:
-                risk_per_share = abs(current_price.value - position.stop_loss_price)
-                metrics["risk_amount"] = risk_per_share * abs(position.quantity)
+                risk_per_share = abs(current_price.value - position.stop_loss_price.value)
+                metrics["risk_amount"] = Money(risk_per_share * abs(position.quantity.value))
 
         return metrics
 
@@ -214,11 +214,16 @@ class RiskCalculator:
         daily_volatility = Decimal("0.02")
 
         # Calculate VaR
-        var = portfolio_value * daily_volatility * z_score * Decimal(math.sqrt(float(time_horizon)))
+        var_amount = (
+            portfolio_value.amount
+            * daily_volatility
+            * z_score
+            * Decimal(math.sqrt(float(time_horizon)))
+        )
 
-        return Money(var, "USD")
+        return Money(var_amount, "USD")
 
-    def calculate_max_drawdown(self, portfolio_history: list[Decimal]) -> Decimal:
+    def calculate_max_drawdown(self, portfolio_history: list[Money]) -> Decimal:
         """Calculate maximum drawdown from portfolio value history.
 
         Computes the largest peak-to-trough decline in portfolio value over the
@@ -227,7 +232,7 @@ class RiskCalculator:
 
         Args:
             portfolio_history: List of portfolio values over time, ordered chronologically.
-                Each value represents the total portfolio value at a point in time.
+                Each Money value represents the total portfolio value at a point in time.
                 Requires at least MIN_DATA_POINTS_FOR_STATS values.
 
         Returns:
@@ -241,8 +246,8 @@ class RiskCalculator:
             3. Return the maximum drawdown observed
 
         Example:
-            >>> history = [Decimal("100000"), Decimal("110000"), Decimal("95000"),
-            ...            Decimal("105000"), Decimal("85000")]
+            >>> history = [Money("100000"), Money("110000"), Money("95000"),
+            ...            Money("105000"), Money("85000")]
             >>> max_dd = calculator.calculate_max_drawdown(history)
             >>> # Peak was 110000, trough was 85000
             >>> # Drawdown = (110000 - 85000) / 110000 = 22.7%
@@ -256,10 +261,11 @@ class RiskCalculator:
         if not portfolio_history or len(portfolio_history) < MIN_DATA_POINTS_FOR_STATS:
             return Decimal("0")
 
-        max_value = portfolio_history[0]
+        max_value = portfolio_history[0].amount
         max_drawdown = Decimal("0")
 
-        for value in portfolio_history:
+        for money_value in portfolio_history:
+            value = money_value.amount
             if value > max_value:
                 max_value = value
 
@@ -376,10 +382,13 @@ class RiskCalculator:
             for market orders.
         """
         # Check position limits
+        estimated_price = new_order.limit_price or Price(
+            Decimal("100")
+        )  # Use estimate if market order
         can_open, reason = portfolio.can_open_position(
             symbol=new_order.symbol,
             quantity=new_order.quantity,
-            price=new_order.limit_price or Decimal("100"),  # Use estimate if market order
+            price=estimated_price,
         )
 
         if not can_open:
@@ -388,12 +397,12 @@ class RiskCalculator:
         # Check leverage
         if portfolio.max_leverage > 1:
             positions_value = portfolio.get_positions_value()
-            order_value = new_order.quantity * (new_order.limit_price or Decimal("100"))
+            order_value = Money(new_order.quantity.value * estimated_price.value)
             total_exposure = positions_value + order_value
 
             leverage = (
-                total_exposure / portfolio.cash_balance
-                if portfolio.cash_balance > 0
+                total_exposure.amount / portfolio.cash_balance.amount
+                if portfolio.cash_balance.amount > 0
                 else Decimal("999")
             )
 
@@ -407,9 +416,9 @@ class RiskCalculator:
         max_concentration = Decimal("0.20")  # Max 20% in single position
         portfolio_value = portfolio.get_total_value()
 
-        if portfolio_value > 0:
-            order_value = new_order.quantity * (new_order.limit_price or Decimal("100"))
-            concentration = order_value / portfolio_value
+        if portfolio_value.amount > 0:
+            order_value = Money(new_order.quantity.value * estimated_price.value)
+            concentration = order_value.amount / portfolio_value.amount
 
             if concentration > max_concentration:
                 return (
@@ -467,7 +476,7 @@ class RiskCalculator:
         return reward / risk
 
     def calculate_kelly_criterion(
-        self, win_probability: Decimal, win_amount: Decimal, loss_amount: Decimal
+        self, win_probability: Decimal, win_amount: Money, loss_amount: Money
     ) -> Decimal:
         """Calculate optimal position size using Kelly Criterion.
 
@@ -478,8 +487,8 @@ class RiskCalculator:
         Args:
             win_probability: Probability of winning as decimal (0-1).
                 Should be based on historical performance or backtesting.
-            win_amount: Average win amount in dollars (positive value).
-            loss_amount: Average loss amount in dollars (positive value).
+            win_amount: Average win amount (Money object with positive value).
+            loss_amount: Average loss amount (Money object with positive value).
 
         Returns:
             Decimal: Optimal fraction of capital to risk (0-0.25).
@@ -503,8 +512,8 @@ class RiskCalculator:
         Example:
             >>> # 60% win rate, average win $200, average loss $100
             >>> win_prob = Decimal("0.6")
-            >>> avg_win = Decimal("200")
-            >>> avg_loss = Decimal("100")
+            >>> avg_win = Money("200")
+            >>> avg_loss = Money("100")
             >>> kelly = calculator.calculate_kelly_criterion(win_prob, avg_win, avg_loss)
             >>> # f* = (0.6 × 2 - 0.4) / 2 = 0.4, capped at 0.25
             >>> print(f"Optimal position size: {kelly:.1%} of capital")
@@ -519,13 +528,13 @@ class RiskCalculator:
         if win_probability <= 0 or win_probability >= 1:
             raise ValueError("Win probability must be between 0 and 1")
 
-        if win_amount <= 0 or loss_amount <= 0:
+        if win_amount.amount <= 0 or loss_amount.amount <= 0:
             raise ValueError("Win and loss amounts must be positive")
 
         # Kelly formula: f = (p*b - q) / b
         # where p = win probability, q = loss probability, b = win/loss ratio
         loss_probability = 1 - win_probability
-        win_loss_ratio = win_amount / loss_amount
+        win_loss_ratio = win_amount.amount / loss_amount.amount
 
         kelly_fraction = (win_probability * win_loss_ratio - loss_probability) / win_loss_ratio
 
@@ -547,16 +556,16 @@ class RiskCalculator:
                 for future time-based filtering). Defaults to 30 days.
 
         Returns:
-            dict[str, Decimal | None]: Dictionary containing metrics:
-                - total_return: Overall portfolio return percentage
-                - win_rate: Percentage of winning trades
-                - profit_factor: Ratio of gross profit to gross loss
-                - average_win: Average profit on winning trades
-                - average_loss: Average loss on losing trades
-                - max_drawdown: Maximum peak-to-trough decline
-                - sharpe_ratio: Risk-adjusted return metric
-                - calmar_ratio: Return relative to maximum drawdown
-                - expectancy: Expected value per trade
+            dict[str, Decimal | Money | None]: Dictionary containing metrics:
+                - total_return: Overall portfolio return percentage (Decimal)
+                - win_rate: Percentage of winning trades (Decimal)
+                - profit_factor: Ratio of gross profit to gross loss (Decimal)
+                - average_win: Average profit on winning trades (Money)
+                - average_loss: Average loss on losing trades (Money)
+                - max_drawdown: Maximum peak-to-trough decline (Decimal)
+                - sharpe_ratio: Risk-adjusted return metric (Decimal)
+                - calmar_ratio: Return relative to maximum drawdown (Decimal)
+                - expectancy: Expected value per trade (Money)
             Values are None when insufficient data or calculation not possible.
 
         Metrics Interpretation:
@@ -567,7 +576,7 @@ class RiskCalculator:
             - Positive Expectancy: Positive expected value per trade
 
         Example:
-            >>> portfolio = Portfolio(cash_balance=Decimal("100000"))
+            >>> portfolio = Portfolio(cash_balance=Money("100000"))
             >>> # ... execute trades ...
             >>> metrics = calculator.calculate_risk_adjusted_return(portfolio)
             >>> print(f"Win Rate: {metrics['win_rate']:.1f}%")
@@ -600,7 +609,9 @@ class RiskCalculator:
         if metrics["win_rate"] and metrics["average_win"] and metrics["average_loss"]:
             win_rate = metrics["win_rate"] / Decimal("100")
             loss_rate = 1 - win_rate
-            expectancy = (win_rate * metrics["average_win"]) - (loss_rate * metrics["average_loss"])
-            metrics["expectancy"] = expectancy
+            expectancy_amount = (win_rate * metrics["average_win"].amount) - (
+                loss_rate * metrics["average_loss"].amount
+            )
+            metrics["expectancy"] = Money(expectancy_amount)
 
         return metrics

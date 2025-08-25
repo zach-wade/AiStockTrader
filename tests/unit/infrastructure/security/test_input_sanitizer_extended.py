@@ -49,9 +49,9 @@ class TestInputSanitizerStringMethods:
         assert len(result) == 50
         assert result == "a" * 50
 
-    def test_sanitize_string_sql_injection_patterns(self):
-        """Test detection of SQL injection patterns"""
-        dangerous_inputs = [
+    def test_sanitize_string_no_longer_blocks_sql_patterns(self):
+        """Test that SQL patterns are no longer blocked (only XSS blocked)"""
+        sql_inputs = [
             "SELECT * FROM users",
             "1; DROP TABLE users",
             "admin' OR '1'='1",
@@ -62,10 +62,12 @@ class TestInputSanitizerStringMethods:
             "'; EXEC xp_cmdshell('dir')--",
         ]
 
-        for dangerous_input in dangerous_inputs:
-            with pytest.raises(SanitizationError) as exc_info:
-                InputSanitizer.sanitize_string(dangerous_input)
-            assert "potentially dangerous patterns" in str(exc_info)
+        for sql_input in sql_inputs:
+            # These should now pass through and be HTML escaped only
+            result = InputSanitizer.sanitize_string(sql_input)
+            import html
+
+            assert result == html.escape(sql_input)
 
     def test_sanitize_string_xss_patterns(self):
         """Test detection of XSS patterns"""
@@ -81,30 +83,39 @@ class TestInputSanitizerStringMethods:
         for xss_input in xss_inputs:
             with pytest.raises(SanitizationError) as exc_info:
                 InputSanitizer.sanitize_string(xss_input)
-            assert "potentially dangerous patterns" in str(exc_info)
+            assert "potentially dangerous XSS patterns" in str(exc_info)
 
-    def test_sanitize_string_mixed_case_patterns(self):
-        """Test case-insensitive pattern detection"""
-        dangerous_inputs = ["SeLeCt * FrOm users", "JaVaScRiPt:alert(1)", "OnClIcK='evil()'"]
+    def test_sanitize_string_mixed_case_xss_patterns(self):
+        """Test case-insensitive XSS pattern detection"""
+        xss_inputs = ["JaVaScRiPt:alert(1)", "OnClIcK='evil()'"]
+        sql_inputs = ["SeLeCt * FrOm users"]  # SQL should no longer be blocked
 
-        for dangerous_input in dangerous_inputs:
+        # XSS patterns should still be blocked
+        for xss_input in xss_inputs:
             with pytest.raises(SanitizationError) as exc_info:
-                InputSanitizer.sanitize_string(dangerous_input)
-            assert "potentially dangerous patterns" in str(exc_info)
+                InputSanitizer.sanitize_string(xss_input)
+            assert "potentially dangerous XSS patterns" in str(exc_info)
+
+        # SQL patterns should pass through
+        for sql_input in sql_inputs:
+            result = InputSanitizer.sanitize_string(sql_input)
+            import html
+
+            assert result == html.escape(sql_input)
 
     @patch("src.infrastructure.security.input_sanitizer.logger")
     def test_sanitize_string_logging(self, mock_logger):
-        """Test that dangerous patterns are logged"""
+        """Test that XSS patterns are logged"""
         with pytest.raises(SanitizationError):
-            InputSanitizer.sanitize_string("SELECT * FROM users")
+            InputSanitizer.sanitize_string("<script>alert(1)</script>")
 
         mock_logger.warning.assert_called_once()
         call_args = mock_logger.warning.call_args[0][0]
-        assert "Dangerous pattern detected" in call_args
+        assert "XSS pattern detected" in call_args
 
 
-class TestSQLSanitization:
-    """Test SQL-specific sanitization methods"""
+class TestSQLIdentifierValidation:
+    """Test SQL identifier validation (values should use parameterized queries)"""
 
     def test_sanitize_sql_identifier_valid(self):
         """Test valid SQL identifiers"""
@@ -151,37 +162,20 @@ class TestSQLSanitization:
                 InputSanitizer.sanitize_sql_identifier(word)
             assert "Reserved SQL word" in str(exc_info)
 
-    def test_sanitize_sql_value_none(self):
-        """Test sanitizing None value"""
-        result = InputSanitizer.sanitize_sql_value(None)
-        assert result == "NULL"
+    def test_sql_value_sanitization_removed(self):
+        """Test that SQL value sanitization has been removed for security"""
+        # The sanitize_sql_value method should no longer exist
+        assert not hasattr(
+            InputSanitizer, "sanitize_sql_value"
+        ), "sanitize_sql_value should be removed - use parameterized queries instead"
 
-    def test_sanitize_sql_value_string(self):
-        """Test sanitizing string values"""
-        result = InputSanitizer.sanitize_sql_value("test")
-        assert result == "'test'"
+        # The replacement method should raise NotImplementedError with helpful message
+        with pytest.raises(NotImplementedError) as exc_info:
+            InputSanitizer._removed_sanitize_sql_value("test")
 
-        # Test quote escaping
-        result = InputSanitizer.sanitize_sql_value("O'Brien")
-        assert result == "'O''Brien'"
-
-        # Test backslash escaping
-        result = InputSanitizer.sanitize_sql_value("path\\to\\file")
-        assert result == "'path\\\\to\\\\file'"
-
-    def test_sanitize_sql_value_numbers(self):
-        """Test sanitizing numeric values"""
-        result = InputSanitizer.sanitize_sql_value(123)
-        assert result == "'123'"
-
-        result = InputSanitizer.sanitize_sql_value(45.67)
-        assert result == "'45.67'"
-
-    def test_sanitize_sql_value_complex_escaping(self):
-        """Test complex escaping scenarios"""
-        # Both quotes and backslashes
-        result = InputSanitizer.sanitize_sql_value("It's a 'test' with \\backslash\\")
-        assert result == "'It''s a ''test'' with \\\\backslash\\\\'"
+        error_msg = str(exc_info.value).lower()
+        assert "parameterized queries" in error_msg
+        assert "removed for security" in error_msg
 
 
 class TestFilenameSanitization:
@@ -489,9 +483,7 @@ class TestEdgeCases:
         result = InputSanitizer.sanitize_string("")
         assert result == ""
 
-        result = InputSanitizer.sanitize_sql_value("")
-        assert result == "''"
-
+        # SQL value sanitization removed - test filename instead
         result = InputSanitizer.sanitize_filename("")
         assert result == ""
 

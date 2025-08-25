@@ -37,6 +37,7 @@ from src.application.use_cases import (
     UpdatePortfolioUseCase,
     ValidateOrderRiskUseCase,
 )
+from src.domain.interfaces.time_service import TimeService
 from src.domain.services import (
     ICommissionCalculator,
     IMarketMicrostructure,
@@ -45,6 +46,7 @@ from src.domain.services import (
     RiskCalculator,
     TradingCalendar,
 )
+from src.domain.services.market_hours_service import MarketHoursService
 from src.domain.services.validation_service import DomainValidator
 from src.infrastructure.brokers.broker_factory import BrokerFactory
 from src.infrastructure.database.adapter import PostgreSQLAdapter
@@ -55,6 +57,7 @@ from src.infrastructure.repositories import (
     PostgreSQLPositionRepository,
     PostgreSQLUnitOfWork,
 )
+from src.infrastructure.time import PythonTimeService
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +159,14 @@ class DIContainer:
 
     def _register_domain_services(self) -> None:
         """Register domain services."""
+        # Register TimeService first as it's needed by other services
+        self._register_singleton(TimeService, lambda: PythonTimeService())
+
+        # Register MarketHoursService with time service dependency
+        self._register_singleton(
+            MarketHoursService, lambda: MarketHoursService(self.get(TimeService))
+        )
+
         # Create all domain services
         services = ServiceFactory.create_all_services(
             self.config.broker_type, **(self.config.service_config or {})
@@ -171,7 +182,10 @@ class DIContainer:
             lambda: services["market_microstructure"],
         )
         self._register_singleton(OrderValidator, lambda: services["order_validator"])
-        self._register_singleton(TradingCalendar, lambda: services["trading_calendar"])
+
+        # Register TradingCalendar with time service dependency (override factory version)
+        self._register_singleton(TradingCalendar, lambda: TradingCalendar(self.get(TimeService)))
+
         self._register_singleton(DomainValidator, lambda: services["domain_validator"])
 
         # Risk calculator

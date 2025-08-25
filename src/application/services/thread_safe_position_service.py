@@ -9,6 +9,9 @@ import asyncio
 from decimal import Decimal
 
 from ...domain.entities.position import Position
+from ...domain.value_objects.money import Money
+from ...domain.value_objects.price import Price
+from ...domain.value_objects.quantity import Quantity
 
 
 class ThreadSafePositionService:
@@ -41,7 +44,7 @@ class ThreadSafePositionService:
         """
         async with self._lock:
             # Delegate to domain entity for business logic
-            position.add_to_position(quantity, price, commission)
+            position.add_to_position(Quantity(quantity), Price(price), Money(commission))
 
     async def reduce_position(
         self,
@@ -49,7 +52,7 @@ class ThreadSafePositionService:
         quantity: Decimal,
         exit_price: Decimal,
         commission: Decimal = Decimal("0"),
-    ) -> Decimal:
+    ) -> Money:
         """
         Reduce position size and calculate realized P&L (thread-safe).
 
@@ -64,7 +67,9 @@ class ThreadSafePositionService:
         """
         async with self._lock:
             # Delegate to domain entity for business logic
-            return position.reduce_position(quantity, exit_price, commission)
+            return position.reduce_position(
+                Quantity(quantity), Price(exit_price), Money(commission)
+            )
 
     async def update_market_price(self, position: Position, price: Decimal) -> None:
         """Update current market price (thread-safe)
@@ -75,7 +80,7 @@ class ThreadSafePositionService:
         """
         async with self._lock:
             # Delegate to domain entity for business logic
-            position.update_market_price(price)
+            position.update_market_price(Price(price))
 
     def add_to_position_sync(
         self,
@@ -112,7 +117,7 @@ class ThreadSafePositionService:
         quantity: Decimal,
         exit_price: Decimal,
         commission: Decimal = Decimal("0"),
-    ) -> Decimal:
+    ) -> Money:
         """Synchronous wrapper for reduce_position
 
         Args:

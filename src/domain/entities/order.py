@@ -10,6 +10,8 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
+from ..value_objects import Money, Price, Quantity
+
 
 class OrderSide(Enum):
     """Order side enumeration"""
@@ -53,10 +55,10 @@ class OrderRequest:
     """Request parameters for creating an order."""
 
     symbol: str
-    quantity: Decimal
+    quantity: Quantity
     side: OrderSide
-    limit_price: Decimal | None = None
-    stop_price: Decimal | None = None
+    limit_price: Price | None = None
+    stop_price: Price | None = None
     time_in_force: TimeInForce = TimeInForce.DAY
     reason: str | None = None
 
@@ -75,13 +77,13 @@ class Order:
 
     # Core attributes
     symbol: str = ""
-    quantity: Decimal = Decimal("0")
+    quantity: Quantity = Quantity(Decimal("0"))
     side: OrderSide = OrderSide.BUY
     order_type: OrderType = OrderType.MARKET
 
     # Pricing
-    limit_price: Decimal | None = None
-    stop_price: Decimal | None = None
+    limit_price: Price | None = None
+    stop_price: Price | None = None
 
     # Execution
     status: OrderStatus = OrderStatus.PENDING
@@ -89,8 +91,8 @@ class Order:
 
     # Tracking
     broker_order_id: str | None = None
-    filled_quantity: Decimal = Decimal("0")
-    average_fill_price: Decimal | None = None
+    filled_quantity: Quantity = Quantity(Decimal("0"))
+    average_fill_price: Price | None = None
 
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -111,10 +113,9 @@ class Order:
         if not self.symbol:
             raise ValueError("Order symbol cannot be empty")
 
-        # Check if quantity is positive (handle both Decimal and Quantity types)
-        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-        if qty_value <= 0:
-            raise ValueError(f"Order quantity must be positive, got {qty_value}")
+        # Check if quantity is positive
+        if self.quantity.value <= 0:
+            raise ValueError(f"Order quantity must be positive, got {self.quantity.value}")
 
         if self.order_type == OrderType.LIMIT and self.limit_price is None:
             raise ValueError("Limit order requires limit price")
@@ -127,12 +128,11 @@ class Order:
         ):
             raise ValueError("Stop-limit order requires both stop and limit prices")
 
-        if self.filled_quantity < 0:
+        if self.filled_quantity.value < 0:
             raise ValueError("Filled quantity cannot be negative")
 
-        # Compare filled_quantity with quantity (handle both Decimal and Quantity types)
-        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-        if self.filled_quantity > qty_value:
+        # Compare filled_quantity with quantity
+        if self.filled_quantity.value > self.quantity.value:
             raise ValueError("Filled quantity cannot exceed order quantity")
 
     @classmethod
@@ -243,40 +243,37 @@ class Order:
         self.submitted_at = datetime.now(UTC)
 
     def fill(
-        self, filled_quantity: Decimal, fill_price: Decimal, timestamp: datetime | None = None
+        self, filled_quantity: Quantity, fill_price: Price, timestamp: datetime | None = None
     ) -> None:
         """Record a fill or partial fill"""
         if self.status not in [OrderStatus.SUBMITTED, OrderStatus.PARTIALLY_FILLED]:
             raise ValueError(f"Cannot fill order in {self.status} status")
 
-        if filled_quantity <= 0:
+        if filled_quantity.value <= 0:
             raise ValueError("Fill quantity must be positive")
 
-        if fill_price <= 0:
+        if fill_price.value <= 0:
             raise ValueError("Fill price must be positive")
 
-        new_filled_quantity = self.filled_quantity + filled_quantity
-        # Handle both Decimal and Quantity types for comparison
-        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-        if new_filled_quantity > qty_value:
+        new_filled_quantity_value = self.filled_quantity.value + filled_quantity.value
+        if new_filled_quantity_value > self.quantity.value:
             raise ValueError(
-                f"Total filled quantity {new_filled_quantity} exceeds order quantity {qty_value}"
+                f"Total filled quantity {new_filled_quantity_value} exceeds order quantity {self.quantity.value}"
             )
 
         # Update average fill price
         if self.average_fill_price is None:
             self.average_fill_price = fill_price
         else:
-            total_value = (self.filled_quantity * self.average_fill_price) + (
-                filled_quantity * fill_price
+            total_value = (self.filled_quantity.value * self.average_fill_price.value) + (
+                filled_quantity.value * fill_price.value
             )
-            self.average_fill_price = total_value / new_filled_quantity
+            self.average_fill_price = Price(total_value / new_filled_quantity_value)
 
-        self.filled_quantity = new_filled_quantity
+        self.filled_quantity = Quantity(new_filled_quantity_value)
 
-        # Update status (handle both Decimal and Quantity types)
-        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-        if self.filled_quantity >= qty_value:
+        # Update status
+        if self.filled_quantity.value >= self.quantity.value:
             self.status = OrderStatus.FILLED
             self.filled_at = timestamp or datetime.now(UTC)
         else:
@@ -317,40 +314,33 @@ class Order:
             OrderStatus.EXPIRED,
         ]
 
-    def get_remaining_quantity(self) -> Decimal:
+    def get_remaining_quantity(self) -> Quantity:
         """Get quantity still to be filled"""
-        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-        return Decimal(qty_value) - self.filled_quantity
+        return Quantity(self.quantity.value - self.filled_quantity.value)
 
     def get_fill_ratio(self) -> Decimal:
         """Get ratio of filled quantity to total quantity"""
-        qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-        qty_decimal = Decimal(qty_value)
-        if qty_decimal == 0:
+        if self.quantity.value == 0:
             return Decimal("0")
-        return self.filled_quantity / qty_decimal
+        return self.filled_quantity.value / self.quantity.value
 
-    def get_notional_value(self) -> Decimal | None:
+    def get_notional_value(self) -> Money | None:
         """Get total value of the order"""
         if self.order_type == OrderType.MARKET:
             if self.average_fill_price:
-                return self.filled_quantity * self.average_fill_price
+                return Money(self.filled_quantity.value * self.average_fill_price.value)
             return None
         elif self.order_type == OrderType.LIMIT and self.limit_price:
-            qty_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
-            limit_value = (
-                self.limit_price.value if hasattr(self.limit_price, "value") else self.limit_price
-            )
-            return Decimal(qty_value) * Decimal(limit_value)
+            return Money(self.quantity.value * self.limit_price.value)
         return None
 
     def __str__(self) -> str:
         """String representation"""
         price_str = ""
         if self.order_type == OrderType.LIMIT and self.limit_price:
-            price_str = f" @ ${self.limit_price}"
+            price_str = f" @ {self.limit_price}"
         elif self.order_type == OrderType.STOP and self.stop_price:
-            price_str = f" stop @ ${self.stop_price}"
+            price_str = f" stop @ {self.stop_price}"
 
         return (
             f"Order({self.id}: {self.side.value.upper()} {self.quantity} {self.symbol}"

@@ -198,9 +198,9 @@ class PlaceOrderUseCase(TransactionalUseCase[PlaceOrderRequest, PlaceOrderRespon
             symbol=request.symbol,
             side=OrderSide[request.side.upper()],
             order_type=OrderType[request.order_type.upper()],
-            quantity=Decimal(str(request.quantity)),
-            limit_price=Decimal(str(request.limit_price)) if request.limit_price else None,
-            stop_price=Decimal(str(request.stop_price)) if request.stop_price else None,
+            quantity=Quantity(Decimal(str(request.quantity))),
+            limit_price=Price(Decimal(str(request.limit_price))) if request.limit_price else None,
+            stop_price=Price(Decimal(str(request.stop_price))) if request.stop_price else None,
             time_in_force=TimeInForce[request.time_in_force.upper()],
         )
 

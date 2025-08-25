@@ -10,6 +10,8 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
+from ..value_objects import Money, Price, Quantity
+
 
 class PositionSide(Enum):
     """Position side enumeration"""
@@ -32,21 +34,21 @@ class Position:
     symbol: str = ""
 
     # Position details
-    quantity: Decimal = Decimal("0")  # Positive for long, negative for short
-    average_entry_price: Decimal = Decimal("0")
+    quantity: Quantity = Quantity(Decimal("0"))  # Positive for long, negative for short
+    average_entry_price: Price = Price(Decimal("0"))
 
     # Market data
-    current_price: Decimal | None = None
+    current_price: Price | None = None
     last_updated: datetime | None = None
 
     # P&L tracking
-    realized_pnl: Decimal = Decimal("0")
-    commission_paid: Decimal = Decimal("0")
+    realized_pnl: Money = Money(Decimal("0"))
+    commission_paid: Money = Money(Decimal("0"))
 
     # Risk management
-    stop_loss_price: Decimal | None = None
-    take_profit_price: Decimal | None = None
-    max_position_value: Decimal | None = None
+    stop_loss_price: Price | None = None
+    take_profit_price: Price | None = None
+    max_position_value: Money | None = None
 
     # Timestamps
     opened_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -65,29 +67,28 @@ class Position:
         if not self.symbol:
             raise ValueError("Position symbol cannot be empty")
 
-        if self.average_entry_price < 0:
+        if self.average_entry_price.value < 0:
             raise ValueError("Average entry price cannot be negative")
 
-        if self.quantity == 0 and self.closed_at is None:
+        if self.quantity.value == 0 and self.closed_at is None:
             raise ValueError("Open position cannot have zero quantity")
 
     @classmethod
     def open_position(
         cls,
         symbol: str,
-        quantity: Decimal,
-        entry_price: Decimal,
-        commission: Decimal = Decimal("0"),
+        quantity: Quantity,
+        entry_price: Price,
+        commission: Money = Money(Decimal("0")),
         strategy: str | None = None,
     ) -> "Position":
         """Factory method to open a new position.
 
-        Note: Kept original signature for backward compatibility.
-        Use PositionRequest in Portfolio.open_position for cleaner API.
+        Note: Updated to use value objects.
         """
-        if quantity == 0:
+        if quantity.value == 0:
             raise ValueError("Cannot open position with zero quantity")
-        if entry_price <= 0:
+        if entry_price.value <= 0:
             raise ValueError("Entry price must be positive")
 
         return cls(
@@ -99,64 +100,67 @@ class Position:
         )
 
     def add_to_position(
-        self, quantity: Decimal, price: Decimal, commission: Decimal = Decimal("0")
+        self, quantity: Quantity, price: Price, commission: Money = Money(Decimal("0"))
     ) -> None:
         """Add to existing position (same direction)"""
-        if quantity == 0:
+        if quantity.value == 0:
             return
 
-        if self.is_long() and quantity < 0:
+        if self.is_long() and quantity.value < 0:
             raise ValueError("Cannot add short quantity to long position")
-        if self.is_short() and quantity > 0:
+        if self.is_short() and quantity.value > 0:
             raise ValueError("Cannot add long quantity to short position")
 
         # Calculate new average entry price
-        total_cost = (abs(self.quantity) * self.average_entry_price) + (abs(quantity) * price)
-        new_quantity = self.quantity + quantity
+        total_cost = (abs(self.quantity.value) * self.average_entry_price.value) + (
+            abs(quantity.value) * price.value
+        )
+        new_quantity = self.quantity.value + quantity.value
 
         if new_quantity != 0:
-            self.average_entry_price = total_cost / abs(new_quantity)
+            self.average_entry_price = Price(total_cost / abs(new_quantity))
 
-        self.quantity = new_quantity
-        self.commission_paid += commission
+        self.quantity = Quantity(new_quantity)
+        self.commission_paid = self.commission_paid + commission
 
     def reduce_position(
-        self, quantity: Decimal, exit_price: Decimal, commission: Decimal = Decimal("0")
-    ) -> Decimal:
+        self, quantity: Quantity, exit_price: Price, commission: Money = Money(Decimal("0"))
+    ) -> Money:
         """
         Reduce position size and calculate realized P&L.
 
         Returns:
             Realized P&L from this reduction
         """
-        if quantity == 0:
-            return Decimal("0")
+        if quantity.value == 0:
+            return Money(Decimal("0"))
 
-        if abs(quantity) > abs(self.quantity):
+        if abs(quantity.value) > abs(self.quantity.value):
             raise ValueError(
-                f"Cannot reduce position by {quantity}, current quantity is {self.quantity}"
+                f"Cannot reduce position by {quantity.value}, current quantity is {self.quantity.value}"
             )
 
         # Calculate P&L for the reduced portion
         if self.is_long():
-            pnl = quantity * (exit_price - self.average_entry_price)
+            pnl = Money(quantity.value * (exit_price.value - self.average_entry_price.value))
         else:
-            pnl = abs(quantity) * (self.average_entry_price - exit_price)
+            pnl = Money(abs(quantity.value) * (self.average_entry_price.value - exit_price.value))
 
-        pnl -= commission
+        pnl = pnl - commission
 
         # Update position
-        self.quantity -= quantity if self.is_long() else -quantity
-        self.realized_pnl += pnl
-        self.commission_paid += commission
+        reduction_quantity = quantity.value if self.is_long() else -quantity.value
+        self.quantity = Quantity(self.quantity.value - reduction_quantity)
+        self.realized_pnl = self.realized_pnl + pnl
+        self.commission_paid = self.commission_paid + commission
 
         # Mark as closed if fully exited
-        if self.quantity == 0:
+        if self.quantity.value == 0:
             self.closed_at = datetime.now(UTC)
 
         return pnl
 
-    def close_position(self, exit_price: Decimal, commission: Decimal = Decimal("0")) -> Decimal:
+    def close_position(self, exit_price: Price, commission: Money = Money(Decimal("0"))) -> Money:
         """
         Close entire position and calculate final P&L.
 
@@ -167,69 +171,73 @@ class Position:
             raise ValueError("Position is already closed")
 
         # Reduce the full position
-        self.reduce_position(
-            self.quantity if self.is_long() else -self.quantity, exit_price, commission
-        )
+        close_quantity = Quantity(self.quantity.value if self.is_long() else -self.quantity.value)
+        self.reduce_position(close_quantity, exit_price, commission)
 
         return self.realized_pnl
 
-    def update_market_price(self, price: Decimal) -> None:
+    def update_market_price(self, price: Price) -> None:
         """Update current market price"""
-        if price <= 0:
+        if price.value <= 0:
             raise ValueError("Market price must be positive")
 
         self.current_price = price
         self.last_updated = datetime.now(UTC)
 
-    def set_stop_loss(self, price: Decimal) -> None:
+    def set_stop_loss(self, price: Price) -> None:
         """Set stop loss price"""
-        if price <= 0:
+        if price.value <= 0:
             raise ValueError("Stop loss price must be positive")
 
         # Validate stop loss makes sense for position direction
-        if self.is_long() and self.current_price and price > self.current_price:
+        if self.is_long() and self.current_price and price.value > self.current_price.value:
             raise ValueError("Stop loss for long position must be below current price")
-        if self.is_short() and self.current_price and price < self.current_price:
+        if self.is_short() and self.current_price and price.value < self.current_price.value:
             raise ValueError("Stop loss for short position must be above current price")
 
         self.stop_loss_price = price
 
-    def set_take_profit(self, price: Decimal) -> None:
+    def set_take_profit(self, price: Price) -> None:
         """Set take profit price"""
-        if price <= 0:
+        if price.value <= 0:
             raise ValueError("Take profit price must be positive")
 
         # Validate take profit makes sense for position direction
-        if self.is_long() and self.current_price and price < self.current_price:
+        if self.is_long() and self.current_price and price.value < self.current_price.value:
             raise ValueError("Take profit for long position must be above current price")
-        if self.is_short() and self.current_price and price > self.current_price:
+        if self.is_short() and self.current_price and price.value > self.current_price.value:
             raise ValueError("Take profit for short position must be below current price")
 
         self.take_profit_price = price
 
     def is_long(self) -> bool:
         """Check if this is a long position"""
-        return self.quantity > 0
+        return self.quantity.value > 0
 
     def is_short(self) -> bool:
         """Check if this is a short position"""
-        return self.quantity < 0
+        return self.quantity.value < 0
 
     def is_closed(self) -> bool:
         """Check if position is closed"""
-        return self.quantity == 0 or self.closed_at is not None
+        return self.quantity.value == 0 or self.closed_at is not None
 
-    def get_unrealized_pnl(self) -> Decimal | None:
+    def get_unrealized_pnl(self) -> Money | None:
         """Calculate unrealized P&L based on current price"""
         if self.is_closed() or self.current_price is None:
             return None
 
         if self.is_long():
-            return self.quantity * (self.current_price - self.average_entry_price)
+            return Money(
+                self.quantity.value * (self.current_price.value - self.average_entry_price.value)
+            )
         else:
-            return abs(self.quantity) * (self.average_entry_price - self.current_price)
+            return Money(
+                abs(self.quantity.value)
+                * (self.average_entry_price.value - self.current_price.value)
+            )
 
-    def get_total_pnl(self) -> Decimal | None:
+    def get_total_pnl(self) -> Money | None:
         """Calculate total P&L (realized + unrealized)"""
         unrealized = self.get_unrealized_pnl()
         if unrealized is None:
@@ -237,27 +245,27 @@ class Position:
 
         return self.realized_pnl + unrealized - self.commission_paid
 
-    def get_position_value(self) -> Decimal | None:
+    def get_position_value(self) -> Money | None:
         """Get current market value of position"""
         if self.current_price is None:
             return None
 
-        return abs(self.quantity) * self.current_price
+        return Money(abs(self.quantity.value) * self.current_price.value)
 
     def get_return_percentage(self) -> Decimal | None:
         """Calculate return percentage"""
-        if self.average_entry_price == 0:
+        if self.average_entry_price.value == 0:
             return None
 
         total_pnl = self.get_total_pnl()
         if total_pnl is None:
             return None
 
-        initial_value = abs(self.quantity) * self.average_entry_price
+        initial_value = abs(self.quantity.value) * self.average_entry_price.value
         if initial_value == 0:
             return None
 
-        return (total_pnl / initial_value) * Decimal("100")
+        return (total_pnl.amount / initial_value) * Decimal("100")
 
     def should_stop_loss(self) -> bool:
         """Check if stop loss should be triggered"""
@@ -265,9 +273,9 @@ class Position:
             return False
 
         if self.is_long():
-            return self.current_price <= self.stop_loss_price
+            return self.current_price.value <= self.stop_loss_price.value
         else:
-            return self.current_price >= self.stop_loss_price
+            return self.current_price.value >= self.stop_loss_price.value
 
     def should_take_profit(self) -> bool:
         """Check if take profit should be triggered"""
@@ -275,11 +283,11 @@ class Position:
             return False
 
         if self.is_long():
-            return self.current_price >= self.take_profit_price
+            return self.current_price.value >= self.take_profit_price.value
         else:
-            return self.current_price <= self.take_profit_price
+            return self.current_price.value <= self.take_profit_price.value
 
-    def close(self, final_price: Decimal, close_time: datetime) -> None:
+    def close(self, final_price: Price, close_time: datetime) -> None:
         """
         Close the position at the specified price and time.
 
@@ -292,16 +300,20 @@ class Position:
 
         # Calculate final P&L
         if self.is_long():
-            final_pnl = self.quantity * (final_price - self.average_entry_price)
+            final_pnl = Money(
+                self.quantity.value * (final_price.value - self.average_entry_price.value)
+            )
         else:
-            final_pnl = abs(self.quantity) * (self.average_entry_price - final_price)
+            final_pnl = Money(
+                abs(self.quantity.value) * (self.average_entry_price.value - final_price.value)
+            )
 
         # Update position state
         self.realized_pnl = final_pnl
         self.current_price = final_price
         self.closed_at = close_time
         self.last_updated = close_time
-        self.quantity = Decimal("0")  # Mark as fully closed
+        self.quantity = Quantity(Decimal("0"))  # Mark as fully closed
 
     def __str__(self) -> str:
         """String representation"""
@@ -312,11 +324,11 @@ class Position:
         if not self.is_closed():
             unrealized = self.get_unrealized_pnl()
             if unrealized is not None:
-                pnl_str = f", Unrealized P&L: ${unrealized:.2f}"
+                pnl_str = f", Unrealized P&L: {unrealized}"
         else:
-            pnl_str = f", Realized P&L: ${self.realized_pnl:.2f}"
+            pnl_str = f", Realized P&L: {self.realized_pnl}"
 
         return (
-            f"Position({self.symbol}: {direction} {abs(self.quantity)} @ ${self.average_entry_price:.2f}"
+            f"Position({self.symbol}: {direction} {abs(self.quantity.value)} @ {self.average_entry_price}"
             f" - {status}{pnl_str})"
         )

@@ -54,24 +54,24 @@ class TestInputSanitizerStringMethods:
         assert len(result) == 50
         assert result == "a" * 50
 
-    def test_sanitize_string_sql_injection_patterns(self):
-        """Test detection of SQL injection patterns."""
-        sql_injections = [
-            "'; DROP TABLE users; --",
-            "SELECT * FROM users",
-            "admin'--",
-            "' UNION SELECT * FROM passwords",
-            "DELETE FROM users WHERE 1=1",
-            "' OR 1=1--",
-            "' AND 1=1--",
-            "'; EXEC xp_cmdshell('dir')",
-            "'; EXECUTE sp_configure",
+    def test_sanitize_string_no_longer_blocks_sql_patterns(self):
+        """Test that SQL patterns are no longer blocked (only XSS patterns are blocked)."""
+        # These patterns should now pass through since we only block XSS
+        sql_patterns = [
+            "SELECT * FROM users",  # This is fine as a regular string
+            "INSERT INTO table",  # This is fine as a regular string
+            "UPDATE records",  # This is fine as a regular string
+            "DELETE FROM old",  # This is fine as a regular string
+            "admin'--",  # This is fine as a regular string
         ]
 
-        for injection in sql_injections:
-            with pytest.raises(SanitizationError) as exc_info:
-                InputSanitizer.sanitize_string(injection)
-            assert "dangerous patterns" in str(exc_info).lower()
+        for pattern in sql_patterns:
+            # These should now pass through without error
+            result = InputSanitizer.sanitize_string(pattern)
+            # They should be HTML escaped but not rejected
+            import html
+
+            assert result == html.escape(pattern)
 
     def test_sanitize_string_xss_patterns(self):
         """Test detection of XSS patterns."""
@@ -171,53 +171,25 @@ class TestSqlIdentifierSanitization:
         assert "Invalid SQL identifier" in str(exc_info)
 
 
-class TestSqlValueSanitization:
-    """Test SQL value sanitization."""
+class TestRemovedSqlValueSanitization:
+    """Test that dangerous SQL value sanitization has been removed."""
 
-    def test_sanitize_sql_value_none(self):
-        """Test sanitizing None value."""
-        result = InputSanitizer.sanitize_sql_value(None)
-        assert result == "NULL"
+    def test_sanitize_sql_value_method_removed(self):
+        """Test that the dangerous sanitize_sql_value method has been removed."""
+        # The method should no longer exist
+        assert not hasattr(
+            InputSanitizer, "sanitize_sql_value"
+        ), "sanitize_sql_value method should be removed for security reasons"
 
-    def test_sanitize_sql_value_string(self):
-        """Test sanitizing string values."""
-        result = InputSanitizer.sanitize_sql_value("John's data")
-        assert result == "'John''s data'"
+    def test_removed_method_raises_error(self):
+        """Test that the replacement method raises appropriate error."""
+        # The replacement method should raise NotImplementedError
+        with pytest.raises(NotImplementedError) as exc_info:
+            InputSanitizer._removed_sanitize_sql_value("test")
 
-        result = InputSanitizer.sanitize_sql_value("Regular text")
-        assert result == "'Regular text'"
-
-    def test_sanitize_sql_value_quotes_escaping(self):
-        """Test proper quote escaping."""
-        result = InputSanitizer.sanitize_sql_value("O'Brien")
-        assert result == "'O''Brien'"
-
-        result = InputSanitizer.sanitize_sql_value("It's a 'quoted' string")
-        assert result == "'It''s a ''quoted'' string'"
-
-    def test_sanitize_sql_value_backslash_escaping(self):
-        """Test backslash escaping."""
-        result = InputSanitizer.sanitize_sql_value("path\\to\\file")
-        assert result == "'path\\\\to\\\\file'"
-
-        result = InputSanitizer.sanitize_sql_value("Line1\\nLine2")
-        assert result == "'Line1\\\\nLine2'"
-
-    def test_sanitize_sql_value_numbers(self):
-        """Test sanitizing numeric values."""
-        result = InputSanitizer.sanitize_sql_value(123)
-        assert result == "'123'"
-
-        result = InputSanitizer.sanitize_sql_value(45.67)
-        assert result == "'45.67'"
-
-    def test_sanitize_sql_value_boolean(self):
-        """Test sanitizing boolean values."""
-        result = InputSanitizer.sanitize_sql_value(True)
-        assert result == "'True'"
-
-        result = InputSanitizer.sanitize_sql_value(False)
-        assert result == "'False'"
+        error_msg = str(exc_info.value).lower()
+        assert "parameterized queries" in error_msg
+        assert "removed for security" in error_msg
 
 
 class TestFilenameSanitization:
@@ -339,16 +311,15 @@ class TestSymbolSanitization:
             InputSanitizer.sanitize_symbol(long_symbol)
         assert "Symbol too long" in str(exc_info)
 
-    def test_sanitize_symbol_sql_injection(self):
-        """Test symbols containing SQL injection attempts."""
+    def test_sanitize_symbol_invalid_format(self):
+        """Test symbols with invalid characters (format validation only)."""
         malicious_symbols = ["AAPL'; DROP TABLE--", "MSFT OR 1=1", "SELECT * FROM"]
 
         for symbol in malicious_symbols:
             with pytest.raises(SanitizationError) as exc_info:
                 InputSanitizer.sanitize_symbol(symbol)
-            assert "dangerous patterns" in str(exc_info).lower() or "Invalid trading symbol" in str(
-                exc_info
-            )
+            # Should fail due to invalid format, not "dangerous patterns"
+            assert "Invalid trading symbol" in str(exc_info) or "XSS patterns" in str(exc_info)
 
 
 class TestIdentifierSanitization:
@@ -384,16 +355,15 @@ class TestIdentifierSanitization:
             InputSanitizer.sanitize_identifier(long_identifier)
         assert "Identifier too long" in str(exc_info)
 
-    def test_sanitize_identifier_sql_injection(self):
-        """Test identifiers with SQL injection patterns."""
+    def test_sanitize_identifier_invalid_format(self):
+        """Test identifiers with invalid characters (format validation only)."""
         malicious = ["user_id; DROP TABLE users", "session_OR_1=1"]
 
         for identifier in malicious:
             with pytest.raises(SanitizationError) as exc_info:
                 InputSanitizer.sanitize_identifier(identifier)
-            assert "dangerous patterns" in str(exc_info).lower() or "Invalid identifier" in str(
-                exc_info
-            )
+            # Should fail due to invalid format, not "dangerous patterns"
+            assert "Invalid identifier" in str(exc_info) or "XSS patterns" in str(exc_info)
 
 
 class TestUrlSanitization:
@@ -453,11 +423,11 @@ class TestUrlSanitization:
             assert "dangerous URL scheme" in str(exc_info)
 
 
-class TestDangerousPatternDetection:
-    """Test _contains_dangerous_pattern method."""
+class TestXSSPatternDetection:
+    """Test _contains_xss_pattern method (SQL pattern detection removed)."""
 
-    def test_sql_keywords_detection(self):
-        """Test detection of SQL keywords."""
+    def test_sql_keywords_no_longer_detected(self):
+        """Test that SQL keywords are no longer detected as dangerous."""
         sql_keywords = [
             "SELECT something",
             "INSERT INTO table",
@@ -472,21 +442,24 @@ class TestDangerousPatternDetection:
         ]
 
         for text in sql_keywords:
-            assert InputSanitizer._contains_dangerous_pattern(text) is True
+            # SQL patterns should no longer be detected as dangerous
+            assert InputSanitizer._contains_xss_pattern(text) is False
 
-    def test_sql_comment_detection(self):
-        """Test detection of SQL comments."""
+    def test_sql_comments_no_longer_detected(self):
+        """Test that SQL comments are no longer detected as dangerous."""
         sql_comments = ["value--comment", "value/*comment*/", "value;command", "value|command"]
 
         for text in sql_comments:
-            assert InputSanitizer._contains_dangerous_pattern(text) is True
+            # SQL patterns should no longer be detected as dangerous
+            assert InputSanitizer._contains_xss_pattern(text) is False
 
-    def test_sql_logic_detection(self):
-        """Test detection of SQL logic patterns."""
+    def test_sql_logic_no_longer_detected(self):
+        """Test that SQL logic patterns are no longer detected as dangerous."""
         sql_logic = ["1 OR 1=1", "1 AND 1=1", "value OR 2=2", "test AND 5=5"]
 
         for text in sql_logic:
-            assert InputSanitizer._contains_dangerous_pattern(text) is True
+            # SQL patterns should no longer be detected as dangerous
+            assert InputSanitizer._contains_xss_pattern(text) is False
 
     def test_xss_script_detection(self):
         """Test detection of script tags."""
@@ -497,21 +470,21 @@ class TestDangerousPatternDetection:
         ]
 
         for text in scripts:
-            assert InputSanitizer._contains_dangerous_pattern(text) is True
+            assert InputSanitizer._contains_xss_pattern(text) is True
 
     def test_xss_javascript_detection(self):
         """Test detection of javascript: protocol."""
         javascript_urls = ["javascript:alert(1)", "JavaScript:code", "JAVASCRIPT:test"]
 
         for text in javascript_urls:
-            assert InputSanitizer._contains_dangerous_pattern(text) is True
+            assert InputSanitizer._contains_xss_pattern(text) is True
 
     def test_xss_event_handler_detection(self):
         """Test detection of event handlers."""
         event_handlers = ["onclick='alert(1)'", "onload=code", "onerror='test'", "onmouseover=func"]
 
         for text in event_handlers:
-            assert InputSanitizer._contains_dangerous_pattern(text) is True
+            assert InputSanitizer._contains_xss_pattern(text) is True
 
     def test_safe_patterns(self):
         """Test that safe patterns are not detected."""
@@ -529,7 +502,7 @@ class TestDangerousPatternDetection:
         ]
 
         for text in safe_texts:
-            assert InputSanitizer._contains_dangerous_pattern(text) is False
+            assert InputSanitizer._contains_xss_pattern(text) is False
 
 
 class TestEdgeCasesAndSpecialScenarios:

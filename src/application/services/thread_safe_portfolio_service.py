@@ -10,6 +10,8 @@ from decimal import Decimal
 
 from ...domain.entities.portfolio import Portfolio, PositionRequest
 from ...domain.entities.position import Position
+from ...domain.value_objects.money import Money
+from ...domain.value_objects.price import Price
 
 
 class ThreadSafePortfolioService:
@@ -72,7 +74,7 @@ class ThreadSafePortfolioService:
         symbol: str,
         exit_price: Decimal,
         commission: Decimal = Decimal("0"),
-    ) -> Decimal:
+    ) -> Money:
         """
         Close a position and update portfolio (thread-safe).
 
@@ -89,7 +91,7 @@ class ThreadSafePortfolioService:
             async with self._cash_lock:
                 async with self._stats_lock:
                     # Delegate to domain entity for business logic
-                    return portfolio.close_position(symbol, exit_price, commission)
+                    return portfolio.close_position(symbol, Price(exit_price), Money(commission))
 
     async def update_position_price(
         self, portfolio: Portfolio, symbol: str, price: Decimal
@@ -103,7 +105,7 @@ class ThreadSafePortfolioService:
         """
         async with self._position_lock:
             # Delegate to domain entity for business logic
-            portfolio.update_position_price(symbol, price)
+            portfolio.update_position_price(symbol, Price(price))
 
         async with self._stats_lock:
             # Update portfolio timestamp
@@ -120,7 +122,8 @@ class ThreadSafePortfolioService:
         """
         async with self._position_lock:
             # Delegate to domain entity for business logic
-            portfolio.update_all_prices(prices)
+            price_objects = {symbol: Price(price) for symbol, price in prices.items()}
+            portfolio.update_all_prices(price_objects)
 
         async with self._stats_lock:
             # Update portfolio timestamp
@@ -128,7 +131,7 @@ class ThreadSafePortfolioService:
 
             portfolio.last_updated = datetime.now(UTC)
 
-    async def get_total_value(self, portfolio: Portfolio) -> Decimal:
+    async def get_total_value(self, portfolio: Portfolio) -> Money:
         """Calculate total portfolio value (cash + positions) - thread-safe
 
         Args:
@@ -142,7 +145,7 @@ class ThreadSafePortfolioService:
                 # Delegate to domain entity for business logic
                 return portfolio.get_total_value()
 
-    def get_total_value_sync(self, portfolio: Portfolio) -> Decimal:
+    def get_total_value_sync(self, portfolio: Portfolio) -> Money:
         """Synchronous wrapper for get_total_value
 
         Args:
@@ -193,7 +196,7 @@ class ThreadSafePortfolioService:
         symbol: str,
         exit_price: Decimal,
         commission: Decimal = Decimal("0"),
-    ) -> Decimal:
+    ) -> Money:
         """Synchronous wrapper for close_position
 
         Args:

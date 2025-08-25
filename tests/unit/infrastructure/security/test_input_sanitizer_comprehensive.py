@@ -25,17 +25,12 @@ class TestInputSanitizerBasics:
         error = SanitizationError("Invalid input")
         assert str(error) == "Invalid input"
 
-    def test_sql_injection_patterns(self):
-        """Test SQL injection pattern definitions."""
-        patterns = InputSanitizer.SQL_INJECTION_PATTERNS
-
-        assert any("SELECT" in p for p in patterns)
-        assert any("INSERT" in p for p in patterns)
-        assert any("UPDATE" in p for p in patterns)
-        assert any("DELETE" in p for p in patterns)
-        assert any("DROP" in p for p in patterns)
-        assert any("--" in p for p in patterns)
-        assert any("OR" in p and "=" in p for p in patterns)
+    def test_sql_injection_patterns_removed(self):
+        """Test that SQL injection patterns have been removed for security."""
+        # SQL_INJECTION_PATTERNS should no longer exist
+        assert not hasattr(
+            InputSanitizer, "SQL_INJECTION_PATTERNS"
+        ), "SQL_INJECTION_PATTERNS should be removed - SQL injection prevention should use parameterized queries"
 
     def test_xss_patterns(self):
         """Test XSS pattern definitions."""
@@ -226,54 +221,37 @@ class TestSanitizeSQLIdentifier:
 
 
 @pytest.mark.unit
-class TestSanitizeSQLValue:
-    """Test SQL value sanitization."""
+class TestSqlValueSanitizationRemoved:
+    """Test that dangerous SQL value sanitization has been removed."""
 
-    def test_sanitize_sql_value_none(self):
-        """Test sanitizing None value."""
-        result = InputSanitizer.sanitize_sql_value(None)
-        assert result == "NULL"
+    def test_sanitize_sql_value_method_removed(self):
+        """Test that sanitize_sql_value method has been removed for security."""
+        # Method should no longer exist
+        assert not hasattr(
+            InputSanitizer, "sanitize_sql_value"
+        ), "sanitize_sql_value should be removed - use parameterized queries instead"
 
-    def test_sanitize_sql_value_string(self):
-        """Test sanitizing string values."""
-        result = InputSanitizer.sanitize_sql_value("Hello")
-        assert result == "'Hello'"
+    def test_replacement_method_guidance(self):
+        """Test that replacement method provides proper guidance."""
+        with pytest.raises(NotImplementedError) as exc_info:
+            InputSanitizer._removed_sanitize_sql_value("test")
 
-    def test_sanitize_sql_value_quote_escaping(self):
-        """Test quote escaping in SQL values."""
-        result = InputSanitizer.sanitize_sql_value("O'Brien")
-        assert result == "'O''Brien'"
+        error_msg = str(exc_info.value).lower()
+        assert "parameterized queries" in error_msg
+        assert "removed for security" in error_msg
+        assert "cursor.execute" in error_msg  # Should show example
 
-        result = InputSanitizer.sanitize_sql_value("It's a test")
-        assert result == "'It''s a test'"
+    def test_security_documentation_present(self):
+        """Test that security warnings are present in code."""
+        import inspect
 
-    def test_sanitize_sql_value_backslash_escaping(self):
-        """Test backslash escaping in SQL values."""
-        result = InputSanitizer.sanitize_sql_value("C:\\path\\to\\file")
-        assert result == "'C:\\\\path\\\\to\\\\file'"
+        source = inspect.getsource(InputSanitizer)
 
-    def test_sanitize_sql_value_numbers(self):
-        """Test sanitizing numeric values."""
-        result = InputSanitizer.sanitize_sql_value(123)
-        assert result == "'123'"
-
-        result = InputSanitizer.sanitize_sql_value(3.14)
-        assert result == "'3.14'"
-
-    def test_sanitize_sql_value_boolean(self):
-        """Test sanitizing boolean values."""
-        result = InputSanitizer.sanitize_sql_value(True)
-        assert result == "'True'"
-
-        result = InputSanitizer.sanitize_sql_value(False)
-        assert result == "'False'"
-
-    def test_sanitize_sql_value_complex_string(self):
-        """Test sanitizing complex strings with multiple special characters."""
-        result = InputSanitizer.sanitize_sql_value("'; DROP TABLE users; --")
-        # Should escape quotes but not prevent the string
-        assert "''" in result  # Escaped quotes (single quote becomes double quote)
-        assert "DROP TABLE" in result  # Content preserved but escaped
+        # Should contain security warnings about parameterized queries
+        assert "parameterized queries" in source.lower()
+        assert "security" in source.lower()
+        # Should warn against manual SQL escaping
+        assert "dangerous" in source.lower() or "removed" in source.lower()
 
 
 @pytest.mark.unit

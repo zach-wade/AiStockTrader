@@ -22,6 +22,23 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import INET, UUID
+from sqlalchemy.types import String as SQLString
+from sqlalchemy.types import TypeDecorator
+
+
+class IPAddress(TypeDecorator):
+    """Database-agnostic IP address field."""
+
+    impl = SQLString
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(INET())
+        else:
+            return dialect.type_descriptor(SQLString(45))  # IPv6 max length
+
+
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -93,7 +110,7 @@ class User(Base):  # type: ignore[valid-type, misc]
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime, nullable=True)
     last_login_at = Column(DateTime)
-    last_login_ip = Column(INET)
+    last_login_ip = Column(IPAddress)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -213,7 +230,7 @@ class APIKey(Base):  # type: ignore[valid-type, misc]
     # Expiration and usage
     expires_at = Column(DateTime)
     last_used_at = Column(DateTime)
-    last_used_ip = Column(INET)
+    last_used_ip = Column(IPAddress)
 
     # Status
     is_active = Column(Boolean, default=True)
@@ -293,7 +310,7 @@ class UserSession(Base):  # type: ignore[valid-type, misc]
     # Device and location info
     device_id = Column(String(255))
     user_agent = Column(Text)
-    ip_address = Column(INET)
+    ip_address = Column(IPAddress)
     location = Column(JSON)
 
     # Expiration
@@ -351,7 +368,7 @@ class AuthAuditLog(Base):  # type: ignore[valid-type, misc]
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     event_type = Column(String(50), nullable=False, index=True)
     event_data = Column(JSON)
-    ip_address = Column(INET)
+    ip_address = Column(IPAddress)
     user_agent = Column(Text)
     success = Column(Boolean, default=True)
     error_message = Column(Text)

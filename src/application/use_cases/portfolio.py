@@ -427,7 +427,7 @@ class ClosePositionUseCase(TransactionalUseCase[ClosePositionRequest, ClosePosit
             order_type=OrderType.MARKET,
             quantity=abs(position.quantity),
         )
-        closing_order.average_fill_price = Decimal(str(request.exit_price))
+        closing_order.average_fill_price = Price(Decimal(str(request.exit_price)))
 
         self.position_manager.close_position(
             position=position, order=closing_order, exit_price=exit_price

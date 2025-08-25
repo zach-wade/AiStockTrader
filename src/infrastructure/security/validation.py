@@ -3,6 +3,9 @@ Input validation utilities for infrastructure layer.
 
 This module provides basic security validation for infrastructure components.
 Business logic validation is handled by domain services.
+
+SECURITY NOTICE: This module has been updated to remove dangerous SQL sanitization
+patterns. All SQL operations must use parameterized queries for security.
 """
 
 import functools
@@ -14,6 +17,7 @@ from typing import Any, TypeVar
 from src.domain.services.trading_validation_service import TradingValidationService
 from src.domain.services.validation_service import ValidationService
 from src.infrastructure.security.input_sanitizer import InputSanitizer, SanitizationError
+from src.infrastructure.security.input_validation import InputValidator
 
 logger = logging.getLogger(__name__)
 
@@ -133,35 +137,74 @@ def check_required(**required_params: type) -> Callable[[Callable[..., T]], Call
     return decorator
 
 
-def sanitize_sql_params(params: dict[str, Any]) -> dict[str, Any]:
+def validate_sql_params(params: dict[str, Any]) -> dict[str, Any]:
     """
-    Sanitize a dictionary of SQL parameters.
+    Validate SQL parameters for type safety and basic format checking.
 
-    This is a utility function for sanitizing SQL parameters.
-    Always prefer parameterized queries over string concatenation.
+    SECURITY NOTE: This function validates parameter formats but does NOT
+    sanitize SQL values. Use parameterized queries for all SQL operations!
 
     Args:
-        params: Dictionary of parameters
+        params: Dictionary of parameters to validate
 
     Returns:
-        Dictionary with sanitized values
+        Dictionary with validated parameters
+
+    Raises:
+        ValidationError: If any parameter is invalid
     """
-    sanitized = {}
-    sanitizer = InputSanitizer()
+    validated: dict[str, Any] = {}
+    validator = InputValidator()
 
     for key, value in params.items():
-        if isinstance(value, str):
-            # Sanitize strings
-            try:
-                sanitized[key] = sanitizer.sanitize_string(value)
-            except SanitizationError:
-                logger.warning(f"Failed to sanitize parameter {key}")
-                raise ValidationError(f"Invalid parameter {key}")
-        else:
-            # Keep other types as-is (numbers, dates, etc.)
-            sanitized[key] = value
+        try:
+            # Validate parameter names (they should be safe identifiers)
+            validated_key = validator.validate_safe_identifier(key, f"parameter name '{key}'")
 
-    return sanitized
+            if isinstance(value, str):
+                # Basic string validation (no dangerous sanitization)
+                # This only checks for extremely dangerous patterns like XSS
+                try:
+                    validated_value = InputSanitizer.sanitize_string(value, max_length=10000)
+                    validated[validated_key] = validated_value
+                except SanitizationError as e:
+                    logger.warning(f"Parameter '{key}' contains dangerous patterns: {e}")
+                    raise ValidationError(f"Invalid parameter '{key}': contains dangerous patterns")
+            elif value is None:
+                validated[validated_key] = None
+            elif isinstance(value, (int, float, Decimal)) or isinstance(value, bool):
+                validated[validated_key] = value
+            else:
+                # For other types, convert to string and validate
+                str_value = str(value)
+                try:
+                    validated_value = InputSanitizer.sanitize_string(str_value, max_length=10000)
+                    validated[validated_key] = validated_value
+                except SanitizationError as e:
+                    logger.warning(f"Parameter '{key}' contains dangerous patterns: {e}")
+                    raise ValidationError(f"Invalid parameter '{key}': contains dangerous patterns")
+
+        except ValidationError:
+            raise  # Re-raise validation errors
+        except Exception as e:
+            logger.error(f"Unexpected error validating parameter '{key}': {e}")
+            raise ValidationError(f"Error validating parameter '{key}': {e}")
+
+    return validated
+
+
+# Legacy alias for backward compatibility - will be removed in future version
+def sanitize_sql_params(params: dict[str, Any]) -> dict[str, Any]:
+    """
+    DEPRECATED: Use validate_sql_params() instead.
+
+    This function is deprecated because the name implies SQL sanitization,
+    which should never be done manually. Use parameterized queries instead!
+    """
+    logger.warning(
+        "sanitize_sql_params() is deprecated - use validate_sql_params() and parameterized queries"
+    )
+    return validate_sql_params(params)
 
 
 class SecurityValidator:
