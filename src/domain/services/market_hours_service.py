@@ -129,12 +129,7 @@ class MarketHoursService:
         elif not self._time_service.is_timezone_aware(current_time):
             now = self._time_service.localize_naive_datetime(current_time, self.timezone)
         else:
-            # Create adapter using time service instead of importing from infrastructure
-            if not hasattr(current_time, "native_datetime"):
-                adapter = self._time_service.create_adapter(current_time)
-            else:
-                adapter = current_time
-            now = self._time_service.convert_timezone(adapter, self.timezone)
+            now = self._time_service.convert_timezone(current_time, self.timezone)
 
         # Business rule: Check if today is a holiday
         if self.is_holiday(now):
@@ -250,11 +245,11 @@ class MarketHoursService:
             Next market open datetime, or None if unable to determine
         """
         if from_time is None:
-            current = datetime.now(self.timezone)
-        elif from_time.tzinfo is None:
-            current = self.timezone.localize(from_time)
+            current = self._time_service.get_current_time(self.timezone)
+        elif not self._time_service.is_timezone_aware(from_time):
+            current = self._time_service.localize_naive_datetime(from_time, self.timezone)
         else:
-            current = from_time.astimezone(self.timezone)
+            current = self._time_service.convert_timezone(from_time, self.timezone)
 
         # Start checking from current time
         check_date = current
@@ -292,11 +287,11 @@ class MarketHoursService:
             Next market close datetime, or None if unable to determine
         """
         if from_time is None:
-            current = datetime.now(self.timezone)
-        elif from_time.tzinfo is None:
-            current = self.timezone.localize(from_time)
+            current = self._time_service.get_current_time(self.timezone)
+        elif not self._time_service.is_timezone_aware(from_time):
+            current = self._time_service.localize_naive_datetime(from_time, self.timezone)
         else:
-            current = from_time.astimezone(self.timezone)
+            current = self._time_service.convert_timezone(from_time, self.timezone)
 
         # If market is currently open, return today's close
         if self.is_market_open(current):
@@ -370,8 +365,12 @@ class MarketHoursService:
             return None
 
         # Localize the times for the given day
-        market_open = self.timezone.localize(datetime.combine(trading_day, self.regular_open))
-        market_close = self.timezone.localize(datetime.combine(trading_day, self.regular_close))
+        market_open = self._time_service.localize_naive_datetime(
+            datetime.combine(trading_day, self.regular_open), self.timezone
+        )
+        market_close = self._time_service.localize_naive_datetime(
+            datetime.combine(trading_day, self.regular_close), self.timezone
+        )
 
         return {
             "open": market_open,
@@ -397,26 +396,26 @@ class MarketHoursService:
             return None
 
         # Localize the times for the given day
-        pre_market_open = self.timezone.localize(
-            datetime.combine(trading_day, self.pre_market_open)
+        pre_market_open = self._time_service.localize_naive_datetime(
+            datetime.combine(trading_day, self.pre_market_open), self.timezone
         )
-        after_market_close = self.timezone.localize(
-            datetime.combine(trading_day, self.after_market_close)
+        after_market_close = self._time_service.localize_naive_datetime(
+            datetime.combine(trading_day, self.after_market_close), self.timezone
         )
 
         return {
             "pre_market_open": pre_market_open,
-            "pre_market_close": self.timezone.localize(
-                datetime.combine(trading_day, self.regular_open)
+            "pre_market_close": self._time_service.localize_naive_datetime(
+                datetime.combine(trading_day, self.regular_open), self.timezone
             ),
-            "regular_open": self.timezone.localize(
-                datetime.combine(trading_day, self.regular_open)
+            "regular_open": self._time_service.localize_naive_datetime(
+                datetime.combine(trading_day, self.regular_open), self.timezone
             ),
-            "regular_close": self.timezone.localize(
-                datetime.combine(trading_day, self.regular_close)
+            "regular_close": self._time_service.localize_naive_datetime(
+                datetime.combine(trading_day, self.regular_close), self.timezone
             ),
-            "after_market_open": self.timezone.localize(
-                datetime.combine(trading_day, self.regular_close)
+            "after_market_open": self._time_service.localize_naive_datetime(
+                datetime.combine(trading_day, self.regular_close), self.timezone
             ),
             "after_market_close": after_market_close,
         }
@@ -432,7 +431,7 @@ class MarketHoursService:
             The next trading day
         """
         if from_date is None:
-            from_date = datetime.now(self.timezone).date()
+            from_date = self._time_service.get_current_time(self.timezone).date()
 
         # Start checking from the next day
         next_day = from_date + timedelta(days=1)
@@ -454,7 +453,7 @@ class MarketHoursService:
             The previous trading day
         """
         if from_date is None:
-            from_date = datetime.now(self.timezone).date()
+            from_date = self._time_service.get_current_time(self.timezone).date()
 
         # Start checking from the previous day
         prev_day = from_date - timedelta(days=1)
@@ -477,8 +476,8 @@ class MarketHoursService:
         """
         if from_time is None:
             from_time = datetime.now(self.timezone)
-        elif from_time.tzinfo is None:
-            from_time = self.timezone.localize(from_time)
+        elif not self._time_service.is_timezone_aware(from_time):
+            from_time = self._time_service.localize_naive_datetime(from_time, self.timezone)
 
         # If market is currently open, return 0
         if self.is_market_open(from_time):
@@ -507,8 +506,8 @@ class MarketHoursService:
         """
         if from_time is None:
             from_time = datetime.now(self.timezone)
-        elif from_time.tzinfo is None:
-            from_time = self.timezone.localize(from_time)
+        elif not self._time_service.is_timezone_aware(from_time):
+            from_time = self._time_service.localize_naive_datetime(from_time, self.timezone)
 
         # If market is closed, return None
         if not self.is_market_open(from_time):

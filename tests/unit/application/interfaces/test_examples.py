@@ -44,8 +44,13 @@ class TestTradingService:
     @pytest.fixture
     def sample_order(self):
         """Create a sample order for testing."""
+        from src.domain.value_objects.quantity import Quantity
+
         request = OrderRequest(
-            symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY, reason="Test order"
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
+            reason="Test order",
         )
         order = Order.create_market_order(request)
         # Submit the order so it can be filled
@@ -55,8 +60,11 @@ class TestTradingService:
     @pytest.fixture
     def sample_position(self):
         """Create a sample position for testing."""
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.quantity import Quantity
+
         return Position.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00")
+            symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150.00"))
         )
 
     @pytest.fixture
@@ -91,7 +99,7 @@ class TestTradingService:
         # Verify the order was created correctly
         call_args = mock_uow.orders.save_order.call_args[0][0]
         assert call_args.symbol == "AAPL"
-        assert call_args.quantity == Decimal("100")
+        assert call_args.quantity.value == Decimal("100")
         assert call_args.side == OrderSide.BUY
 
     async def test_place_market_order_without_reason(self, trading_service, mock_uow):
@@ -109,7 +117,7 @@ class TestTradingService:
         assert result == saved_order
         call_args = mock_uow.orders.save_order.call_args[0][0]
         assert call_args.symbol == "TSLA"
-        assert call_args.quantity == Decimal("50")
+        assert call_args.quantity.value == Decimal("50")
         assert call_args.side == OrderSide.SELL
 
     async def test_execute_trade_with_new_position(

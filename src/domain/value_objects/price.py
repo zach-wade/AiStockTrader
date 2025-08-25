@@ -248,6 +248,39 @@ class Price:
         """Get string representation."""
         return self.to_string()
 
+    # Arithmetic operator overloads
+    def __add__(self, other: Self | Decimal | int | float) -> Self:
+        """Add another price or numeric value."""
+        if isinstance(other, Price):
+            return self.add(other)
+        return type(self)(self._value + Decimal(str(other)), tick_size=self._tick_size)
+
+    def __radd__(self, other: Decimal | int | float) -> Self:
+        """Reverse add for numeric value + Price."""
+        return type(self)(Decimal(str(other)) + self._value, tick_size=self._tick_size)
+
+    def __sub__(self, other: Self | Decimal | int | float) -> Self:
+        """Subtract another price or numeric value."""
+        if isinstance(other, Price):
+            return self.subtract(other)
+        return type(self)(self._value - Decimal(str(other)), tick_size=self._tick_size)
+
+    def __rsub__(self, other: Decimal | int | float) -> Self:
+        """Reverse subtract for numeric value - Price."""
+        return type(self)(Decimal(str(other)) - self._value, tick_size=self._tick_size)
+
+    def __mul__(self, other: Decimal | int | float) -> Self:
+        """Multiply by a numeric value."""
+        return self.multiply(other)
+
+    def __rmul__(self, other: Decimal | int | float) -> Self:
+        """Reverse multiply for numeric value * Price."""
+        return self.multiply(other)
+
+    def __truediv__(self, other: Decimal | int | float) -> Self:
+        """Divide by a numeric value."""
+        return self.divide(other)
+
     @classmethod
     def from_bid_ask(cls, bid: Decimal | float, ask: Decimal | float, **kwargs: Any) -> Self:
         """Create Price from bid/ask midpoint.

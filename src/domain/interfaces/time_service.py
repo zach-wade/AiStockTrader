@@ -7,20 +7,35 @@ operations it needs, and infrastructure provides the implementation.
 """
 
 from abc import ABC, abstractmethod
-from datetime import date, datetime, time
-from typing import Any, Protocol
+from datetime import date, datetime, time, timedelta, tzinfo
+from typing import Any, Protocol, runtime_checkable
 
 
+@runtime_checkable
 class TimezoneInfo(Protocol):
-    """Protocol for timezone information objects."""
+    """Protocol for timezone information objects compatible with Python's tzinfo."""
+
+    # Required tzinfo methods
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        """Return offset of local time from UTC."""
+        ...
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        """Return name of timezone."""
+        ...
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        """Return DST offset."""
+        ...
 
     def __str__(self) -> str:
         """String representation of the timezone."""
         ...
 
 
+@runtime_checkable
 class LocalizedDatetime(Protocol):
-    """Protocol for timezone-aware datetime objects."""
+    """Protocol for timezone-aware datetime objects compatible with datetime."""
 
     def date(self) -> date:
         """Get the date component."""
@@ -38,31 +53,31 @@ class LocalizedDatetime(Protocol):
         """Format datetime as string."""
         ...
 
-    def replace(self, **kwargs: Any) -> "LocalizedDatetime":
+    def replace(self, **kwargs: Any) -> datetime:
         """Return datetime with specified components replaced."""
         ...
 
-    def __add__(self, other: Any) -> "LocalizedDatetime":
+    def __add__(self, other: timedelta) -> datetime:
         """Add timedelta to datetime."""
         ...
 
-    def __sub__(self, other: Any) -> Any:
+    def __sub__(self, other: datetime | timedelta) -> timedelta | datetime:
         """Subtract datetime or timedelta."""
         ...
 
-    def __lt__(self, other: "LocalizedDatetime") -> bool:
+    def __lt__(self, other: datetime) -> bool:
         """Less than comparison."""
         ...
 
-    def __le__(self, other: "LocalizedDatetime") -> bool:
+    def __le__(self, other: datetime) -> bool:
         """Less than or equal comparison."""
         ...
 
-    def __gt__(self, other: "LocalizedDatetime") -> bool:
+    def __gt__(self, other: datetime) -> bool:
         """Greater than comparison."""
         ...
 
-    def __ge__(self, other: "LocalizedDatetime") -> bool:
+    def __ge__(self, other: datetime) -> bool:
         """Greater than or equal comparison."""
         ...
 
@@ -70,8 +85,13 @@ class LocalizedDatetime(Protocol):
         """Equality comparison."""
         ...
 
-    def as_datetime(self) -> "datetime":
+    def as_datetime(self) -> datetime:
         """Convert to standard datetime object."""
+        ...
+
+    @property
+    def tzinfo(self) -> tzinfo | None:
+        """Get timezone info."""
         ...
 
 

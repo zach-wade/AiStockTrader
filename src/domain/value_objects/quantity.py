@@ -227,3 +227,36 @@ class Quantity:
         # Normalize to remove trailing zeros
         normalized = self._value.normalize()
         return str(normalized)
+
+    # Arithmetic operator overloads
+    def __add__(self, other: Self | Decimal | int | float) -> Self:
+        """Add another quantity or numeric value."""
+        if isinstance(other, Quantity):
+            return self.add(other)
+        return type(self)(self._value + Decimal(str(other)))
+
+    def __radd__(self, other: Decimal | int | float) -> Self:
+        """Reverse add for numeric value + Quantity."""
+        return type(self)(Decimal(str(other)) + self._value)
+
+    def __sub__(self, other: Self | Decimal | int | float) -> Self:
+        """Subtract another quantity or numeric value."""
+        if isinstance(other, Quantity):
+            return self.subtract(other)
+        return type(self)(self._value - Decimal(str(other)))
+
+    def __rsub__(self, other: Decimal | int | float) -> Self:
+        """Reverse subtract for numeric value - Quantity."""
+        return type(self)(Decimal(str(other)) - self._value)
+
+    def __mul__(self, other: Decimal | int | float) -> Self:
+        """Multiply by a numeric value."""
+        return self.multiply(other)
+
+    def __rmul__(self, other: Decimal | int | float) -> Self:
+        """Reverse multiply for numeric value * Quantity."""
+        return self.multiply(other)
+
+    def __truediv__(self, other: Decimal | int | float) -> Self:
+        """Divide by a numeric value."""
+        return self.divide(other)

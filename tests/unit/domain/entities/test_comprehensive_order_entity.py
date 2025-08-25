@@ -233,8 +233,9 @@ class TestOrderStateTransitions:
 
         # Test if order has submit method
         if hasattr(order, "submit"):
-            order.submit()
-            assert order.status in [OrderStatus.SUBMITTED, OrderStatus.PENDING]
+            order.submit("BROKER123")
+            assert order.status == OrderStatus.SUBMITTED
+            assert order.broker_order_id == "BROKER123"
 
     def test_order_acceptance(self):
         """Test order acceptance by broker."""

@@ -14,6 +14,8 @@ from uuid import UUID, uuid4
 # Local imports
 from src.domain.entities.order import Order, OrderRequest, OrderSide, OrderStatus
 from src.domain.entities.position import Position
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 from .exceptions import OrderNotFoundError, PositionNotFoundError
 from .unit_of_work import ITransactionManager, IUnitOfWork
@@ -44,7 +46,7 @@ class TradingService:
         Example of using repository interface for simple operations.
         """
         # Create domain entity
-        request = OrderRequest(symbol=symbol, quantity=quantity, side=side, reason=reason)
+        request = OrderRequest(symbol=symbol, quantity=Quantity(quantity), side=side, reason=reason)
         order = Order.create_market_order(request)
 
         # Save using repository interface
@@ -70,7 +72,7 @@ class TradingService:
                 raise OrderNotFoundError(order_id)
 
             # Fill the order
-            order.fill(fill_quantity, fill_price)
+            order.fill(Quantity(fill_quantity), Price(fill_price))
 
             # Get or create position
             position = await uow.positions.get_position_by_symbol(order.symbol)
@@ -78,13 +80,15 @@ class TradingService:
                 # Create new position
                 position = Position.open_position(
                     symbol=order.symbol,
-                    quantity=fill_quantity if order.side == OrderSide.BUY else -fill_quantity,
-                    entry_price=fill_price,
+                    quantity=Quantity(
+                        fill_quantity if order.side == OrderSide.BUY else -fill_quantity
+                    ),
+                    entry_price=Price(fill_price),
                 )
             elif order.side == OrderSide.BUY:
-                position.add_to_position(fill_quantity, fill_price)
+                position.add_to_position(Quantity(fill_quantity), Price(fill_price))
             else:
-                position.reduce_position(fill_quantity, fill_price)
+                position.reduce_position(Quantity(fill_quantity), Price(fill_price))
 
             # Save changes
             updated_order = await uow.orders.update_order(order)
@@ -114,7 +118,7 @@ class TradingService:
             closing_side = OrderSide.SELL if position.is_long() else OrderSide.BUY
             close_request = OrderRequest(
                 symbol=symbol,
-                quantity=abs(position.quantity),
+                quantity=Quantity(abs(position.quantity)),
                 side=closing_side,
                 reason=f"Close position {position.id}",
             )
@@ -122,10 +126,10 @@ class TradingService:
 
             # Mark order as filled immediately (assuming market execution)
             closing_order.submit(f"broker_{closing_order.id}")
-            closing_order.fill(abs(position.quantity), exit_price)
+            closing_order.fill(Quantity(abs(position.quantity.value)), Price(exit_price))
 
             # Close the position
-            position.close_position(exit_price)
+            position.close_position(Price(exit_price))
 
             # Save changes
             saved_order = await uow.orders.save_order(closing_order)
@@ -202,7 +206,7 @@ class TradingService:
             for symbol, price in price_updates.items():
                 position = await uow.positions.get_position_by_symbol(symbol)
                 if position and not position.is_closed():
-                    position.update_market_price(price)
+                    position.update_market_price(Price(price))
                     updated_position = await uow.positions.update_position(position)
                     updated_positions.append(updated_position)
 
