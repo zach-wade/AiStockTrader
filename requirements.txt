@@ -1,5 +1,5 @@
-# Editable Git install with no remote (ai-trader==1.0.0)
--e /Users/zachwade/StockMonitoring/ai_trader
+# Removed local editable install (not compatible with CI)
+# Use PYTHONPATH or install in development mode locally
 aiofiles==24.1.0
 aiohappyeyeballs==2.6.1
 aiohttp==3.12.14
