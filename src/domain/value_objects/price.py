@@ -1,5 +1,7 @@
 """Price value object for representing trading prices."""
 
+from __future__ import annotations
+
 # Standard library imports
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, ClassVar, Self
@@ -30,13 +32,13 @@ class Price:
             market_type: Type of market for default tick size
 
         Raises:
-            ValueError: If price is negative or invalid
+            ValueError: If price is zero, negative, or invalid
         """
         if not isinstance(value, Decimal):
             value = Decimal(str(value))
 
-        if value < 0:
-            raise ValueError(f"Price cannot be negative: {value}")
+        if value <= 0:
+            raise ValueError(f"Price must be positive: {value}")
 
         self._value = value
 
@@ -86,13 +88,13 @@ class Price:
 
     def is_valid(self) -> bool:
         """Check if price is valid for trading."""
-        return self._value >= 0
+        return self._value > 0
 
     def is_zero(self) -> bool:
         """Check if price is zero."""
         return self._value == 0
 
-    def add(self, other: Self) -> Self:
+    def add(self, other: Price) -> Self:
         """Add another price.
 
         Args:
@@ -106,7 +108,7 @@ class Price:
 
         return type(self)(self._value + other._value, self._tick_size, self._market_type)
 
-    def subtract(self, other: Self) -> Self:
+    def subtract(self, other: Price) -> Self:
         """Subtract another price.
 
         Args:
@@ -122,8 +124,8 @@ class Price:
             raise TypeError(f"Cannot subtract {type(other)} from Price")
 
         result = self._value - other._value
-        if result < 0:
-            raise ValueError("Price cannot be negative")
+        if result <= 0:
+            raise ValueError("Price must be positive")
 
         return type(self)(result, self._tick_size, self._market_type)
 
@@ -161,7 +163,7 @@ class Price:
 
         return type(self)(self._value / divisor, self._tick_size, self._market_type)
 
-    def calculate_difference(self, other: Self) -> Decimal:
+    def calculate_difference(self, other: Price) -> Decimal:
         """Calculate difference between two prices.
 
         Args:
@@ -175,7 +177,7 @@ class Price:
 
         return abs(self._value - other._value)
 
-    def calculate_difference_percentage(self, other: Self) -> Decimal:
+    def calculate_difference_percentage(self, other: Price) -> Decimal:
         """Calculate difference as percentage.
 
         Args:
@@ -216,25 +218,37 @@ class Price:
             return False
         return self._value == other._value
 
-    def __lt__(self, other: Self) -> bool:
-        """Check if less than another Price."""
-        if not isinstance(other, Price):
-            raise TypeError(f"Cannot compare Price and {type(other)}")
-        return self._value < other._value
+    def __lt__(self, other: Price | Decimal | int | float) -> bool:
+        """Check if less than another Price or numeric value."""
+        if isinstance(other, Price):
+            return self._value < other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value < Decimal(str(other))
+        raise TypeError(f"Cannot compare Price and {type(other)}")
 
-    def __le__(self, other: Self) -> bool:
-        """Check if less than or equal to another Price."""
-        return self == other or self < other
+    def __le__(self, other: Price | Decimal | int | float) -> bool:
+        """Check if less than or equal to another Price or numeric value."""
+        if isinstance(other, Price):
+            return self._value <= other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value <= Decimal(str(other))
+        raise TypeError(f"Cannot compare Price and {type(other)}")
 
-    def __gt__(self, other: Self) -> bool:
-        """Check if greater than another Price."""
-        if not isinstance(other, Price):
-            raise TypeError(f"Cannot compare Price and {type(other)}")
-        return self._value > other._value
+    def __gt__(self, other: Price | Decimal | int | float) -> bool:
+        """Check if greater than another Price or numeric value."""
+        if isinstance(other, Price):
+            return self._value > other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value > Decimal(str(other))
+        raise TypeError(f"Cannot compare Price and {type(other)}")
 
-    def __ge__(self, other: Self) -> bool:
-        """Check if greater than or equal to another Price."""
-        return self == other or self > other
+    def __ge__(self, other: Price | Decimal | int | float) -> bool:
+        """Check if greater than or equal to another Price or numeric value."""
+        if isinstance(other, Price):
+            return self._value >= other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value >= Decimal(str(other))
+        raise TypeError(f"Cannot compare Price and {type(other)}")
 
     def __hash__(self) -> int:
         """Get hash for use in sets/dicts."""
@@ -249,7 +263,7 @@ class Price:
         return self.to_string()
 
     # Arithmetic operator overloads
-    def __add__(self, other: Self | Decimal | int | float) -> Self:
+    def __add__(self, other: Price | Decimal | int | float) -> Self:
         """Add another price or numeric value."""
         if isinstance(other, Price):
             return self.add(other)
@@ -259,7 +273,7 @@ class Price:
         """Reverse add for numeric value + Price."""
         return type(self)(Decimal(str(other)) + self._value, tick_size=self._tick_size)
 
-    def __sub__(self, other: Self | Decimal | int | float) -> Self:
+    def __sub__(self, other: Price | Decimal | int | float) -> Self:
         """Subtract another price or numeric value."""
         if isinstance(other, Price):
             return self.subtract(other)

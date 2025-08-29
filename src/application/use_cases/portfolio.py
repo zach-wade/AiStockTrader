@@ -12,30 +12,22 @@ from uuid import UUID, uuid4
 from src.application.interfaces.unit_of_work import IUnitOfWork
 from src.domain.services.position_manager import PositionManager
 from src.domain.services.risk_calculator import RiskCalculator
+from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
 
 from .base import TransactionalUseCase, UseCaseResponse
+from .base_request import BaseRequestDTO
 
 
 # Request/Response DTOs
 @dataclass
-class GetPortfolioRequest:
+class GetPortfolioRequest(BaseRequestDTO):
     """Request to get portfolio details."""
 
     portfolio_id: UUID
     include_positions: bool = True
     include_metrics: bool = True
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -48,7 +40,7 @@ class GetPortfolioResponse(UseCaseResponse):
 
 
 @dataclass
-class UpdatePortfolioRequest:
+class UpdatePortfolioRequest(BaseRequestDTO):
     """Request to update portfolio settings."""
 
     portfolio_id: UUID
@@ -57,16 +49,6 @@ class UpdatePortfolioRequest:
     max_positions: int | None = None
     max_leverage: Decimal | None = None
     max_portfolio_risk: Decimal | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -77,22 +59,12 @@ class UpdatePortfolioResponse(UseCaseResponse):
 
 
 @dataclass
-class GetPositionsRequest:
+class GetPositionsRequest(BaseRequestDTO):
     """Request to get portfolio positions."""
 
     portfolio_id: UUID
     only_open: bool = True
     symbol: str | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -104,22 +76,12 @@ class GetPositionsResponse(UseCaseResponse):
 
 
 @dataclass
-class ClosePositionRequest:
+class ClosePositionRequest(BaseRequestDTO):
     """Request to close a position."""
 
     position_id: UUID
     exit_price: Decimal
     reason: str | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -162,34 +124,36 @@ class GetPortfolioUseCase(TransactionalUseCase[GetPortfolioRequest, GetPortfolio
             )
 
         # Build portfolio data
-        # Use await for async method, sync methods for others
-        total_value = await portfolio.get_total_value()
+        # Use sync methods for portfolio calculations
+        total_value = portfolio.get_total_value()
+        # Handle case where mocked method returns coroutine
+        if hasattr(total_value, "__await__"):
+            # If it's a coroutine, await it
+            total_value = await total_value
 
         portfolio_data = {
             "id": str(portfolio.id),
             "name": portfolio.name,
-            "cash_balance": (
-                float(portfolio.cash_balance.amount)
-                if hasattr(portfolio.cash_balance, "amount")
-                else float(portfolio.cash_balance)
+            "cash_balance": float(ValueObjectConverter.extract_amount(portfolio.cash_balance)),
+            "initial_capital": float(
+                ValueObjectConverter.extract_amount(portfolio.initial_capital)
             ),
-            "initial_capital": (
-                float(portfolio.initial_capital.amount)
-                if hasattr(portfolio.initial_capital, "amount")
-                else float(portfolio.initial_capital)
+            "total_value": float(ValueObjectConverter.extract_amount(total_value)),
+            "positions_value": float(
+                ValueObjectConverter.extract_amount(portfolio.get_positions_value())
             ),
-            "total_value": float(total_value),
-            "positions_value": float(portfolio.get_positions_value()),
-            "unrealized_pnl": float(portfolio.get_unrealized_pnl()),
-            "realized_pnl": (
-                float(portfolio.total_realized_pnl.amount)
-                if hasattr(portfolio.total_realized_pnl, "amount")
-                else float(portfolio.total_realized_pnl)
+            "unrealized_pnl": float(
+                ValueObjectConverter.extract_amount(portfolio.get_unrealized_pnl())
+            ),
+            "realized_pnl": float(
+                ValueObjectConverter.extract_amount(portfolio.total_realized_pnl)
             ),
             "total_return": float(portfolio.get_return_percentage()),
             "open_positions_count": len(portfolio.get_open_positions()),
             "max_position_size": (
-                float(portfolio.max_position_size) if portfolio.max_position_size else None
+                float(ValueObjectConverter.extract_amount(portfolio.max_position_size))
+                if portfolio.max_position_size
+                else None
             ),
             "max_positions": portfolio.max_positions,
             "max_leverage": float(portfolio.max_leverage) if portfolio.max_leverage else None,
@@ -204,16 +168,28 @@ class GetPortfolioUseCase(TransactionalUseCase[GetPortfolioRequest, GetPortfolio
                     "id": str(pos.id),
                     "symbol": pos.symbol,
                     "side": "long" if pos.quantity > 0 else "short",
-                    "quantity": abs(pos.quantity),
-                    "entry_price": float(pos.average_entry_price),
-                    "current_price": float(pos.current_price) if pos.current_price else None,
+                    "quantity": abs(ValueObjectConverter.extract_value(pos.quantity)),
+                    "entry_price": float(
+                        ValueObjectConverter.extract_value(pos.average_entry_price)
+                    ),
+                    "current_price": (
+                        float(ValueObjectConverter.extract_value(pos.current_price))
+                        if pos.current_price
+                        else None
+                    ),
                     "unrealized_pnl": (
-                        float(pos.get_unrealized_pnl()) if pos.get_unrealized_pnl() else 0.0
+                        float(ValueObjectConverter.extract_amount(pos.get_unrealized_pnl()))
+                        if pos.get_unrealized_pnl()
+                        else 0.0
                     ),
                     "return_pct": (
                         float(pos.get_return_percentage()) if pos.get_return_percentage() else 0.0
                     ),
-                    "value": float(pos.get_position_value()) if pos.get_position_value() else 0.0,
+                    "value": (
+                        float(ValueObjectConverter.extract_amount(pos.get_position_value()))
+                        if pos.get_position_value()
+                        else 0.0
+                    ),
                 }
                 for pos in positions
             ]
@@ -343,17 +319,31 @@ class GetPositionsUseCase(TransactionalUseCase[GetPositionsRequest, GetPositions
                 "id": str(pos.id),
                 "symbol": pos.symbol,
                 "side": "long" if pos.quantity > 0 else "short",
-                "quantity": abs(pos.quantity),
-                "entry_price": float(pos.average_entry_price),
-                "current_price": float(pos.current_price) if pos.current_price else None,
-                "unrealized_pnl": (
-                    float(pos.get_unrealized_pnl()) if pos.get_unrealized_pnl() else 0.0
+                "quantity": abs(ValueObjectConverter.extract_value(pos.quantity)),
+                "entry_price": float(ValueObjectConverter.extract_value(pos.average_entry_price)),
+                "current_price": (
+                    float(ValueObjectConverter.extract_value(pos.current_price))
+                    if pos.current_price
+                    else None
                 ),
-                "realized_pnl": float(pos.realized_pnl) if pos.realized_pnl is not None else 0.0,
+                "unrealized_pnl": (
+                    float(ValueObjectConverter.extract_amount(pos.get_unrealized_pnl()))
+                    if pos.get_unrealized_pnl()
+                    else 0.0
+                ),
+                "realized_pnl": (
+                    float(ValueObjectConverter.extract_amount(pos.realized_pnl))
+                    if pos.realized_pnl is not None
+                    else 0.0
+                ),
                 "return_pct": (
                     float(pos.get_return_percentage()) if pos.get_return_percentage() else 0.0
                 ),
-                "value": float(pos.get_position_value()) if pos.get_position_value() else 0.0,
+                "value": (
+                    float(ValueObjectConverter.extract_amount(pos.get_position_value()))
+                    if pos.get_position_value()
+                    else 0.0
+                ),
                 "is_open": not pos.is_closed(),
                 "opened_at": pos.opened_at.isoformat() if pos.opened_at else None,
                 "closed_at": pos.closed_at.isoformat() if pos.closed_at else None,
@@ -419,13 +409,17 @@ class ClosePositionUseCase(TransactionalUseCase[ClosePositionRequest, ClosePosit
         from decimal import Decimal
 
         from src.domain.entities.order import Order, OrderSide, OrderType
+        from src.domain.value_objects import Quantity
 
         # Create a mock closing order
+        # Handle both Quantity objects and raw values
+        position_quantity = ValueObjectConverter.extract_value(position.quantity)
+
         closing_order = Order(
             symbol=position.symbol,
-            side=OrderSide.SELL if position.quantity > 0 else OrderSide.BUY,
+            side=OrderSide.SELL if position_quantity > 0 else OrderSide.BUY,
             order_type=OrderType.MARKET,
-            quantity=abs(position.quantity),
+            quantity=Quantity(abs(position_quantity)),
         )
         closing_order.average_fill_price = Price(Decimal(str(request.exit_price)))
 
@@ -450,10 +444,13 @@ class ClosePositionUseCase(TransactionalUseCase[ClosePositionRequest, ClosePosit
         #     portfolio.total_realized_pnl += realized_pnl
         #     await portfolio_repo.update_portfolio(portfolio)
 
+        # Convert Money to Decimal for response DTO
+        realized_pnl_decimal = ValueObjectConverter.extract_amount(realized_pnl)
+
         return ClosePositionResponse(
             success=True,
             closed=True,
-            realized_pnl=realized_pnl,
+            realized_pnl=realized_pnl_decimal,
             total_return=total_return,
             request_id=request.request_id,
         )

@@ -108,7 +108,12 @@ class AuditDecorator:
 
                 # Create and log audit event
                 audit_event = self._create_audit_event(event_data, args, kwargs, result)
-                self.logger.log_event(audit_event, audit_context)
+
+                try:
+                    self.logger.log_event(audit_event, audit_context)
+                except Exception as audit_error:
+                    # Don't let audit failures break the original function
+                    print(f"Audit logging failed: {audit_error}")
 
                 return result
 

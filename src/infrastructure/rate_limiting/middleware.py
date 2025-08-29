@@ -23,9 +23,9 @@ class RateLimitMiddleware:
     def __init__(
         self,
         config: RateLimitConfig,
-        get_user_id: Callable | None = None,
-        get_api_key: Callable | None = None,
-        get_user_tier: Callable | None = None,
+        get_user_id: Callable[..., str] | None = None,
+        get_api_key: Callable[..., str] | None = None,
+        get_user_tier: Callable[..., str] | None = None,
         exempt_paths: list[str] | None = None,
         rate_limit_headers: bool = True,
     ):
@@ -43,17 +43,19 @@ class RateLimitMiddleware:
         if hasattr(request, "user") and hasattr(request.user, "id"):
             return str(request.user.id)
         elif hasattr(request, "headers"):
-            return request.headers.get("X-User-ID")
+            header_value = request.headers.get("X-User-ID")
+            return str(header_value) if header_value is not None else None
         return None
 
     def _default_get_api_key(self, request: Any) -> str | None:
         """Default method to extract API key from request."""
         if hasattr(request, "headers"):
-            return (
+            api_key = (
                 request.headers.get("X-API-Key")
                 or request.headers.get("Authorization", "").replace("Bearer ", "")
                 or request.headers.get("Api-Key")
             )
+            return str(api_key) if api_key else None
         return None
 
     def _default_get_user_tier(self, request: Any) -> "RateLimitTier":
@@ -68,7 +70,10 @@ class RateLimitMiddleware:
         # Extract user information
         context.user_id = self.get_user_id(request)
         context.api_key = self.get_api_key(request)
-        context.user_tier = self.get_user_tier(request)
+        user_tier = self.get_user_tier(request)
+        context.user_tier = (
+            user_tier if isinstance(user_tier, RateLimitTier) else RateLimitTier.BASIC
+        )
 
         # Extract request information
         context.ip_address = self._get_ip_address(request)
@@ -80,27 +85,31 @@ class RateLimitMiddleware:
     def _get_ip_address(self, request: Any) -> str | None:
         """Extract IP address from request."""
         if hasattr(request, "remote_addr"):
-            return request.remote_addr
+            addr = request.remote_addr
+            return str(addr) if addr else None
         elif hasattr(request, "META"):  # Django
-            return (
+            ip = (
                 request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
                 or request.META.get("HTTP_X_REAL_IP")
                 or request.META.get("REMOTE_ADDR")
             )
+            return str(ip) if ip else None
         elif hasattr(request, "headers"):  # FastAPI
-            return (
+            ip = (
                 request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
                 or request.headers.get("X-Real-IP")
                 or getattr(request.client, "host", None)
                 if hasattr(request, "client")
                 else None
             )
+            return str(ip) if ip else None
         return None
 
     def _get_endpoint(self, request: Any) -> str | None:
         """Extract endpoint from request."""
         if hasattr(request, "path"):
-            return request.path
+            path = request.path
+            return str(path) if path else None
         elif hasattr(request, "url"):
             return str(request.url.path) if hasattr(request.url, "path") else str(request.url)
         return None
@@ -108,7 +117,8 @@ class RateLimitMiddleware:
     def _get_method(self, request: Any) -> str | None:
         """Extract HTTP method from request."""
         if hasattr(request, "method"):
-            return request.method
+            method = request.method
+            return str(method) if method else None
         return None
 
     def _is_exempt_path(self, path: str) -> bool:
@@ -191,7 +201,7 @@ class FlaskRateLimitMiddleware(RateLimitMiddleware):
 
         # Skip exempt paths
         if self._is_exempt_path(request.path):
-            return
+            return None
 
         # Build context and check rate limits
         context = self._build_context(request)
@@ -199,11 +209,12 @@ class FlaskRateLimitMiddleware(RateLimitMiddleware):
         try:
             statuses = self.manager.check_rate_limit(context)
             g.rate_limit_statuses = statuses
+            return None
         except RateLimitExceeded:
             # Let the error handler deal with it
             raise
 
-    def after_request(self, response) -> Any:
+    def after_request(self, response: Any) -> Any:
         """Flask after_request handler."""
         from flask import g
 
@@ -219,7 +230,7 @@ class FlaskRateLimitMiddleware(RateLimitMiddleware):
 class FastAPIRateLimitMiddleware(RateLimitMiddleware):
     """FastAPI-specific rate limiting middleware."""
 
-    async def __call__(self, request, call_next) -> Any:
+    async def __call__(self, request: Any, call_next: Any) -> Any:
         """FastAPI middleware call."""
         # Skip exempt paths
         if self._is_exempt_path(str(request.url.path)):
@@ -254,11 +265,11 @@ class FastAPIRateLimitMiddleware(RateLimitMiddleware):
 class DjangoRateLimitMiddleware(RateLimitMiddleware):
     """Django-specific rate limiting middleware."""
 
-    def __init__(self, get_response, **kwargs: Any) -> None:
+    def __init__(self, get_response: Any, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.get_response = get_response
 
-    def __call__(self, request) -> Any:
+    def __call__(self, request: Any) -> Any:
         """Django middleware call."""
         # Skip exempt paths
         if self._is_exempt_path(request.path):
@@ -298,10 +309,11 @@ class CustomFrameworkMiddleware(RateLimitMiddleware):
     Extend this class for other web frameworks.
     """
 
-    def process_request(self, request) -> Any:
+    def process_request(self, request: Any) -> Any:
         """Process incoming request."""
         # Skip exempt paths
-        if self._is_exempt_path(self._get_endpoint(request)):
+        endpoint = self._get_endpoint(request)
+        if endpoint and self._is_exempt_path(endpoint):
             return None
 
         # Build context and check rate limits
@@ -317,7 +329,7 @@ class CustomFrameworkMiddleware(RateLimitMiddleware):
 
         return None
 
-    def process_response(self, request, response) -> Any:
+    def process_response(self, request: Any, response: Any) -> Any:
         """Process outgoing response."""
         # Add rate limit headers if available
         if hasattr(request, "_rate_limit_statuses"):
@@ -328,7 +340,9 @@ class CustomFrameworkMiddleware(RateLimitMiddleware):
         return response
 
 
-def create_middleware(framework: str, config: RateLimitConfig, **kwargs) -> RateLimitMiddleware:
+def create_middleware(
+    framework: str, config: RateLimitConfig, **kwargs: Any
+) -> RateLimitMiddleware:
     """
     Factory function to create framework-specific middleware.
 
@@ -352,13 +366,13 @@ def create_middleware(framework: str, config: RateLimitConfig, **kwargs) -> Rate
 # Example usage functions for different frameworks
 
 
-def setup_flask_rate_limiting(app, config: RateLimitConfig, **kwargs: Any) -> Any:
+def setup_flask_rate_limiting(app: Any, config: RateLimitConfig, **kwargs: Any) -> Any:
     """Setup rate limiting for Flask app."""
     middleware = FlaskRateLimitMiddleware(app=app, config=config, **kwargs)
     return middleware
 
 
-def setup_fastapi_rate_limiting(app, config: RateLimitConfig, **kwargs: Any) -> Any:
+def setup_fastapi_rate_limiting(app: Any, config: RateLimitConfig, **kwargs: Any) -> Any:
     """Setup rate limiting for FastAPI app."""
     middleware = FastAPIRateLimitMiddleware(config=config, **kwargs)
     app.add_middleware(lambda request, call_next: middleware(request, call_next))
@@ -369,7 +383,7 @@ def setup_django_rate_limiting(config: RateLimitConfig, **kwargs: Any) -> Any:
     """Setup rate limiting for Django (add to MIDDLEWARE setting)."""
 
     # Return the middleware class that Django will instantiate
-    def middleware_factory(get_response) -> Any:
+    def middleware_factory(get_response: Any) -> Any:
         return DjangoRateLimitMiddleware(get_response, config=config, **kwargs)
 
     return middleware_factory

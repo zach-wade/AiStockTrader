@@ -990,6 +990,7 @@ class TestTrackTradingMetricDecorator:
         mock_get_metrics.return_value = mock_metrics
 
         @track_trading_metric("async_calls", "counter")
+        @pytest.mark.asyncio
         async def test_func():
             await asyncio.sleep(0.01)
             return "async_result"
@@ -1009,6 +1010,7 @@ class TestTrackTradingMetricDecorator:
         mock_get_metrics.return_value = mock_metrics
 
         @track_trading_metric("async_duration", "histogram", {"async": "true"})
+        @pytest.mark.asyncio
         async def test_func():
             await asyncio.sleep(0.01)
             return "done"

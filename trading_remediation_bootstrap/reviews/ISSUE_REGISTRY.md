@@ -1,9 +1,9 @@
 # AI Trading System - Issue Registry Index
 
-**Version**: 65.0  
-**Updated**: 2025-08-16 (FINAL FILE REVIEWED - ai_trader.py main CLI - 100% COMPLETE!)  
-**Total Issues**: 5267 (data_pipeline: 196, feature_pipeline: 93, utils: 268, models: 358, trading_engine: 143, monitoring: 129, scanners: 152, interfaces: 800, orchestration: 31, jobs: 14, config: 224, app: 418, universe: 43, features: 51, backtesting: 540, risk_management: 943, events: 718, main: 45, retroactive: 10)  
-**Files Reviewed**: 787 of 787 (100% COMPLETE) 🎉  
+**Version**: 65.0
+**Updated**: 2025-08-16 (FINAL FILE REVIEWED - ai_trader.py main CLI - 100% COMPLETE!)
+**Total Issues**: 5267 (data_pipeline: 196, feature_pipeline: 93, utils: 268, models: 358, trading_engine: 143, monitoring: 129, scanners: 152, interfaces: 800, orchestration: 31, jobs: 14, config: 224, app: 418, universe: 43, features: 51, backtesting: 540, risk_management: 943, events: 718, main: 45, retroactive: 10)
+**Files Reviewed**: 787 of 787 (100% COMPLETE) 🎉
 **System Status**: 🔴 CATASTROPHIC - 833 critical vulnerabilities (12 data_pipeline, 1 utils, 20 models, 11 trading_engine, 16 monitoring, 13 scanners, 186 interfaces, 5 orchestration, 2 jobs, 47 config, 110 app, 3 universe, 6 features, 98 backtesting, 238 risk_management, 55 events, 10 main CLI) - SYSTEM 100% REVIEWED: Main CLI has debug info disclosure, credential exposure, path injection, NO input validation, SOLID score 2/10!
 
 ---
@@ -11,7 +11,9 @@
 ## ✅ POSITIVE FINDINGS
 
 ### SQL Security Module is EXCELLENT
+
 **sql_security.py** (utils/security/) - Reviewed in Batch 21:
+
 - ✅ Comprehensive SQL injection prevention
 - ✅ Proper identifier validation with pattern matching
 - ✅ Reserved keyword blacklisting
@@ -20,7 +22,9 @@
 - **Recommendation**: Use this module consistently throughout the codebase
 
 ### Catalyst Scanners Architecture is SOLID (Batch 6)
+
 **Catalyst scanner files** (scanners/catalysts/) - Reviewed in Batch 6:
+
 - ✅ NO CRITICAL ISSUES in entire batch (first batch with zero critical issues!)
 - ✅ Excellent use of repository pattern with IScannerRepository
 - ✅ Clean inheritance from CatalystScannerBase
@@ -83,7 +87,7 @@
 **🔴 NO AUTHENTICATION**: Dashboard, integration layer, and position sizing have ZERO access controls
 **🔴 BLOCKING OPERATIONS**: Synchronous SMTP causes 5-30 second system freezes
 
-### 586 Critical Issues Requiring Immediate Fixes (First 200 Listed):
+### 586 Critical Issues Requiring Immediate Fixes (First 200 Listed)
 
 1. **ISSUE-171**: eval() Code Execution in Rule Engine → [data_pipeline](ISSUES_data_pipeline.md#issue-171-eval-code-execution-in-rule-engine)
 2. **ISSUE-162**: SQL Injection in Data Existence Checker → [data_pipeline](ISSUES_data_pipeline.md#issue-162-sql-injection-in-data-existence-checker)
@@ -167,7 +171,7 @@
 80. **ISSUE-1402**: No Input Validation in Database Operations → [interfaces](ISSUES_interfaces.md#issue-1402-no-input-validation-in-database-operations-critical)
 81. **ISSUE-1403**: Missing Transaction Isolation Levels → [interfaces](ISSUES_interfaces.md#issue-1403-missing-transaction-isolation-levels-critical)
 82. **ISSUE-1404**: No Connection Pool Limits → [interfaces](ISSUES_interfaces.md#issue-1404-no-connection-pool-limits-critical)
-83. **ISSUE-1405**: Missing Import in Event __init__ → [interfaces](ISSUES_interfaces.md#issue-1405-missing-import-in-event-init-critical)
+83. **ISSUE-1405**: Missing Import in Event **init** → [interfaces](ISSUES_interfaces.md#issue-1405-missing-import-in-event-init-critical)
 84. **ISSUE-1406**: No Error Recovery in Event Bus → [interfaces](ISSUES_interfaces.md#issue-1406-no-error-recovery-in-event-bus-critical)
 85. **ISSUE-1407**: Memory Leak in Event Subscriptions → [interfaces](ISSUES_interfaces.md#issue-1407-memory-leak-in-event-subscriptions-critical)
 86. **ISSUE-1408**: No Event Ordering Guarantees → [interfaces](ISSUES_interfaces.md#issue-1408-no-event-ordering-guarantees-critical)
@@ -270,11 +274,12 @@
 175. **ISSUE-2545**: Missing Import Existence Validation → [risk_management](ISSUES_risk_management.md#issue-2545-critical-missing-import-existence-validation)
 176. **ISSUE-2546**: Placeholder Classes in Production Code → [risk_management](ISSUES_risk_management.md#issue-2546-critical-placeholder-classes-in-production-code)
 177. **ISSUE-2547**: Missing Error Handling for Import Failures → [risk_management](ISSUES_risk_management.md#issue-2547-critical-missing-error-handling-for-import-failures)
-178. **ISSUE-2548**: Inconsistent Export in real_time/__init__.py → [risk_management](ISSUES_risk_management.md#issue-2548-critical-inconsistent-export-in-real_time-initpy)
+178. **ISSUE-2548**: Inconsistent Export in real_time/**init**.py → [risk_management](ISSUES_risk_management.md#issue-2548-critical-inconsistent-export-in-real_time-initpy)
 
 ### NEW BATCH 3 CRITICAL ISSUES (Authentication Bypass & Architecture Collapse)
+
 179. **ISSUE-2658**: Missing Import Dependencies Causing System Crash → [risk_management](ISSUES_risk_management.md#issue-2658-critical-missing-import-dependencies-causing-system-crash)
-180. **ISSUE-2660**: Missing Import for Statistical Functions → [risk_management](ISSUES_risk_management.md#issue-2660-critical-missing-import-for-statistical-functions) 
+180. **ISSUE-2660**: Missing Import for Statistical Functions → [risk_management](ISSUES_risk_management.md#issue-2660-critical-missing-import-for-statistical-functions)
 181. **ISSUE-2662**: Authentication Bypass in Position Liquidation → [risk_management](ISSUES_risk_management.md#issue-2662-critical-authentication-bypass-in-position-liquidation)
 182. **ISSUE-2666**: Predictable ID Generation → [risk_management](ISSUES_risk_management.md#issue-2666-critical-predictable-id-generation)
 183. **ISSUE-2669**: Missing Configuration Dependencies → [risk_management](ISSUES_risk_management.md#issue-2669-critical-missing-configuration-dependencies)
@@ -351,12 +356,14 @@
 ## 📁 Module-Specific Issue Files
 
 ### Completed Modules
+
 - **[ISSUES_data_pipeline.md](ISSUES_data_pipeline.md)** - 170 files reviewed, 196 issues including 12 critical security vulnerabilities
 - **[ISSUES_feature_pipeline.md](ISSUES_feature_pipeline.md)** - 90 files reviewed, 93 issues with zero critical security vulnerabilities
 - **[ISSUES_utils.md](ISSUES_utils.md)** - 145 files reviewed, 268 issues found (1 critical CONFIRMED, 8 HIGH priority)
 - **[ISSUES_models.md](ISSUES_models.md)** - 101 files reviewed (100% COMPLETE), 358 issues found (20 critical, 83 high priority) - Module complete with Batch 20
 
 ### Completed Modules (Continued)
+
 - **[ISSUES_trading_engine.md](ISSUES_trading_engine.md)** - 33 files reviewed (100% COMPLETE), 143 issues found (11 critical, 37 high priority) - Module complete with all 33 files reviewed
 - **[ISSUES_monitoring.md](ISSUES_monitoring.md)** - 36 files reviewed (100% COMPLETE), 129 issues found (16 critical, 32 high priority) - Module complete
 - **[ISSUES_scanners.md](ISSUES_scanners.md)** - 34 files reviewed (100% COMPLETE), 152 issues found (13 critical, 50 high priority) - Module complete with sophisticated ML/network analysis
@@ -373,9 +380,11 @@
 - **[ISSUES_main.md](ISSUES_main.md)** - 1/1 file reviewed (100%), 45 issues found (10 critical, 15 high) - Main CLI COMPLETE
 
 ### Enhanced Retroactive Reviews
+
 - **[RETROACTIVE_REVIEW_CRITICAL_FILES.md](RETROACTIVE_REVIEW_CRITICAL_FILES.md)** - Enhanced Phase 6-11 retroactive reviews of critical files (10 new issues, 0 critical)
 
 ### Pending Review
+
 - **ISSUES_trading_engine.md** - To be created when review starts
 - **ISSUES_monitoring.md** - To be created when review starts
 - **ISSUES_other.md** - For smaller modules
@@ -385,6 +394,7 @@
 ## 🔥 Priority Action Items
 
 ### Week 1: Critical Security Fixes
+
 1. [ ] **ISSUE-171**: Remove eval() from rule_executor.py - IMMEDIATE
 2. [ ] **ISSUE-162**: Fix SQL injection in data_existence_checker.py
 3. [ ] **ISSUE-144**: Fix SQL injection in partition_manager.py
@@ -393,12 +403,14 @@
 6. [ ] **ISSUE-619**: Replace MD5 with SHA256 for A/B test routing
 
 ### Week 2: High Priority Fixes
+
 1. [ ] **ISSUE-071**: Fix random data in technical indicators
 2. [ ] **ISSUE-163**: Fix undefined variable runtime errors
 3. [ ] **ISSUE-119**: Fix undefined logger references
 4. [ ] Replace all SQL string interpolation with parameterized queries
 
 ### Week 3: Medium Priority
+
 1. [ ] Replace MD5 with SHA256 for all hashing
 2. [ ] Add cache TTL management
 3. [ ] Fix deprecated pandas methods (fillna)
@@ -409,15 +421,17 @@
 ## 📈 Review Progress
 
 ### Current Phase: Phase 5 Week 6 Batch 27
-- **Started**: 2025-08-10  
+
+- **Started**: 2025-08-10
 - **Current Module**: utils (Batches 1-27 complete)
 - **Progress Today**: 136 files reviewed across authentication, core utilities, database helpers, config management, monitoring, network/HTTP, data processing, core utils, resilience/security, alerting/API, app context, cache, database operations, events, logging, market data/processing, state management, root utility modules, data utilities, factories, time utilities, processing modules, review tools, security, scanner utilities, trading utilities, monitoring core, monitoring components, dashboard components, and enhanced monitoring
 - **Total Progress**: 396/787 files (50.3%)
 
 ### Review Timeline
+
 - **Phase 1-4**: Initial exploration and issue discovery
 - **Phase 5 Week 1-4**: data_pipeline complete review (170 files)
-- **Phase 5 Week 5**: feature_pipeline complete review (90 files)  
+- **Phase 5 Week 5**: feature_pipeline complete review (90 files)
 - **Phase 5 Week 6**: utils module review (in progress, 111/145 files)
 - **Estimated Completion**: ~8 more weeks at current pace
 
@@ -426,6 +440,7 @@
 ## 🏆 Positive Findings
 
 ### Architectural Excellence
+
 1. **Layer-based architecture**: 4-tier system for symbol management
 2. **Circuit breakers**: Resilience patterns throughout
 3. **Event-driven design**: Streaming and async support
@@ -433,6 +448,7 @@
 5. **Comprehensive validation**: Multi-stage data validation
 
 ### Security Wins
+
 1. **Bulk loaders**: Proper SQL parameterization (Week 2 Batch 2)
 2. **feature_pipeline**: No critical vulnerabilities found so far
 3. **Proper secrets management**: No hardcoded credentials found
@@ -442,27 +458,32 @@
 ## 📝 Notes
 
 ### Documentation Structure
+
 This registry has been reorganized for better navigation:
+
 - **Main Index**: This file - executive summary and critical issues
 - **Module Files**: Detailed issues per module
 - **Archive**: Historical Phase 1-4 issues in separate archive
 
 ### Issue Numbering & Categories
 
-#### Sequential Issues:
+#### Sequential Issues
+
 - **ISSUE-001 to ISSUE-599**: Sequential discovery order (traditional single-file issues)
 - **ISSUE-RM-XXX**: Risk management specific issues
 
-#### **NEW** Integration Issues (2025-08-10):
+#### **NEW** Integration Issues (2025-08-10)
+
 Cross-module integration analysis that identifies problems individual file reviews miss.
 
 **Critical Integration Issues (P0-P1):**
+
 - **I-INTEGRATION-XXX**: Cross-module integration problems that prevent system operation
-  - Missing imports causing NameError at runtime  
+  - Missing imports causing NameError at runtime
   - Module dependencies that don't exist or are circular
   - Integration workflows that cannot complete end-to-end
 
-- **I-CONTRACT-XXX**: Interface contract violations causing runtime failures  
+- **I-CONTRACT-XXX**: Interface contract violations causing runtime failures
   - Return dataclass fields don't match interface specification (e.g., ensemble_probability vs final_probability)
   - Method signatures differ between interface and implementation
   - Type mismatches causing AttributeError
@@ -473,6 +494,7 @@ Cross-module integration analysis that identifies problems individual file revie
   - Service locator anti-patterns
 
 **Medium Integration Issues (P2):**
+
 - **I-DATAFLOW-XXX**: Data flow breakdowns between modules
   - Serialization format changes breaking downstream consumers
   - Cache invalidation not propagating across module boundaries
@@ -484,17 +506,20 @@ Cross-module integration analysis that identifies problems individual file revie
   - Configuration access patterns that ignore nested settings
 
 **Low Integration Issues (P3):**
+
 - **I-ERROR-XXX**: Error propagation failures
   - Exceptions swallowed at module boundaries
   - Error context lost in cross-module calls
   - Missing error handling in integration points
 
-#### **NEW** Correctness & Operations Issues (2025-08-10):
+#### **NEW** Correctness & Operations Issues (2025-08-10)
+
 Enhanced audit methodology to catch business logic, data integrity, and operational readiness issues.
 
 **Critical Correctness Issues (P0-P1):**
+
 - **B-LOGIC-XXX**: Business Logic Correctness Violations
-  - Incorrect financial calculations causing wrong trading signals  
+  - Incorrect financial calculations causing wrong trading signals
   - Mathematical formulas that don't match standard specifications
   - Trading logic that generates invalid or inconsistent signals
   - Risk calculations that fail to enforce business constraints
@@ -506,6 +531,7 @@ Enhanced audit methodology to catch business logic, data integrity, and operatio
   - Cross-table referential integrity violations
 
 **Production & Operational Issues (P1-P2):**
+
 - **P-PRODUCTION-XXX**: Production Readiness Issues
   - Test-only code paths that could run in production
   - Missing monitoring for critical business operations
@@ -519,6 +545,7 @@ Enhanced audit methodology to catch business logic, data integrity, and operatio
   - Synchronous operations blocking concurrent processing
 
 **Observability Issues (P2-P3):**
+
 - **O-OBSERVABILITY-XXX**: Observability & Debugging Issues
   - Inconsistent logging levels across modules
   - Error messages without sufficient debugging context
@@ -527,20 +554,22 @@ Enhanced audit methodology to catch business logic, data integrity, and operatio
 
 ### Enhanced Review Methodology (Updated 2025-08-10)
 
-#### Traditional Review Components:
+#### Traditional Review Components
+
 - **Batch-based review** (5 files per batch for systematic coverage)
 - **Security-first analysis** (SQL injection, eval() usage, path traversal, unsafe deserialization)
 - **Architecture quality assessment** (design patterns, separation of concerns)
 - **Performance and maintainability checks** (large files, code duplication, optimization opportunities)
 
 #### **NEW**: Cross-Module Integration Analysis (2025-08-10)
+
 **Major Enhancement**: Added comprehensive integration analysis to catch failures that individual file reviews miss.
 
 **Per-Batch Integration Analysis Process:**
 
-1. **Import & Dependency Verification**: 
+1. **Import & Dependency Verification**:
    - Validate all imported modules exist and provide expected functions/classes
-   - Check for NameError risks from missing/moved imports  
+   - Check for NameError risks from missing/moved imports
    - Verify circular import risks are managed with proper interfaces
    - Confirm conditional imports have fallback handling
 
@@ -568,7 +597,7 @@ Enhanced audit methodology to catch business logic, data integrity, and operatio
    - Check environment settings isolation and consistency
    - Confirm integration workflows execute completely
 
-#### **NEW** Enhanced Analysis Areas (2025-08-10):
+#### **NEW** Enhanced Analysis Areas (2025-08-10)
 
 6. **Business Logic Correctness Validation**:
    - Verify mathematical formulas match standard specifications

@@ -7,7 +7,6 @@ and session lifecycle operations.
 
 import logging
 import secrets
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -16,22 +15,9 @@ from sqlalchemy.orm import Session
 
 from ..jwt_service import JWTService
 from ..models import AuthAuditLog, User, UserSession
+from ..types import AuthenticationResult
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class AuthenticationResult:
-    """Authentication result data."""
-
-    user_id: str
-    access_token: str
-    refresh_token: str
-    expires_in: int
-    roles: list[str]
-    permissions: list[str]
-    mfa_required: bool = False
-    mfa_session_token: str | None = None
 
 
 class SessionManager:
@@ -54,7 +40,7 @@ class SessionManager:
 
         # Update last login
         user.last_login_at = datetime.utcnow()  # type: ignore[assignment]
-        user.last_login_ip = ip_address
+        user.last_login_ip = ip_address  # type: ignore[assignment]
 
         # Create session
         session = UserSession(
@@ -94,7 +80,9 @@ class SessionManager:
         # Update session with token hashes
         session.refresh_token_hash = bcrypt.hashpw(
             refresh_token.encode("utf-8"), bcrypt.gensalt()
-        ).decode("utf-8")
+        ).decode(
+            "utf-8"
+        )  # type: ignore[assignment]
         self.db.commit()
 
         # Log successful login
@@ -118,7 +106,7 @@ class SessionManager:
             mfa_required=False,
         )
 
-    async def logout(self, user_id: str, session_id: str, everywhere: bool = False):
+    async def logout(self, user_id: str, session_id: str, everywhere: bool = False) -> None:
         """
         Logout user from current session or all sessions.
 
@@ -135,21 +123,21 @@ class SessionManager:
                 session.revoke("User logged out from all devices")
 
             # Revoke all JWT tokens
-            self.jwt_service.revoke_all_user_tokens(user_id)
+            await self.jwt_service.revoke_all_user_tokens(user_id)
 
             self._log_audit_event(event_type="logout_all", user_id=user_id, success=True)
 
             logger.info(f"User {user_id} logged out from all devices")
         else:
             # Revoke current session
-            session = (
+            current_session: UserSession | None = (
                 self.db.query(UserSession)
                 .filter_by(id=session_id, user_id=user_id, is_active=True)
                 .first()
             )
 
-            if session:
-                session.revoke("User logged out")
+            if current_session:
+                current_session.revoke("User logged out")
                 self.jwt_service.revoke_session_tokens(session_id)
 
             self._log_audit_event(
@@ -215,7 +203,7 @@ class SessionManager:
             permissions=permissions,
             session_id=str(session.id),
             device_id=device_id,
-            ip_address=session.ip_address,
+            ip_address=session.ip_address,  # type: ignore[arg-type]
             mfa_verified=bool(user.mfa_enabled),
         )
 
@@ -226,11 +214,13 @@ class SessionManager:
         # Update session with new refresh token hash
         session.refresh_token_hash = bcrypt.hashpw(
             new_refresh_token.encode("utf-8"), bcrypt.gensalt()
-        ).decode("utf-8")
+        ).decode(
+            "utf-8"
+        )  # type: ignore[assignment]
 
         # Extend session expiry
-        session.expires_at = datetime.utcnow() + timedelta(hours=24)
-        session.refresh_expires_at = datetime.utcnow() + timedelta(days=7)
+        session.expires_at = datetime.utcnow() + timedelta(hours=24)  # type: ignore[assignment]
+        session.refresh_expires_at = datetime.utcnow() + timedelta(days=7)  # type: ignore[assignment]
 
         self.db.commit()
 
@@ -293,8 +283,15 @@ class SessionManager:
         success: bool = True,
     ) -> None:
         """Log audit event."""
+        from uuid import UUID
+
+        # Convert string UUID to UUID object if needed
+        uuid_user_id = None
+        if user_id:
+            uuid_user_id = UUID(user_id) if isinstance(user_id, str) else user_id
+
         audit_log = AuthAuditLog(
-            user_id=user_id,
+            user_id=uuid_user_id,
             event_type=event_type,
             event_data=event_data or {},
             ip_address=ip_address,

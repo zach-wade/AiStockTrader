@@ -21,24 +21,24 @@ class TestPriceCreation:
     def test_create_price_with_decimal(self):
         """Test creating price with Decimal value."""
         price = Price(Decimal("100.50"))
-        assert price == Decimal("100.50")
+        assert price.value == Decimal("100.50")
         assert price.tick_size == Decimal("0.01")  # Default stock tick
         assert price.market_type == "stock"
 
     def test_create_price_with_float(self):
         """Test creating price with float value."""
         price = Price(100.50)
-        assert price == Decimal("100.50")
+        assert price.value == Decimal("100.50")
 
     def test_create_price_with_int(self):
         """Test creating price with integer value."""
         price = Price(100)
-        assert price == Decimal("100")
+        assert price.value == Decimal("100")
 
     def test_create_price_with_string(self):
         """Test creating price with string value."""
         price = Price("100.50")
-        assert price == Decimal("100.50")
+        assert price.value == Decimal("100.50")
 
     def test_create_price_with_custom_tick_size(self):
         """Test creating price with custom tick size."""
@@ -81,18 +81,16 @@ class TestPriceCreation:
 
     def test_negative_price_raises_error(self):
         """Test that negative price raises ValueError."""
-        with pytest.raises(ValueError, match="Price cannot be negative"):
+        with pytest.raises(ValueError, match="Price must be positive"):
             Price(Decimal("-10.00"))
 
-        with pytest.raises(ValueError, match="Price cannot be negative"):
+        with pytest.raises(ValueError, match="Price must be positive"):
             Price(-10)
 
-    def test_zero_price_allowed(self):
-        """Test that zero price is allowed."""
-        price = Price(Decimal("0"))
-        assert price == Decimal("0")
-        assert price.is_zero()
-        assert price.is_valid()
+    def test_zero_price_rejected(self):
+        """Test that zero price is rejected for financial safety."""
+        with pytest.raises(ValueError, match="Price must be positive"):
+            Price(Decimal("0"))
 
     def test_invalid_tick_size_raises_error(self):
         """Test that invalid tick size raises error."""
@@ -105,7 +103,7 @@ class TestPriceCreation:
     def test_extreme_precision(self):
         """Test price with extreme decimal precision."""
         price = Price(Decimal("100.123456789123456789"))
-        assert price == Decimal("100.123456789123456789")
+        assert price.value == Decimal("100.123456789123456789")
 
 
 class TestPriceProperties:
@@ -114,7 +112,7 @@ class TestPriceProperties:
     def test_value_property(self):
         """Test value property returns correct value."""
         price = Price(Decimal("123.45"))
-        assert price == Decimal("123.45")
+        assert price.value == Decimal("123.45")
 
     def test_tick_size_property(self):
         """Test tick_size property returns correct value."""
@@ -137,7 +135,7 @@ class TestPriceArithmetic:
 
         result = price1.add(price2)
         assert isinstance(result, Price)
-        assert result == Decimal("150.00")
+        assert result.value == Decimal("150.00")
         assert result.tick_size == price1.tick_size
         assert result.market_type == price1.market_type
 
@@ -155,7 +153,7 @@ class TestPriceArithmetic:
 
         result = price1.subtract(price2)
         assert isinstance(result, Price)
-        assert result == Decimal("70.00")
+        assert result.value == Decimal("70.00")
         assert result.tick_size == price1.tick_size
         assert result.market_type == price1.market_type
 
@@ -164,7 +162,7 @@ class TestPriceArithmetic:
         price1 = Price(Decimal("30.00"))
         price2 = Price(Decimal("100.00"))
 
-        with pytest.raises(ValueError, match="Price cannot be negative"):
+        with pytest.raises(ValueError, match="Price must be positive"):
             price1.subtract(price2)
 
     def test_subtract_non_price_raises_error(self):
@@ -180,7 +178,7 @@ class TestPriceArithmetic:
 
         result = price.multiply(Decimal("2.5"))
         assert isinstance(result, Price)
-        assert result == Decimal("250.00")
+        assert result.value == Decimal("250.00")
         assert result.tick_size == price.tick_size
         assert result.market_type == price.market_type
 
@@ -189,29 +187,28 @@ class TestPriceArithmetic:
         price = Price(Decimal("100.00"))
 
         result = price.multiply(3)
-        assert result == Decimal("300.00")
+        assert result.value == Decimal("300.00")
 
     def test_multiply_by_float(self):
         """Test multiplying price by float factor."""
         price = Price(Decimal("100.00"))
 
         result = price.multiply(0.5)
-        assert result == Decimal("50.00")
+        assert result.value == Decimal("50.00")
 
-    def test_multiply_by_zero(self):
-        """Test multiplying price by zero."""
+    def test_multiply_by_zero_raises_error(self):
+        """Test multiplying price by zero raises error (would create invalid zero price)."""
         price = Price(Decimal("100.00"))
 
-        result = price.multiply(0)
-        assert result == Decimal("0")
-        assert result.is_zero()
+        with pytest.raises(ValueError, match="Price must be positive"):
+            price.multiply(0)
 
     def test_multiply_resulting_in_negative_raises_error(self):
         """Test multiplying by negative factor raises error since Price cannot be negative."""
         price = Price(Decimal("100.00"))
 
         # Price cannot be negative, so multiplying by negative should raise error
-        with pytest.raises(ValueError, match="Price cannot be negative"):
+        with pytest.raises(ValueError, match="Price must be positive"):
             price.multiply(Decimal("-2"))
 
     def test_divide_by_decimal(self):
@@ -220,7 +217,7 @@ class TestPriceArithmetic:
 
         result = price.divide(Decimal("4"))
         assert isinstance(result, Price)
-        assert result == Decimal("25.00")
+        assert result.value == Decimal("25.00")
         assert result.tick_size == price.tick_size
         assert result.market_type == price.market_type
 
@@ -229,14 +226,14 @@ class TestPriceArithmetic:
         price = Price(Decimal("100.00"))
 
         result = price.divide(2)
-        assert result == Decimal("50.00")
+        assert result.value == Decimal("50.00")
 
     def test_divide_by_float(self):
         """Test dividing price by float divisor."""
         price = Price(Decimal("100.00"))
 
         result = price.divide(2.5)
-        assert result == Decimal("40.00")
+        assert result.value == Decimal("40.00")
 
     def test_divide_by_zero_raises_error(self):
         """Test dividing by zero raises ValueError."""
@@ -256,45 +253,45 @@ class TestPriceRounding:
         """Test rounding to tick size for stock market."""
         price = Price(Decimal("100.12678"), market_type="stock")
         rounded = price.round_to_tick()
-        assert rounded == Decimal("100.13")
+        assert rounded.value == Decimal("100.13")
 
     def test_round_to_tick_custom_tick_size(self):
         """Test rounding with custom tick size."""
         # Tick size of 0.25
         price = Price(Decimal("100.37"), tick_size=Decimal("0.25"))
         rounded = price.round_to_tick()
-        assert rounded == Decimal("100.25")
+        assert rounded.value == Decimal("100.25")
 
         price = Price(Decimal("100.38"), tick_size=Decimal("0.25"))
         rounded = price.round_to_tick()
-        assert rounded == Decimal("100.50")
+        assert rounded.value == Decimal("100.50")
 
         price = Price(Decimal("100.62"), tick_size=Decimal("0.25"))
         rounded = price.round_to_tick()
-        assert rounded == Decimal("100.50")
+        assert rounded.value == Decimal("100.50")
 
         price = Price(Decimal("100.63"), tick_size=Decimal("0.25"))
         rounded = price.round_to_tick()
-        assert rounded == Decimal("100.75")
+        assert rounded.value == Decimal("100.75")
 
     def test_round_to_tick_forex(self):
         """Test rounding for forex market."""
         price = Price(Decimal("1.234567"), market_type="forex")
         rounded = price.round_to_tick()
-        assert rounded == Decimal("1.2346")
+        assert rounded.value == Decimal("1.2346")
 
     def test_round_to_tick_crypto(self):
         """Test rounding for crypto market."""
         price = Price(Decimal("50000.123456789"), market_type="crypto")
         rounded = price.round_to_tick()
         # Crypto tick is 0.00000001 (satoshi level)
-        assert rounded == Decimal("50000.12345679")
+        assert rounded.value == Decimal("50000.12345679")
 
     def test_round_to_tick_futures(self):
         """Test rounding for futures market."""
         price = Price(Decimal("100.37"), market_type="futures")
         rounded = price.round_to_tick()
-        assert rounded == Decimal("100.25")
+        assert rounded.value == Decimal("100.25")
 
     def test_round_to_tick_zero_tick_size(self):
         """Test that zero tick size (edge case) returns same price."""
@@ -303,7 +300,7 @@ class TestPriceRounding:
         price = Price(Decimal("100.123"))
         price._tick_size = Decimal("0")  # Force zero tick size
         rounded = price.round_to_tick()
-        assert rounded == price
+        assert rounded.value == price.value
 
 
 class TestPriceComparison:
@@ -353,7 +350,7 @@ class TestPriceComparison:
         price = Price(Decimal("100.00"))
 
         with pytest.raises(TypeError, match="Cannot compare Price and"):
-            price < 50
+            price < "50"
 
     def test_less_than_or_equal(self):
         """Test less than or equal comparison."""
@@ -378,7 +375,7 @@ class TestPriceComparison:
         price = Price(Decimal("100.00"))
 
         with pytest.raises(TypeError, match="Cannot compare Price and"):
-            price > 150
+            price > "150"
 
     def test_greater_than_or_equal(self):
         """Test greater than or equal comparison."""
@@ -416,13 +413,16 @@ class TestPriceUtilityMethods:
         valid_price = Price(Decimal("100.00"))
         assert valid_price.is_valid()
 
-        zero_price = Price(Decimal("0"))
-        assert zero_price.is_valid()
+        # Zero prices are no longer valid in financial contexts
+        # They are rejected at Price creation time
 
     def test_is_zero(self):
-        """Test is_zero method."""
-        zero_price = Price(Decimal("0"))
-        assert zero_price.is_zero()
+        """Test is_zero method with valid price."""
+        # Since zero prices are not allowed, test is_zero with a positive price
+        positive_price = Price(Decimal("0.01"))
+        assert not positive_price.is_zero()
+
+        # The is_zero method is still available for edge cases in calculations
 
         non_zero_price = Price(Decimal("0.01"))
         assert not non_zero_price.is_zero()
@@ -460,39 +460,40 @@ class TestPriceUtilityMethods:
         expected = Decimal("1.00") / Decimal("100.50") * 100
         assert abs(difference_pct - expected) < Decimal("0.0001")
 
-    def test_calculate_difference_percentage_zero_prices(self):
-        """Test calculating difference percentage with zero prices."""
-        zero1 = Price(Decimal("0"))
-        zero2 = Price(Decimal("0"))
+    def test_calculate_difference_percentage_same_prices(self):
+        """Test calculating difference percentage with identical prices."""
+        price1 = Price(Decimal("100.00"))
+        price2 = Price(Decimal("100.00"))
 
-        difference_pct = zero1.calculate_difference_percentage(zero2)
+        difference_pct = price1.calculate_difference_percentage(price2)
         assert difference_pct == Decimal("0")
 
-    def test_calculate_difference_percentage_one_zero(self):
-        """Test calculating difference percentage with one zero price."""
-        zero = Price(Decimal("0"))
-        non_zero = Price(Decimal("100.00"))
+    def test_calculate_difference_percentage_very_small_price(self):
+        """Test calculating difference percentage with very small price."""
+        small = Price(Decimal("0.01"))
+        large = Price(Decimal("100.00"))
 
-        # When average is 50 and difference is 100
-        difference_pct = non_zero.calculate_difference_percentage(zero)
-        assert difference_pct == Decimal("200")
+        # When average is ~50 and difference is ~100
+        difference_pct = large.calculate_difference_percentage(small)
+        # Should be around 200% difference
+        assert difference_pct > Decimal("190")
 
     def test_from_bid_ask(self):
         """Test creating price from bid/ask midpoint."""
         mid_price = Price.from_bid_ask(Decimal("100.00"), Decimal("100.50"))
-        assert mid_price == Decimal("100.25")
+        assert mid_price.value == Decimal("100.25")
 
     def test_from_bid_ask_with_floats(self):
         """Test creating price from bid/ask with floats."""
         mid_price = Price.from_bid_ask(100.00, 101.00)
-        assert mid_price == Decimal("100.50")
+        assert mid_price.value == Decimal("100.50")
 
     def test_from_bid_ask_with_kwargs(self):
         """Test creating price from bid/ask with additional arguments."""
         mid_price = Price.from_bid_ask(
             Decimal("100.00"), Decimal("100.50"), tick_size=Decimal("0.05"), market_type="futures"
         )
-        assert mid_price == Decimal("100.25")
+        assert mid_price.value == Decimal("100.25")
         assert mid_price.tick_size == Decimal("0.05")
         assert mid_price.market_type == "futures"
 
@@ -526,11 +527,11 @@ class TestPriceFormatting:
         futures_price = Price(Decimal("100.25"), market_type="futures")
         assert futures_price.to_string() == "100.25"  # 2 decimals for 0.25 tick
 
-    def test_format_zero(self):
-        """Test formatting zero price."""
-        zero_price = Price(Decimal("0"))
-        assert zero_price.to_string() == "0.00"
-        assert zero_price.to_string(decimal_places=4) == "0.0000"
+    def test_format_very_small_price(self):
+        """Test formatting very small price."""
+        small_price = Price(Decimal("0.01"))
+        assert small_price.to_string() == "0.01"
+        assert small_price.to_string(decimal_places=4) == "0.0100"
 
     def test_str_representation(self):
         """Test string representation."""
@@ -549,28 +550,28 @@ class TestPriceEdgeCases:
     def test_very_large_price(self):
         """Test handling very large prices."""
         large_price = Price(Decimal("999999999999999.99"))
-        assert large_price == Decimal("999999999999999.99")
+        assert large_price.value == Decimal("999999999999999.99")
         assert large_price.is_valid()
 
     def test_very_small_price(self):
         """Test handling very small prices."""
         small_price = Price(Decimal("0.00000001"))
-        assert small_price == Decimal("0.00000001")
+        assert small_price.value == Decimal("0.00000001")
         assert small_price.is_valid()
         assert not small_price.is_zero()
 
     def test_many_decimal_places(self):
         """Test price with many decimal places."""
         price = Price(Decimal("100.123456789123456789"))
-        assert price == Decimal("100.123456789123456789")
+        assert price.value == Decimal("100.123456789123456789")
 
     def test_scientific_notation(self):
         """Test handling scientific notation."""
         price = Price("1.5E+3")
-        assert price == Decimal("1500")
+        assert price.value == Decimal("1500")
 
         price = Price("1.5E-3")
-        assert price == Decimal("0.0015")
+        assert price.value == Decimal("0.0015")
 
     def test_immutability(self):
         """Test that Price is immutable."""
@@ -580,12 +581,12 @@ class TestPriceEdgeCases:
 
         # Operations return new objects
         new_price = price.add(Price(Decimal("50.00")))
-        assert price == original_value
-        assert new_price == Decimal("150.00")
+        assert price.value == original_value.value
+        assert new_price.value == Decimal("150.00")
 
         # Properties can't be modified
         with pytest.raises(AttributeError):
-            price = Decimal("200.00")
+            price.value = Decimal("200.00")
 
         with pytest.raises(AttributeError):
             price.tick_size = Decimal("0.05")
@@ -595,30 +596,31 @@ class TestPriceEdgeCases:
         price = Price(Decimal("100.00"))
 
         result = price.add(Price(Decimal("50.00"))).multiply(2).divide(3)
-        assert result == Decimal("100.00")
+        assert result.value == Decimal("100.00")
 
         # Original unchanged
-        assert price == Decimal("100.00")
+        assert price.value == Decimal("100.00")
 
-    def test_zero_arithmetic(self):
-        """Test arithmetic with zero prices."""
-        zero = Price(Decimal("0"))
+    def test_small_price_arithmetic(self):
+        """Test arithmetic with very small prices."""
+        small = Price(Decimal("0.01"))
         hundred = Price(Decimal("100.00"))
 
-        # Adding zero
-        assert hundred.add(zero) == Decimal("100.00")
-        assert zero.add(hundred) == Decimal("100.00")
+        # Adding small price
+        result_add = hundred.add(small)
+        assert result_add.value == Decimal("100.01")
+        assert small.add(hundred).value == Decimal("100.01")
 
-        # Subtracting zero
-        assert hundred.subtract(zero) == Decimal("100.00")
+        # Subtracting small price
+        result_sub = hundred.subtract(small)
+        assert result_sub.value == Decimal("99.99")
 
-        # Can't subtract from zero (would be negative)
+        # Can't subtract larger from smaller (would be negative)
         with pytest.raises(ValueError):
-            zero.subtract(hundred)
+            small.subtract(hundred)
 
-        # Multiplying by zero
-        assert hundred.multiply(0) == Decimal("0")
-        assert zero.multiply(100) == Decimal("0")
+        # Multiplying by factors
+        assert small.multiply(100).value == Decimal("1.00")
 
     def test_precision_preservation(self):
         """Test that precision is preserved in operations."""
@@ -626,11 +628,11 @@ class TestPriceEdgeCases:
         price2 = Price(Decimal("0.002"))
 
         result = price1.add(price2)
-        assert result == Decimal("0.003")
+        assert result.value == Decimal("0.003")
 
         # Multiplication preserves precision
         result = price1.multiply(Decimal("3"))
-        assert result == Decimal("0.003")
+        assert result.value == Decimal("0.003")
 
     def test_tick_size_inheritance(self):
         """Test that tick size is inherited in operations."""

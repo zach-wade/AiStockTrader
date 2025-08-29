@@ -18,7 +18,7 @@ class TestSymbolCreation:
     def test_create_stock_symbol(self):
         """Test creating standard stock symbols."""
         symbol = Symbol("AAPL")
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
         assert symbol.base_symbol == "AAPL"
         assert symbol.exchange is None
         assert symbol.is_stock()
@@ -28,23 +28,23 @@ class TestSymbolCreation:
     def test_create_symbol_with_lowercase(self):
         """Test that symbols are normalized to uppercase."""
         symbol = Symbol("aapl")
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
 
     def test_create_symbol_with_whitespace(self):
         """Test that whitespace is stripped."""
         symbol = Symbol("  AAPL  ")
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
 
     def test_create_single_letter_symbol(self):
         """Test creating single letter symbol."""
         symbol = Symbol("F")  # Ford
-        assert symbol == "F"
+        assert symbol.value == "F"
         assert symbol.is_stock()
 
     def test_create_five_letter_symbol(self):
         """Test creating five letter symbol (max for stocks)."""
         symbol = Symbol("GOOGL")
-        assert symbol == "GOOGL"
+        assert symbol.value == "GOOGL"
         assert symbol.is_stock()
 
     def test_empty_symbol_raises_error(self):
@@ -68,7 +68,7 @@ class TestSymbolCreation:
 
         # Contains lowercase (after normalization this should work though)
         symbol = Symbol("aapl")  # This should work due to normalization
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
 
         # Special characters
         with pytest.raises(ValueError, match="Invalid symbol format"):
@@ -84,7 +84,7 @@ class TestSymbolWithExchange:
     def test_create_symbol_with_exchange_dot_notation(self):
         """Test creating symbol with exchange using dot notation."""
         symbol = Symbol("AAPL.US")
-        assert symbol == "AAPL.US"
+        assert symbol.value == "AAPL.US"
         assert symbol.base_symbol == "AAPL"
         assert symbol.exchange == "US"
         assert symbol.is_stock()
@@ -92,7 +92,7 @@ class TestSymbolWithExchange:
     def test_create_symbol_with_exchange_colon_notation(self):
         """Test creating symbol with exchange using colon notation."""
         symbol = Symbol("AAPL:NASDAQ")
-        assert symbol == "AAPL:NASDAQ"
+        assert symbol.value == "AAPL:NASDAQ"
         assert symbol.base_symbol == "AAPL"
         assert symbol.exchange == "NASDAQ"
         assert symbol.is_stock()
@@ -109,7 +109,7 @@ class TestSymbolWithExchange:
 
         for full_symbol, (base, exchange) in exchanges.items():
             symbol = Symbol(full_symbol)
-            assert symbol == full_symbol
+            assert symbol.value == full_symbol
             assert symbol.base_symbol == base
             assert symbol.exchange == exchange
 
@@ -120,7 +120,7 @@ class TestCryptoSymbols:
     def test_create_crypto_symbol(self):
         """Test creating cryptocurrency symbols."""
         symbol = Symbol("BTC-USD")
-        assert symbol == "BTC-USD"
+        assert symbol.value == "BTC-USD"
         assert symbol.base_symbol == "BTC"
         assert symbol.quote_currency == "USD"
         assert symbol.exchange is None
@@ -140,7 +140,7 @@ class TestCryptoSymbols:
 
         for full_symbol, (base, quote) in pairs.items():
             symbol = Symbol(full_symbol)
-            assert symbol == full_symbol
+            assert symbol.value == full_symbol
             assert symbol.base_symbol == base
             assert symbol.quote_currency == quote
             assert symbol.is_crypto()
@@ -153,7 +153,7 @@ class TestOptionSymbols:
         """Test creating option symbols (OCC format)."""
         # AAPL Jan 19, 2024 $150 Call
         symbol = Symbol("AAPL240119C00150000")
-        assert symbol == "AAPL240119C00150000"
+        assert symbol.value == "AAPL240119C00150000"
         assert symbol.is_option()
         assert not symbol.is_stock()
         assert not symbol.is_crypto()
@@ -169,7 +169,7 @@ class TestOptionSymbols:
 
         for option_symbol in options:
             symbol = Symbol(option_symbol)
-            assert symbol == option_symbol
+            assert symbol.value == option_symbol
             assert symbol.is_option()
 
 
@@ -179,7 +179,7 @@ class TestSymbolProperties:
     def test_value_property(self):
         """Test value property returns full symbol."""
         symbol = Symbol("AAPL")
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
 
     def test_base_symbol_property(self):
         """Test base_symbol property."""
@@ -259,12 +259,12 @@ class TestSymbolManipulation:
         symbol = Symbol("AAPL")
         new_symbol = symbol.with_exchange("NASDAQ")
 
-        assert new_symbol == "AAPL.NASDAQ"
+        assert new_symbol.value == "AAPL.NASDAQ"
         assert new_symbol.base_symbol == "AAPL"
         assert new_symbol.exchange == "NASDAQ"
 
         # Original unchanged
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
         assert symbol.exchange is None
 
     def test_with_exchange_normalizes_uppercase(self):
@@ -272,7 +272,7 @@ class TestSymbolManipulation:
         symbol = Symbol("AAPL")
         new_symbol = symbol.with_exchange("nasdaq")
 
-        assert new_symbol == "AAPL.NASDAQ"
+        assert new_symbol.value == "AAPL.NASDAQ"
         assert new_symbol.exchange == "NASDAQ"
 
     def test_with_exchange_on_crypto_raises_error(self):
@@ -287,12 +287,12 @@ class TestSymbolManipulation:
         symbol = Symbol("AAPL.US")
         new_symbol = symbol.without_exchange()
 
-        assert new_symbol == "AAPL"
+        assert new_symbol.value == "AAPL"
         assert new_symbol.base_symbol == "AAPL"
         assert new_symbol.exchange is None
 
         # Original unchanged
-        assert symbol == "AAPL.US"
+        assert symbol.value == "AAPL.US"
         assert symbol.exchange == "US"
 
     def test_without_exchange_no_exchange(self):
@@ -301,7 +301,7 @@ class TestSymbolManipulation:
         new_symbol = symbol.without_exchange()
 
         assert new_symbol == symbol
-        assert new_symbol == "AAPL"
+        assert new_symbol.value == "AAPL"
 
 
 class TestSymbolComparison:
@@ -430,7 +430,7 @@ class TestSymbolEdgeCases:
         """Test symbols that are purely numeric (some exchanges allow)."""
         # Some exchanges like Tokyo use numeric codes with proper exchange suffix
         symbol = Symbol("SONY.TYO")
-        assert symbol == "SONY.TYO"
+        assert symbol.value == "SONY.TYO"
         assert symbol.base_symbol == "SONY"
         assert symbol.exchange == "TYO"
 
@@ -447,7 +447,7 @@ class TestSymbolEdgeCases:
         # Operations return new objects
         new_symbol = symbol.with_exchange("US")
         assert symbol == original_value
-        assert new_symbol == "AAPL.US"
+        assert new_symbol.value == "AAPL.US"
 
     def test_mixed_patterns(self):
         """Test that symbols match only one pattern."""
@@ -466,15 +466,15 @@ class TestSymbolEdgeCases:
         """Test boundary cases for symbol lengths."""
         # Minimum length (1 character)
         symbol = Symbol("F")
-        assert symbol == "F"
+        assert symbol.value == "F"
 
         # Maximum length for plain stock (5 characters)
         symbol = Symbol("GOOGL")
-        assert symbol == "GOOGL"
+        assert symbol.value == "GOOGL"
 
         # With exchange can be longer
         symbol = Symbol("GOOGL.NASDAQ")
-        assert symbol == "GOOGL.NASDAQ"
+        assert symbol.value == "GOOGL.NASDAQ"
 
     def test_special_exchange_codes(self):
         """Test special exchange codes from various markets."""
@@ -491,7 +491,7 @@ class TestSymbolEdgeCases:
 
         for full_symbol in exchanges:
             symbol = Symbol(full_symbol)
-            assert "." in symbol
+            assert "." in symbol.value
             assert symbol.exchange is not None
             assert symbol.is_stock()
 
@@ -499,29 +499,29 @@ class TestSymbolEdgeCases:
         """Test various whitespace scenarios."""
         # Leading/trailing spaces
         symbol = Symbol("  AAPL  ")
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
 
         # Spaces with exchange
         symbol = Symbol("  AAPL.US  ")
-        assert symbol == "AAPL.US"
+        assert symbol.value == "AAPL.US"
 
         # Spaces with crypto
         symbol = Symbol("  BTC-USD  ")
-        assert symbol == "BTC-USD"
+        assert symbol.value == "BTC-USD"
 
     def test_case_normalization(self):
         """Test case normalization scenarios."""
         # Mixed case
         symbol = Symbol("AaPl")
-        assert symbol == "AAPL"
+        assert symbol.value == "AAPL"
 
         # With exchange
         symbol = Symbol("aapl.us")
-        assert symbol == "AAPL.US"
+        assert symbol.value == "AAPL.US"
 
         # Crypto pair
         symbol = Symbol("btc-usd")
-        assert symbol == "BTC-USD"
+        assert symbol.value == "BTC-USD"
 
     def test_symbol_sorting(self):
         """Test that symbols can be sorted alphabetically."""
@@ -534,7 +534,7 @@ class TestSymbolEdgeCases:
 
         sorted_symbols = sorted(symbols)
         expected_order = ["AAPL", "AMZN", "GOOGL", "MSFT"]
-        assert [s for s in sorted_symbols] == expected_order
+        assert [s.value for s in sorted_symbols] == expected_order
 
     def test_symbol_as_dict_key(self):
         """Test using Symbol as dictionary key."""

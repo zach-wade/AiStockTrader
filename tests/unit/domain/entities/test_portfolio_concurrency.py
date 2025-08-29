@@ -14,6 +14,7 @@ import pytest
 
 from src.domain.entities.portfolio import Portfolio, PositionRequest
 from src.domain.exceptions import StaleDataException
+from src.domain.value_objects import Money, Price, Quantity
 
 
 class TestPortfolioConcurrency:
@@ -25,9 +26,9 @@ class TestPortfolioConcurrency:
         return Portfolio(
             id=uuid4(),
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("100000"),
-            max_position_size=Decimal("20000"),  # Increase limit to allow test positions
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("100000")),
+            max_position_size=Money(Decimal("20000")),  # Increase limit to allow test positions
             max_portfolio_risk=Decimal("0.25"),  # Increase risk limit to 25%
             version=1,
         )
@@ -42,9 +43,9 @@ class TestPortfolioConcurrency:
 
         request = PositionRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("1.00"),
+            quantity=Quantity(Decimal("100")),
+            entry_price=Price(Decimal("150.00")),
+            commission=Money(Decimal("1.00")),
         )
 
         sample_portfolio.open_position(request)
@@ -57,15 +58,15 @@ class TestPortfolioConcurrency:
         # First open a position
         request = PositionRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("1.00"),
+            quantity=Quantity(Decimal("100")),
+            entry_price=Price(Decimal("150.00")),
+            commission=Money(Decimal("1.00")),
         )
         sample_portfolio.open_position(request)
         initial_version = sample_portfolio.version
 
         # Then close it
-        sample_portfolio.close_position("AAPL", Decimal("160.00"), Decimal("1.00"))
+        sample_portfolio.close_position("AAPL", Price(Decimal("160.00")), Money(Decimal("1.00")))
 
         assert sample_portfolio.version == initial_version + 1
 
@@ -74,14 +75,14 @@ class TestPortfolioConcurrency:
         # First open a position
         request = PositionRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),
+            entry_price=Price(Decimal("150.00")),
         )
         sample_portfolio.open_position(request)
         initial_version = sample_portfolio.version
 
         # Update price
-        sample_portfolio.update_position_price("AAPL", Decimal("155.00"))
+        sample_portfolio.update_position_price("AAPL", Price(Decimal("155.00")))
 
         assert sample_portfolio.version == initial_version + 1
 
@@ -91,8 +92,8 @@ class TestPortfolioConcurrency:
         for symbol in ["AAPL", "GOOGL", "MSFT"]:
             request = PositionRequest(
                 symbol=symbol,
-                quantity=Decimal("50"),
-                entry_price=Decimal("150.00"),
+                quantity=Quantity(Decimal("50")),
+                entry_price=Price(Decimal("150.00")),
             )
             sample_portfolio.open_position(request)
 
@@ -100,9 +101,9 @@ class TestPortfolioConcurrency:
 
         # Update all prices
         prices = {
-            "AAPL": Decimal("155.00"),
-            "GOOGL": Decimal("2800.00"),
-            "MSFT": Decimal("300.00"),
+            "AAPL": Price(Decimal("155.00")),
+            "GOOGL": Price(Decimal("2800.00")),
+            "MSFT": Price(Decimal("300.00")),
         }
         sample_portfolio.update_all_prices(prices)
 
@@ -147,9 +148,9 @@ class TestPortfolioConcurrency:
             try:
                 request = PositionRequest(
                     symbol=f"STOCK{thread_id}",
-                    quantity=Decimal("100"),
-                    entry_price=Decimal("100.00"),
-                    commission=Decimal("1.00"),
+                    quantity=Quantity(Decimal("100")),
+                    entry_price=Price(Decimal("100.00")),
+                    commission=Money(Decimal("1.00")),
                 )
 
                 # Add small delay to increase chance of contention
@@ -190,18 +191,18 @@ class TestPortfolioConcurrency:
         # Open position
         request = PositionRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),
+            entry_price=Price(Decimal("150.00")),
         )
         sample_portfolio.open_position(request)
         operations_count += 1
 
         # Update price
-        sample_portfolio.update_position_price("AAPL", Decimal("155.00"))
+        sample_portfolio.update_position_price("AAPL", Price(Decimal("155.00")))
         operations_count += 1
 
         # Close position
-        sample_portfolio.close_position("AAPL", Decimal("160.00"))
+        sample_portfolio.close_position("AAPL", Price(Decimal("160.00")))
         operations_count += 1
 
         expected_version = initial_version + operations_count

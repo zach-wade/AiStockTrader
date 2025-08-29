@@ -166,33 +166,45 @@ class Money:
             return False
         return self._amount == other._amount and self._currency == other._currency
 
-    def __lt__(self, other: Self) -> bool:
-        """Check if less than another Money instance."""
-        if not isinstance(other, Money):
-            raise TypeError(f"Cannot compare Money and {type(other)}")
-        if self._currency != other._currency:
-            raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
-        return self._amount < other._amount
+    def __lt__(self, other: Self | Decimal | int | float) -> bool:
+        """Check if less than another Money instance or numeric value."""
+        if isinstance(other, Money):
+            if self._currency != other._currency:
+                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
+            return self._amount < other._amount
+        if isinstance(other, (Decimal, int, float)):
+            return self._amount < Decimal(str(other))
+        raise TypeError(f"Cannot compare Money and {type(other)}")
 
-    def __le__(self, other: Self) -> bool:
-        """Check if less than or equal to another Money instance."""
-        if not isinstance(other, Money):
-            raise TypeError(f"Cannot compare Money and {type(other)}")
-        return self == other or self < other
+    def __le__(self, other: Self | Decimal | int | float) -> bool:
+        """Check if less than or equal to another Money instance or numeric value."""
+        if isinstance(other, Money):
+            if self._currency != other._currency:
+                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
+            return self._amount <= other._amount
+        if isinstance(other, (Decimal, int, float)):
+            return self._amount <= Decimal(str(other))
+        raise TypeError(f"Cannot compare Money and {type(other)}")
 
-    def __gt__(self, other: Self) -> bool:
-        """Check if greater than another Money instance."""
-        if not isinstance(other, Money):
-            raise TypeError(f"Cannot compare Money and {type(other)}")
-        if self._currency != other._currency:
-            raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
-        return self._amount > other._amount
+    def __gt__(self, other: Self | Decimal | int | float) -> bool:
+        """Check if greater than another Money instance or numeric value."""
+        if isinstance(other, Money):
+            if self._currency != other._currency:
+                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
+            return self._amount > other._amount
+        if isinstance(other, (Decimal, int, float)):
+            return self._amount > Decimal(str(other))
+        raise TypeError(f"Cannot compare Money and {type(other)}")
 
-    def __ge__(self, other: Self) -> bool:
-        """Check if greater than or equal to another Money instance."""
-        if not isinstance(other, Money):
-            raise TypeError(f"Cannot compare Money and {type(other)}")
-        return self == other or self > other
+    def __ge__(self, other: Self | Decimal | int | float) -> bool:
+        """Check if greater than or equal to another Money instance or numeric value."""
+        if isinstance(other, Money):
+            if self._currency != other._currency:
+                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
+            return self._amount >= other._amount
+        if isinstance(other, (Decimal, int, float)):
+            return self._amount >= Decimal(str(other))
+        raise TypeError(f"Cannot compare Money and {type(other)}")
 
     def __neg__(self) -> Self:
         """Negate the money amount."""

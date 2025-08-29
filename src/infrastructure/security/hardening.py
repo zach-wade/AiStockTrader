@@ -411,10 +411,11 @@ def secure_endpoint(
 # Trading-specific rate limits are now in the domain service
 def get_trading_rate_limits() -> dict[str, RateLimitRule]:
     """Get trading rate limits from domain service."""
-    from src.domain.services.request_validation_service import RequestValidationService
 
     limits = {}
-    for endpoint, config in RequestValidationService.TRADING_RATE_LIMITS.items():
+    from src.domain.services.rate_limiting_service import RateLimitingService
+
+    for endpoint, config in RateLimitingService.TRADING_RATE_LIMITS.items():
         limits[endpoint] = RateLimitRule(
             max_requests=config["max_requests"],
             window_seconds=config["window_seconds"],

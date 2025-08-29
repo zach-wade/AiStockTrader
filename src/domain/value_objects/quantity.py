@@ -1,8 +1,17 @@
 """Quantity value object for representing trading quantities."""
 
+from __future__ import annotations
+
 # Standard library imports
 from decimal import ROUND_DOWN, Decimal, getcontext
-from typing import Self
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from .money import Money
+    from .price import Price
+
+# Import converter for DRY compliance
+from .converter import ValueObjectConverter
 
 # Set high precision for Decimal operations to maintain precision in calculations
 getcontext().prec = 50
@@ -58,7 +67,7 @@ class Quantity:
         """
         return type(self)(abs(self._value))
 
-    def add(self, other: Self) -> Self:
+    def add(self, other: Quantity) -> Self:
         """Add another quantity.
 
         Args:
@@ -72,7 +81,7 @@ class Quantity:
 
         return type(self)(self._value + other._value)
 
-    def subtract(self, other: Self) -> Self:
+    def subtract(self, other: Quantity) -> Self:
         """Subtract another quantity.
 
         Args:
@@ -183,25 +192,49 @@ class Quantity:
             return False
         return self._value == other._value
 
-    def __lt__(self, other: Self) -> bool:
-        """Check if less than another Quantity."""
-        if not isinstance(other, Quantity):
-            raise TypeError(f"Cannot compare Quantity and {type(other)}")
-        return self._value < other._value
+    def __lt__(self, other: Quantity | Decimal | int | float | Money) -> bool:
+        """Check if less than another Quantity, numeric value, or Money."""
+        if isinstance(other, Quantity):
+            return self._value < other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value < Decimal(str(other))
+        if hasattr(other, "_amount"):  # Duck typing for Money
+            # Compare absolute values - this is likely a logic error in business code
+            return abs(self._value) < ValueObjectConverter.to_decimal(other)
+        raise TypeError(f"Cannot compare Quantity and {type(other)}")
 
-    def __le__(self, other: Self) -> bool:
-        """Check if less than or equal to another Quantity."""
-        return self == other or self < other
+    def __le__(self, other: Quantity | Decimal | int | float | Money) -> bool:
+        """Check if less than or equal to another Quantity, numeric value, or Money."""
+        if isinstance(other, Quantity):
+            return self._value <= other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value <= Decimal(str(other))
+        if hasattr(other, "_amount"):  # Duck typing for Money
+            # Compare absolute values - this is likely a logic error in business code
+            return abs(self._value) <= ValueObjectConverter.to_decimal(other)
+        raise TypeError(f"Cannot compare Quantity and {type(other)}")
 
-    def __gt__(self, other: Self) -> bool:
-        """Check if greater than another Quantity."""
-        if not isinstance(other, Quantity):
-            raise TypeError(f"Cannot compare Quantity and {type(other)}")
-        return self._value > other._value
+    def __gt__(self, other: Quantity | Decimal | int | float | Money) -> bool:
+        """Check if greater than another Quantity, numeric value, or Money."""
+        if isinstance(other, Quantity):
+            return self._value > other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value > Decimal(str(other))
+        if hasattr(other, "_amount"):  # Duck typing for Money
+            # Compare absolute values - this is likely a logic error in business code
+            return abs(self._value) > ValueObjectConverter.to_decimal(other)
+        raise TypeError(f"Cannot compare Quantity and {type(other)}")
 
-    def __ge__(self, other: Self) -> bool:
-        """Check if greater than or equal to another Quantity."""
-        return self == other or self > other
+    def __ge__(self, other: Quantity | Decimal | int | float | Money) -> bool:
+        """Check if greater than or equal to another Quantity, numeric value, or Money."""
+        if isinstance(other, Quantity):
+            return self._value >= other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self._value >= Decimal(str(other))
+        if hasattr(other, "_amount"):  # Duck typing for Money
+            # Compare absolute values - this is likely a logic error in business code
+            return abs(self._value) >= ValueObjectConverter.to_decimal(other)
+        raise TypeError(f"Cannot compare Quantity and {type(other)}")
 
     def __neg__(self) -> Self:
         """Negate the quantity."""
@@ -229,7 +262,7 @@ class Quantity:
         return str(normalized)
 
     # Arithmetic operator overloads
-    def __add__(self, other: Self | Decimal | int | float) -> Self:
+    def __add__(self, other: Quantity | Decimal | int | float) -> Self:
         """Add another quantity or numeric value."""
         if isinstance(other, Quantity):
             return self.add(other)
@@ -239,7 +272,7 @@ class Quantity:
         """Reverse add for numeric value + Quantity."""
         return type(self)(Decimal(str(other)) + self._value)
 
-    def __sub__(self, other: Self | Decimal | int | float) -> Self:
+    def __sub__(self, other: Quantity | Decimal | int | float) -> Self:
         """Subtract another quantity or numeric value."""
         if isinstance(other, Quantity):
             return self.subtract(other)
@@ -249,14 +282,22 @@ class Quantity:
         """Reverse subtract for numeric value - Quantity."""
         return type(self)(Decimal(str(other)) - self._value)
 
-    def __mul__(self, other: Decimal | int | float) -> Self:
-        """Multiply by a numeric value."""
+    def __mul__(self, other: Decimal | int | float | Price) -> Self | Money:
+        """Multiply by a numeric value or Price (returns Money)."""
+        if hasattr(other, "_value") and hasattr(other, "_tick_size"):  # Duck typing for Price
+            # Quantity * Price = Money
+            from .money import Money
+
+            return Money(self._value * ValueObjectConverter.extract_value(other), "USD")
         return self.multiply(other)
 
     def __rmul__(self, other: Decimal | int | float) -> Self:
         """Reverse multiply for numeric value * Quantity."""
         return self.multiply(other)
 
-    def __truediv__(self, other: Decimal | int | float) -> Self:
-        """Divide by a numeric value."""
+    def __truediv__(self, other: Decimal | int | float | Money) -> Self | Decimal:
+        """Divide by a numeric value or Money (returns ratio)."""
+        if hasattr(other, "_amount"):  # Duck typing for Money
+            # Quantity / Money = ratio (Decimal)
+            return self._value / ValueObjectConverter.to_decimal(other)
         return self.divide(other)

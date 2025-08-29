@@ -66,6 +66,8 @@ class ExternalStorage(AuditStorage):
         self.retry_attempts = config.storage_config.external_storage_retry_attempts
 
         # Initialize external system client
+        if self.external_type is None:
+            raise ValueError("External storage type is required but was None")
         self.client = ExternalSystemClient(
             self.external_type, self.external_config, self.retry_attempts
         )

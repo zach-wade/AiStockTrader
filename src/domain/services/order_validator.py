@@ -345,15 +345,15 @@ class OrderValidator:
         """
         # Determine execution price
         if order.order_type == OrderType.LIMIT and order.limit_price:
-            execution_price = Price(order.limit_price)
+            execution_price = order.limit_price
         else:
             execution_price = current_price
 
         # Calculate order value
-        order_value = Money(order.quantity * execution_price.value)
+        order_value = Money(order.quantity.value * execution_price.value)
 
         # Calculate commission
-        commission = self.commission_calculator.calculate(Quantity(order.quantity), order_value)
+        commission = self.commission_calculator.calculate(order.quantity, order_value)
 
         # Total required capital
         if order.side == OrderSide.BUY:
@@ -396,7 +396,7 @@ class OrderValidator:
                 )
 
         # Check min/max order value
-        order_value = Money(order.quantity * current_price.value)
+        order_value = Money(order.quantity.value * current_price.value)
 
         if self.constraints.min_order_value:
             if order_value.amount < self.constraints.min_order_value.amount:

@@ -629,6 +629,7 @@ class TestPredefinedConfigurations:
 class TestRetryIntegrationScenarios:
     """Integration tests for real-world retry scenarios."""
 
+    @pytest.mark.asyncio
     async def test_database_connection_retry(self):
         """Test database connection retry scenario."""
 

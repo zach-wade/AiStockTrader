@@ -152,8 +152,8 @@ class RegistrationService:
             return None
 
         verification_token = secrets.token_urlsafe(32)
-        user.email_verification_token = verification_token
-        user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
+        user.email_verification_token = verification_token  # type: ignore[assignment]
+        user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)  # type: ignore[assignment]
         return verification_token
 
     def _assign_roles(self, user: User, role_names: list[str]) -> None:
@@ -185,9 +185,9 @@ class RegistrationService:
         if not user:
             raise ValueError("Invalid or expired verification token")
 
-        user.email_verified = True
-        user.email_verification_token = None
-        user.email_verification_expires = None
+        user.email_verified = True  # type: ignore[assignment]
+        user.email_verification_token = None  # type: ignore[assignment]
+        user.email_verification_expires = None  # type: ignore[assignment]
         self.db.commit()
 
         return True
@@ -209,8 +209,8 @@ class RegistrationService:
 
         # Generate new token
         verification_token = secrets.token_urlsafe(32)
-        user.email_verification_token = verification_token
-        user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)
+        user.email_verification_token = verification_token  # type: ignore[assignment]
+        user.email_verification_expires = datetime.utcnow() + timedelta(hours=24)  # type: ignore[assignment]
 
         self.db.commit()
 

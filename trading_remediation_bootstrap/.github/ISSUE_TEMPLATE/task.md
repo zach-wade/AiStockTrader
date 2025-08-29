@@ -13,13 +13,16 @@ What is in/out of scope.
 -
 
 **Acceptance Criteria**
-- [ ] 
+
+- [ ]
 
 **Test Plan**
+
 - Unit:
 - Integration:
 - E2E:
 
 **Risk & Rollback**
+
 - Risk:
 - Rollback:

@@ -270,7 +270,7 @@ class TestProcessOrderFillUseCase:
         )
 
         # Setup mocks
-        sample_order.filled_quantity = Decimal("30")
+        sample_order.filled_quantity = Quantity(Decimal("30"))
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = sample_portfolio
 
@@ -616,7 +616,7 @@ class TestSimulateOrderExecutionUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
         )
         order.id = uuid4()
 
@@ -654,7 +654,7 @@ class TestSimulateOrderExecutionUseCase:
             symbol="AAPL",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
         )
         order.id = uuid4()
 

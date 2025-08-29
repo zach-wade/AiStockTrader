@@ -669,7 +669,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
                         raise StaleDataException(
                             entity_type="Portfolio",
                             entity_id=portfolio_id,
-                            expected_version=expected_version,
+                            expected_version=expected_version or 0,
                             actual_version=check_result["version"],
                         )
 

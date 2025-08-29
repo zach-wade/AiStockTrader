@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 # Local imports
 from src.domain.entities.order import Order, OrderRequest, OrderSide, OrderStatus
 from src.domain.entities.position import Position
+from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
 from src.domain.value_objects.quantity import Quantity
 
@@ -118,7 +119,7 @@ class TradingService:
             closing_side = OrderSide.SELL if position.is_long() else OrderSide.BUY
             close_request = OrderRequest(
                 symbol=symbol,
-                quantity=Quantity(abs(position.quantity)),
+                quantity=Quantity(abs(position.quantity.value)),
                 side=closing_side,
                 reason=f"Close position {position.id}",
             )
@@ -166,10 +167,10 @@ class TradingService:
                 "active_positions": [
                     {
                         "symbol": pos.symbol,
-                        "quantity": float(pos.quantity),
-                        "entry_price": float(pos.average_entry_price),
-                        "current_value": float(pos.get_position_value() or 0),
-                        "unrealized_pnl": float(pos.get_unrealized_pnl() or 0),
+                        "quantity": float(pos.quantity.value),
+                        "entry_price": float(pos.average_entry_price.value),
+                        "current_value": float((pos.get_position_value() or Money(0)).amount),
+                        "unrealized_pnl": float((pos.get_unrealized_pnl() or Money(0)).amount),
                     }
                     for pos in active_positions
                 ],
@@ -178,17 +179,17 @@ class TradingService:
                         "id": str(order.id),
                         "symbol": order.symbol,
                         "side": order.side.value,
-                        "quantity": float(order.quantity),
+                        "quantity": float(order.quantity.value),
                         "status": order.status.value,
                         "created_at": order.created_at.isoformat(),
                     }
                     for order in recent_orders
                 ],
                 "summary": {
-                    "total_value": float(portfolio.get_total_value()),
-                    "cash_balance": float(portfolio.cash_balance),
-                    "unrealized_pnl": float(portfolio.get_unrealized_pnl()),
-                    "total_pnl": float(portfolio.get_total_pnl()),
+                    "total_value": float(portfolio.get_total_value().amount),
+                    "cash_balance": float(portfolio.cash_balance.amount),
+                    "unrealized_pnl": float(portfolio.get_unrealized_pnl().amount),
+                    "total_pnl": float(portfolio.get_total_pnl().amount),
                     "return_percentage": float(portfolio.get_return_percentage()),
                 },
             }
@@ -233,8 +234,10 @@ class TradingService:
             filled_orders = [o for o in all_orders if o.status == OrderStatus.FILLED]
             cancelled_orders = [o for o in all_orders if o.status == OrderStatus.CANCELLED]
 
+            from src.domain.value_objects.money import Money
+
             closed_positions = [p for p in all_positions if p.is_closed()]
-            winning_positions = [p for p in closed_positions if p.realized_pnl > 0]
+            winning_positions = [p for p in closed_positions if p.realized_pnl > Money(0)]
 
             return {
                 "symbol": symbol,
@@ -253,16 +256,23 @@ class TradingService:
                     ),
                 },
                 "pnl_stats": {
-                    "total_realized_pnl": float(sum(p.realized_pnl for p in closed_positions)),
+                    "total_realized_pnl": float(
+                        sum(p.realized_pnl.amount for p in closed_positions)
+                    ),
                     "average_win": float(
-                        sum(p.realized_pnl for p in winning_positions) / len(winning_positions)
+                        sum(p.realized_pnl.amount for p in winning_positions)
+                        / len(winning_positions)
                         if winning_positions
                         else 0
                     ),
                     "average_loss": float(
-                        sum(p.realized_pnl for p in closed_positions if p.realized_pnl < 0)
-                        / len([p for p in closed_positions if p.realized_pnl < 0])
-                        if any(p.realized_pnl < 0 for p in closed_positions)
+                        sum(
+                            p.realized_pnl.amount
+                            for p in closed_positions
+                            if p.realized_pnl < Money(0)
+                        )
+                        / len([p for p in closed_positions if p.realized_pnl < Money(0)])
+                        if any(p.realized_pnl < Money(0) for p in closed_positions)
                         else 0
                     ),
                 },

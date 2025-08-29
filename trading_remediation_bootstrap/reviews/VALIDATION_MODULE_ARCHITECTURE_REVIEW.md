@@ -1,12 +1,15 @@
 # Architectural Review: Data Validation Models Module
+
 ## File: `/ai_trader/src/main/config/validation_models/data.py`
 
 ## Architectural Impact Assessment
+
 **Rating: HIGH**
 
 **Justification:** This module exhibits fundamental architectural violations that create systemic issues across the entire configuration layer. The mixing of data models, business logic, validation rules, and domain concepts within a single module creates a fragile foundation that impacts maintainability, testability, and extensibility of the entire system.
 
 ## Pattern Compliance Checklist
+
 - ❌ **Single Responsibility Principle (SRP)**: Multiple violations across all classes
 - ❌ **Open/Closed Principle (OCP)**: Hardcoded validation logic prevents extension
 - ✅ **Liskov Substitution Principle (LSP)**: No inheritance issues (minimal inheritance used)
@@ -20,7 +23,9 @@
 ### 1. SRP Violations - Critical Severity
 
 #### DataConfig Class (Lines 86-100)
+
 **Violation:** Single class responsible for:
+
 - Data structure definition
 - Validation logic
 - Default value management
@@ -31,7 +36,9 @@
 **Problem:** Changes to any aspect (validation rules, data structure, defaults) require modifying the same class, violating the principle that a class should have only one reason to change.
 
 #### FeaturesConfig Class (Lines 120-136)
+
 **Violation:** Combines:
+
 - Feature configuration storage
 - Timeframe validation
 - Technical indicator management
@@ -40,7 +47,9 @@
 **Problem:** Feature-specific logic is tightly coupled with configuration structure, making it impossible to modify feature behavior without touching configuration models.
 
 #### TrainingConfig Class (Lines 139-154)
+
 **Violation:** Mixes:
+
 - Training parameter storage
 - Sector diversity logic
 - Symbol selection rules
@@ -52,12 +61,15 @@
 ### 2. DIP Violations - High Severity
 
 #### Lines 46, 105-111: Hardcoded Types
+
 ```python
 PositiveFloat = float  # Direct concrete type
 ```
+
 **Problem:** No abstraction for numeric constraints. Should use abstract validation interfaces.
 
 #### Lines 93-99: Embedded Validation Logic
+
 ```python
 @field_validator('sources')
 @classmethod
@@ -65,14 +77,17 @@ def validate_sources(cls, v):
     if not v:
         raise ValueError("At least one data source must be configured")
 ```
+
 **Problem:** Validation logic directly embedded in data models instead of using validator abstractions.
 
 ### 3. OCP Violations - High Severity
 
 #### Lines 13-42: Hardcoded Enums
+
 **Problem:** Adding new data providers, timeframes, or universe types requires modifying existing enums. No extension mechanism without modification.
 
 **Example Impact:** Adding a new data provider requires:
+
 1. Modifying the DataProvider enum
 2. Potentially updating all dependent validation logic
 3. Redeploying the entire configuration module
@@ -80,13 +95,15 @@ def validate_sources(cls, v):
 ### 4. ISP Violations - Medium Severity
 
 #### Lines 50-85: Fat Configuration Interfaces
+
 **Problem:** Clients must depend on entire configuration objects even when they only need specific fields.
 
 **Example:** A component needing only `max_symbols` must depend on entire `UniverseConfig` including crypto settings, asset class, and provider information.
 
 ### 5. Abstraction Level Mixing - High Severity
 
-#### Throughout the file:
+#### Throughout the file
+
 - **Lines 13-42:** Domain enums (high-level business concepts)
 - **Lines 44-46:** Type definitions (low-level technical details)
 - **Lines 50-189:** Configuration models (mid-level structures)
@@ -97,22 +114,28 @@ def validate_sources(cls, v):
 ### 6. Hidden Dependencies - Medium Severity
 
 #### Line 10: Logger Dependency
+
 ```python
 logger = logging.getLogger(__name__)
 ```
+
 **Problem:** Global logger creates hidden dependency. Should be injected.
 
 #### Lines 71-76: Implicit Domain Knowledge
+
 ```python
 lookback_strategy: str = Field(default="days", description="Lookback strategy")
 destination: str = Field(default="data_lake", description="Data destination")
 ```
+
 **Problem:** String literals encoding domain concepts without type safety or validation.
 
 ### 7. Coupling Issues - High Severity
 
 #### Cross-Model Dependencies (Lines 86-91)
+
 **Problem:** DataConfig directly instantiates and couples to:
+
 - UniverseConfig
 - BackfillConfig
 - DataProvider enum
@@ -165,7 +188,7 @@ class ValidationRule(ABC):
 class CompositeValidator:
     def __init__(self, rules: List[ValidationRule]):
         self.rules = rules
-    
+
     def validate(self, config: Any) -> ValidationResult:
         for rule in self.rules:
             result = rule.validate(config)
@@ -197,7 +220,7 @@ class DataProviderPlugin(ABC):
     @abstractmethod
     def get_name(self) -> str:
         pass
-    
+
     @abstractmethod
     def validate_config(self, config: Dict) -> bool:
         pass
@@ -224,26 +247,32 @@ class DataProviderManager:
 ## Long-term Implications
 
 ### Technical Debt Being Introduced
+
 1. **Validation Logic Scatter:** Business rules embedded in models will proliferate throughout codebase
 2. **Testing Complexity:** Cannot unit test validation independently from data structures
 3. **Migration Difficulty:** Changing validation frameworks requires rewriting all models
 4. **Performance Impact:** No ability to optimize validation separately from data access
 
 ### System Evolution Constraints
+
 1. **Provider Lock-in:** Adding new data providers requires core module changes
 2. **Validation Rigidity:** Cannot customize validation per environment without code changes
 3. **Feature Coupling:** Cannot evolve feature configuration independently from data configuration
 4. **Scale Limitations:** Monolithic validation prevents distributed validation strategies
 
 ### Positive Potential
+
 If refactored properly, this module could become:
+
 1. **Highly Extensible:** Plugin architecture for providers and validators
 2. **Testable:** Independent testing of each concern
 3. **Performant:** Optimized validation strategies per configuration type
 4. **Maintainable:** Clear separation allows team specialization
 
 ### Risk Assessment
+
 **Current State Risk: HIGH**
+
 - Single point of failure for all configuration
 - High change propagation risk
 - Testing coverage limitations
@@ -251,6 +280,7 @@ If refactored properly, this module could become:
 
 **Recommended Priority: IMMEDIATE**
 This module is foundational to the configuration system. Its architectural issues will compound as the system grows. Refactoring should begin with:
+
 1. Extract validation logic to separate validators
 2. Create abstraction layer for providers
 3. Implement dependency injection

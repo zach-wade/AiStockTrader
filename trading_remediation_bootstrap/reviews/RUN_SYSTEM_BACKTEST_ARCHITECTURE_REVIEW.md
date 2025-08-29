@@ -1,19 +1,22 @@
 # COMPREHENSIVE ARCHITECTURAL REVIEW: run_system_backtest.py
 
 ## Review Metadata
+
 - **File**: `/Users/zachwade/StockMonitoring/ai_trader/src/main/backtesting/run_system_backtest.py`
 - **Review Date**: 2025-01-14
 - **Review Type**: SOLID Principles & Architectural Integrity
 - **Issue Range**: ISSUE-2722 to ISSUE-2800
 
 ## Architectural Impact Assessment
-**Rating: HIGH** 
+
+**Rating: HIGH**
 
 This file serves as a critical orchestration point in the backtesting system, making it architecturally significant. The violations found introduce substantial technical debt and create maintenance challenges that will compound over time.
 
 ## Pattern Compliance Checklist
 
 ### SOLID Principles
+
 - ❌ **Single Responsibility Principle (SRP)**: Multiple violations
 - ❌ **Open/Closed Principle (OCP)**: Limited extensibility
 - ❌ **Liskov Substitution Principle (LSP)**: Proper interface usage
@@ -21,6 +24,7 @@ This file serves as a critical orchestration point in the backtesting system, ma
 - ❌ **Dependency Inversion Principle (DIP)**: Direct concrete dependencies
 
 ### Architectural Patterns
+
 - ❌ **Dependency Injection**: Partial implementation with issues
 - ❌ **Clean Architecture**: Layer violations present
 - ❌ **Hexagonal Architecture**: Port/adapter pattern violations
@@ -30,10 +34,12 @@ This file serves as a critical orchestration point in the backtesting system, ma
 ## CRITICAL VIOLATIONS
 
 ### ISSUE-2722: Single Responsibility Principle Violation - God Class Anti-pattern
+
 **Severity**: CRITICAL
 **Location**: Lines 45-224 (SystemBacktestRunner class)
 
 The `SystemBacktestRunner` class has 12+ distinct responsibilities:
+
 1. Database initialization (lines 56-57)
 2. Data source management (lines 58-59)
 3. Data fetching coordination (lines 60-64)
@@ -50,6 +56,7 @@ The `SystemBacktestRunner` class has 12+ distinct responsibilities:
 **Impact**: This creates a maintenance nightmare where changes to any subsystem require modifying this class.
 
 **Recommended Refactoring**:
+
 ```python
 # Split into focused classes
 class BacktestDependencyContainer:
@@ -58,12 +65,12 @@ class BacktestDependencyContainer:
         self._config = config
         self._initialize_infrastructure()
         self._initialize_domain_services()
-    
+
 class BacktestOrchestrator:
     """Pure orchestration logic"""
     def __init__(self, container: BacktestDependencyContainer):
         self._container = container
-    
+
 class BacktestReportGenerator:
     """Handles all reporting concerns"""
     def generate_summary(self, results: Dict) -> pd.DataFrame:
@@ -71,10 +78,12 @@ class BacktestReportGenerator:
 ```
 
 ### ISSUE-2723: Dependency Inversion Principle Violation
+
 **Severity**: CRITICAL
 **Location**: Lines 56-79
 
 Direct instantiation of concrete classes violates DIP:
+
 ```python
 # Current violation (lines 56-57)
 db_factory = DatabaseFactory()
@@ -84,6 +93,7 @@ self.db_adapter: IAsyncDatabase = db_factory.create_async_database(config.model_
 **Impact**: Tightly couples the orchestrator to specific implementations, making testing and modification difficult.
 
 **Recommended Refactoring**:
+
 ```python
 from typing import Protocol
 
@@ -102,10 +112,12 @@ class SystemBacktestRunner:
 ## HIGH SEVERITY VIOLATIONS
 
 ### ISSUE-2724: Open/Closed Principle Violation - Hardcoded Strategy List
+
 **Severity**: HIGH
 **Location**: Lines 84-94
 
 Strategies are hardcoded, requiring code changes to add new ones:
+
 ```python
 def _initialize_strategies(self) -> Dict[str, BaseStrategy]:
     strategies = {
@@ -116,14 +128,15 @@ def _initialize_strategies(self) -> Dict[str, BaseStrategy]:
 ```
 
 **Recommended Refactoring**:
+
 ```python
 class IStrategyFactory(Protocol):
-    def create_strategies(self, config: DictConfig, 
+    def create_strategies(self, config: DictConfig,
                          feature_engine: IFeatureEngine) -> Dict[str, BaseStrategy]:
         pass
 
 class ConfigurableStrategyFactory:
-    def create_strategies(self, config: DictConfig, 
+    def create_strategies(self, config: DictConfig,
                          feature_engine: IFeatureEngine) -> Dict[str, BaseStrategy]:
         strategies = {}
         for name, strategy_config in config.strategies.items():
@@ -133,24 +146,27 @@ class ConfigurableStrategyFactory:
 ```
 
 ### ISSUE-2725: Interface Segregation Principle Violation
+
 **Severity**: HIGH
 **Location**: Lines 96-222
 
 The `run_all_backtests` method is a monolithic 126-line method handling multiple distinct workflows:
+
 - Universe selection (lines 102-125)
 - Backtest execution (lines 127-163)
 - Report generation (line 165)
 - Validation execution (lines 167-171)
 
 **Recommended Refactoring**:
+
 ```python
 class IUniverseSelector(Protocol):
-    async def select_universe(self, symbols: List[str], 
+    async def select_universe(self, symbols: List[str],
                               start: datetime, end: datetime) -> List[str]:
         pass
 
 class IBacktestExecutor(Protocol):
-    async def execute_backtests(self, symbols: List[str], 
+    async def execute_backtests(self, symbols: List[str],
                                 strategies: Dict[str, BaseStrategy]) -> Dict:
         pass
 
@@ -160,10 +176,12 @@ class IValidationRunner(Protocol):
 ```
 
 ### ISSUE-2726: Layer Architecture Violation - Presentation in Business Logic
+
 **Severity**: HIGH
 **Location**: Lines 192-196
 
 Direct console output in business logic:
+
 ```python
 print("\n" + "="*80)
 print("                        PHASE 1 & 2: BROAD SCAN SUMMARY")
@@ -172,6 +190,7 @@ print(summary_df[['total_return_pct', 'sharpe_ratio', 'max_drawdown_pct', 'win_r
 ```
 
 **Recommended Refactoring**:
+
 ```python
 class IReportRenderer(Protocol):
     def render_summary(self, data: pd.DataFrame) -> None:
@@ -186,27 +205,32 @@ class ConsoleReportRenderer:
 ## MEDIUM SEVERITY VIOLATIONS
 
 ### ISSUE-2727: Data Access Layer Violation
+
 **Severity**: MEDIUM
 **Location**: Line 109
 
 Direct data fetching bypasses repository pattern:
+
 ```python
 historical_data_map = await self.data_provider.get_bulk_daily_data(broad_universe_symbols, start_date, end_date)
 ```
 
 **Recommended Refactoring**:
+
 ```python
 class IMarketDataRepository(Protocol):
-    async def get_historical_data(self, symbols: List[str], 
+    async def get_historical_data(self, symbols: List[str],
                                   start: datetime, end: datetime) -> Dict[str, pd.DataFrame]:
         pass
 ```
 
 ### ISSUE-2728: Error Handling Inconsistency
+
 **Severity**: MEDIUM
 **Location**: Lines 160-162
 
 Generic exception catching with inconsistent handling:
+
 ```python
 except Exception as e:
     logger.error(f"Backtest failed for strategy '{name}' on symbol '{symbol}': {e}", exc_info=True)
@@ -214,6 +238,7 @@ except Exception as e:
 ```
 
 **Recommended Refactoring**:
+
 ```python
 class BacktestExecutionError(Exception):
     """Domain-specific exception for backtest failures"""
@@ -226,16 +251,19 @@ except BacktestExecutionError as e:
 ```
 
 ### ISSUE-2729: Configuration Access Anti-pattern
+
 **Severity**: MEDIUM
 **Location**: Lines 118, 205, 231-235
 
 Direct dictionary access to configuration:
+
 ```python
 max_symbols=self.config.get('backtesting', {}).get('max_symbols_to_test', 50)
 validation_symbol = self.config.get('backtesting', {}).get('validation_symbol', 'SPY')
 ```
 
 **Recommended Refactoring**:
+
 ```python
 @dataclass
 class BacktestingConfig:
@@ -243,23 +271,26 @@ class BacktestingConfig:
     validation_symbol: str = 'SPY'
     default_lookback_days: int = 730
     broad_universe: List[str] = field(default_factory=list)
-    
+
     @classmethod
     def from_dict(cls, config_dict: Dict) -> 'BacktestingConfig':
         return cls(**config_dict.get('backtesting', {}))
 ```
 
 ### ISSUE-2730: Feature Envy Code Smell
+
 **Severity**: MEDIUM
 **Location**: Lines 136-139
 
 Accessing internal details of external objects:
+
 ```python
 score_metric = symbol_metrics.get(symbol)
 score = score_metric.overall_score if score_metric else 0.0
 ```
 
 **Recommended Refactoring**:
+
 ```python
 class SymbolMetrics:
     def get_score_for_symbol(self, symbol: str) -> float:
@@ -270,16 +301,19 @@ class SymbolMetrics:
 ## LOW SEVERITY VIOLATIONS
 
 ### ISSUE-2731: Magic Numbers
+
 **Severity**: LOW
 **Location**: Lines 193, 233
 
 Hardcoded magic numbers:
+
 ```python
 print("="*80)  # Magic number 80
 start_date = end_date - timedelta(days=backtest_config.get('default_lookback_days', 365 * 2))  # 365 * 2
 ```
 
 **Recommended Refactoring**:
+
 ```python
 class Constants:
     CONSOLE_WIDTH = 80
@@ -288,6 +322,7 @@ class Constants:
 ```
 
 ### ISSUE-2732: Naming Convention Inconsistency
+
 **Severity**: LOW
 **Location**: Lines 200-222
 
@@ -298,6 +333,7 @@ Private method `_run_deep_validation_on_best_strategy` has complex public-like b
 ## Architectural Improvements
 
 ### 1. Implement Hexagonal Architecture
+
 ```python
 # Ports (domain interfaces)
 class IBacktestPort:
@@ -308,7 +344,7 @@ class IBacktestPort:
 class BacktestEngineAdapter(IBacktestPort):
     def __init__(self, engine: BacktestEngine):
         self._engine = engine
-    
+
     async def execute(self, strategy: Strategy, data: pd.DataFrame) -> BacktestResult:
         return await self._engine.run(strategy, data)
 
@@ -319,6 +355,7 @@ class BacktestApplicationService:
 ```
 
 ### 2. Implement Command Pattern for Orchestration
+
 ```python
 class BacktestCommand(Protocol):
     async def execute(self) -> Any:
@@ -328,7 +365,7 @@ class SelectUniverseCommand:
     def __init__(self, selector: IUniverseSelector, symbols: List[str]):
         self._selector = selector
         self._symbols = symbols
-    
+
     async def execute(self) -> List[str]:
         return await self._selector.select(self._symbols)
 
@@ -342,15 +379,16 @@ class BacktestOrchestrator:
 ```
 
 ### 3. Implement Repository Pattern
+
 ```python
 class BacktestResultRepository:
     def __init__(self, database: IAsyncDatabase):
         self._database = database
-    
+
     async def save_results(self, results: List[BacktestResult]) -> None:
-        await self._database.insert_many('backtest_results', 
+        await self._database.insert_many('backtest_results',
                                         [r.to_dict() for r in results])
-    
+
     async def get_best_strategy(self, metric: str = 'sharpe_ratio') -> str:
         query = f"SELECT strategy FROM results ORDER BY {metric} DESC LIMIT 1"
         result = await self._database.fetch_one(query)
@@ -360,18 +398,21 @@ class BacktestResultRepository:
 ## Long-term Implications
 
 ### Technical Debt Accumulation
+
 1. **Maintenance Burden**: The god class pattern will make every change risky
 2. **Testing Complexity**: Impossible to unit test in isolation
 3. **Team Scalability**: Multiple developers cannot work on different aspects simultaneously
 4. **Performance**: Monolithic structure prevents optimization of individual components
 
 ### Evolution Constraints
+
 1. **Strategy Addition**: Requires code changes rather than configuration
 2. **New Data Sources**: Tightly coupled initialization prevents easy extension
 3. **Validation Methods**: Hard to add new validation approaches
 4. **Reporting Formats**: Presentation logic embedded in business logic
 
 ### Positive Aspects to Preserve
+
 1. **Clear Phase Separation**: The three-phase approach is well-structured
 2. **Comprehensive Logging**: Good observability for debugging
 3. **Async/Await Pattern**: Proper use of async for I/O operations
@@ -380,16 +421,19 @@ class BacktestResultRepository:
 ## Priority Recommendations
 
 ### Immediate (P0)
+
 1. **Extract orchestration logic** into separate command classes
 2. **Implement dependency injection container** for initialization
 3. **Create strategy factory** for dynamic strategy loading
 
 ### Short-term (P1)
+
 1. **Separate reporting concerns** into dedicated renderer
 2. **Implement repository pattern** for data access
 3. **Create configuration classes** instead of dict access
 
 ### Long-term (P2)
+
 1. **Migrate to hexagonal architecture** with clear ports/adapters
 2. **Implement event-driven architecture** for phase transitions
 3. **Add circuit breakers** for external service calls
@@ -399,6 +443,7 @@ class BacktestResultRepository:
 The `run_system_backtest.py` file exhibits significant architectural violations that compromise maintainability, testability, and extensibility. The primary issue is the god class anti-pattern combined with violations of all five SOLID principles. While the overall workflow logic is sound, the implementation requires substantial refactoring to align with clean architecture principles.
 
 The recommended refactoring path focuses on:
+
 1. **Separation of Concerns**: Breaking the monolithic class into focused components
 2. **Dependency Inversion**: Using interfaces and dependency injection
 3. **Open/Closed Principle**: Making the system extensible without modification

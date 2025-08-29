@@ -11,13 +11,17 @@ from typing import Any
 from uuid import UUID
 
 from alpaca.common.exceptions import APIError
-from alpaca.trading import GetOrdersRequest, LimitOrderRequest, MarketOrderRequest
+from alpaca.trading import (
+    GetOrdersRequest,
+    LimitOrderRequest,
+    MarketOrderRequest,
+    QueryOrderStatus,
+    TradingClient,
+)
 from alpaca.trading import OrderSide as AlpacaOrderSide
 from alpaca.trading import OrderStatus as AlpacaOrderStatus
 from alpaca.trading import OrderType as AlpacaOrderType
-from alpaca.trading import QueryOrderStatus
 from alpaca.trading import TimeInForce as AlpacaTimeInForce
-from alpaca.trading import TradingClient
 from alpaca.trading.models import Order as AlpacaOrder
 
 from src.application.interfaces.broker import (
@@ -31,6 +35,9 @@ from src.application.interfaces.broker import (
 )
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType, TimeInForce
 from src.domain.entities.position import Position
+from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 logger = logging.getLogger(__name__)
 
@@ -130,17 +137,19 @@ class AlpacaBroker(IBroker):
         if order.order_type == OrderType.MARKET:
             order_request = MarketOrderRequest(
                 symbol=order.symbol,
-                qty=float(order.quantity),
+                qty=float(order.quantity.value),  # Extract Decimal value from Quantity
                 side=AlpacaOrderSide.BUY if order.side == OrderSide.BUY else AlpacaOrderSide.SELL,
                 time_in_force=alpaca_tif,
             )
         else:
             order_request = LimitOrderRequest(
                 symbol=order.symbol,
-                qty=float(order.quantity),
+                qty=float(order.quantity.value),  # Extract Decimal value from Quantity
                 side=AlpacaOrderSide.BUY if order.side == OrderSide.BUY else AlpacaOrderSide.SELL,
                 time_in_force=alpaca_tif,
-                limit_price=float(order.limit_price) if order.limit_price else None,
+                limit_price=(
+                    float(order.limit_price.value) if order.limit_price else None
+                ),  # Extract value from Price
             )
 
         # Submit to Alpaca
@@ -251,20 +260,20 @@ class AlpacaBroker(IBroker):
 
         return domain_orders
 
-    def _map_alpaca_to_domain_order(self, alpaca_order: AlpacaOrder) -> Order:
+    def _map_alpaca_to_domain_order(self, alpaca_order: AlpacaOrder | Any) -> Order:
         """Simple direct mapping from Alpaca order to domain order."""
         # Direct field mapping
         order = Order(
             symbol=alpaca_order.symbol if alpaca_order.symbol else "",
             side=self._map_side(alpaca_order.side) if alpaca_order.side else OrderSide.BUY,
-            quantity=Decimal(str(alpaca_order.qty)) if alpaca_order.qty else Decimal("0"),
+            quantity=Quantity(Decimal(str(alpaca_order.qty)) if alpaca_order.qty else Decimal("0")),
             order_type=(
                 self._map_order_type(alpaca_order.order_type)
                 if alpaca_order.order_type
                 else OrderType.MARKET
             ),
-            limit_price=self._safe_decimal(alpaca_order.limit_price),
-            stop_price=self._safe_decimal(alpaca_order.stop_price),
+            limit_price=self._safe_price(getattr(alpaca_order, "limit_price", None)),
+            stop_price=self._safe_price(getattr(alpaca_order, "stop_price", None)),
         )
 
         # Direct assignment
@@ -278,10 +287,10 @@ class AlpacaBroker(IBroker):
         order.filled_at = getattr(alpaca_order, "filled_at", None)
         filled_qty = self._safe_decimal(getattr(alpaca_order, "filled_qty", None))
         if filled_qty is not None:
-            order.filled_quantity = filled_qty
+            order.filled_quantity = Quantity(filled_qty)
         avg_price = self._safe_decimal(getattr(alpaca_order, "filled_avg_price", None))
         if avg_price is not None:
-            order.average_fill_price = avg_price
+            order.average_fill_price = Price(avg_price)
 
         return order
 
@@ -297,6 +306,10 @@ class AlpacaBroker(IBroker):
         """Safe conversion to Decimal."""
         return Decimal(str(value)) if value is not None else None
 
+    def _safe_price(self, value: Any) -> Price | None:
+        """Safe conversion to Price."""
+        return Price(Decimal(str(value))) if value is not None else None
+
     def get_position(self, symbol: str) -> Position | None:
         """Get position by symbol from Alpaca."""
         self._check_connection()
@@ -305,20 +318,21 @@ class AlpacaBroker(IBroker):
             raise RuntimeError("Alpaca client not initialized")
 
         try:
-            alpaca_pos = self.client.get_position(symbol)
+            # Use get_open_position instead of get_position
+            alpaca_pos = self.client.get_open_position(symbol)
 
             # Check for zero quantity positions
             qty = Decimal(str(getattr(alpaca_pos, "qty", 0)))
             if qty == 0:
                 return None
 
-            # Create domain position from Alpaca position
+            # Create domain position from Alpaca position with proper value objects
             position = Position(
                 symbol=getattr(alpaca_pos, "symbol", ""),
-                quantity=qty,
-                average_entry_price=Decimal(str(getattr(alpaca_pos, "avg_entry_price", 0))),
+                quantity=Quantity(qty),
+                average_entry_price=Price(Decimal(str(getattr(alpaca_pos, "avg_entry_price", 0)))),
                 current_price=(
-                    Decimal(str(getattr(alpaca_pos, "current_price", 0)))
+                    Price(Decimal(str(getattr(alpaca_pos, "current_price", 0))))
                     if hasattr(alpaca_pos, "current_price")
                     else None
                 ),
@@ -326,7 +340,7 @@ class AlpacaBroker(IBroker):
 
             # Set P&L if available
             if hasattr(alpaca_pos, "realized_pl") and alpaca_pos.realized_pl is not None:
-                position.realized_pnl = Decimal(str(alpaca_pos.realized_pl))
+                position.realized_pnl = Money(Decimal(str(alpaca_pos.realized_pl)))
 
             return position
         except APIError:
@@ -381,14 +395,14 @@ class AlpacaBroker(IBroker):
 
             position = Position(
                 symbol=getattr(alpaca_pos, "symbol", ""),
-                quantity=Decimal(str(getattr(alpaca_pos, "qty", 0))),
-                average_entry_price=Decimal(str(getattr(alpaca_pos, "avg_entry_price", 0))),
-                current_price=current_price,
+                quantity=Quantity(Decimal(str(getattr(alpaca_pos, "qty", 0)))),
+                average_entry_price=Price(Decimal(str(getattr(alpaca_pos, "avg_entry_price", 0)))),
+                current_price=Price(current_price) if current_price is not None else None,
             )
 
             # Set P&L if available
             if hasattr(alpaca_pos, "realized_pl") and alpaca_pos.realized_pl is not None:
-                position.realized_pnl = Decimal(str(alpaca_pos.realized_pl))
+                position.realized_pnl = Money(Decimal(str(alpaca_pos.realized_pl)))
 
             domain_positions.append(position)
 
@@ -455,7 +469,7 @@ class AlpacaBroker(IBroker):
                 request = GetCalendarRequest(start=date_only, end=date_only)
                 calendar = self.client.get_calendar(filters=request)
 
-                if calendar:
+                if calendar and isinstance(calendar, list) and len(calendar) > 0:
                     cal_day = calendar[0]
                     return MarketHours(
                         is_open=True,

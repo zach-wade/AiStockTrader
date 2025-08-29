@@ -9,11 +9,13 @@ The `/src/main/config/validation_models/services.py` file exhibits severe archit
 ### 1. Deeply Nested Validation Hierarchy (11+ Levels)
 
 **Impact**: Every configuration access traverses multiple object layers, causing:
+
 - **CPU overhead**: ~15-20% performance penalty for deep attribute access
 - **Memory fragmentation**: Each nested level creates separate heap allocations
 - **Cache misses**: Poor locality of reference destroys CPU cache efficiency
 
 **Evidence**:
+
 ```python
 # Lines 216-285: 5-level nesting example
 DataPipelineConfig
@@ -25,7 +27,8 @@ DataPipelineConfig
       └── ProfileSettings (Line 270)
 ```
 
-**Measured Impact**: 
+**Measured Impact**:
+
 - Configuration access: ~3-5ms per deep nested property
 - Full config traversal: ~150-200ms for complete validation
 
@@ -34,6 +37,7 @@ DataPipelineConfig
 **Problem**: Each configuration instance creates 23+ Pydantic model instances
 
 **Memory Analysis**:
+
 ```python
 # Lines 38-91: IntervalsConfig alone creates 7 nested objects
 - DataCollectionConfig: ~2KB per instance
@@ -57,6 +61,7 @@ Full OrchestratorConfig: ~45-50KB per instance
 **Lines 47-52, 107-122, 161-166, 203-209**: Custom validators that run on every instantiation
 
 **Performance Cost**:
+
 - Initial parsing: ~50-100ms
 - Validation passes: ~20-30ms each
 - Total startup overhead: ~200-300ms just for config validation
@@ -64,11 +69,13 @@ Full OrchestratorConfig: ~45-50KB per instance
 ### 4. Factory Function Anti-Pattern
 
 **Lines 84-90, 147-149, 173-174, 211-213, 278-282, 284-285**:
+
 ```python
 Field(default_factory=DataCollectionConfig)
 ```
 
 **Problems**:
+
 - Creates new instances on every access if not cached
 - No singleton pattern for immutable configs
 - Memory churn from repeated instantiation
@@ -78,6 +85,7 @@ Field(default_factory=DataCollectionConfig)
 **Issue**: All 23 classes are defined at module import time
 
 **Impact**:
+
 - Import time: ~100-150ms
 - Memory allocation: ~2MB on import
 - Blocks main thread during initialization
@@ -89,6 +97,7 @@ Field(default_factory=DataCollectionConfig)
 **Anti-pattern**: Treating configuration as a deeply nested object hierarchy
 
 **Better approach**: Flat key-value store with namespacing
+
 ```python
 # Instead of: config.data_pipeline.validation.features.max_correlation
 # Use: config["data_pipeline.validation.features.max_correlation"]
@@ -101,6 +110,7 @@ Field(default_factory=DataCollectionConfig)
 **Lines 47-52, 107-122**: Business rules embedded in configuration models
 
 **Better approach**: Separate validation layer
+
 ```python
 class ConfigValidator:
     def validate_market_hours(self, config: dict) -> ValidationResult:
@@ -120,6 +130,7 @@ class ConfigValidator:
 **Issue**: Nested objects can be modified independently, causing race conditions
 
 **Example vulnerability**:
+
 ```python
 # Thread 1: Reading config
 threshold = config.data_pipeline.validation.quality_thresholds.min_quality_score
@@ -133,6 +144,7 @@ config.data_pipeline.validation.quality_thresholds = new_thresholds  # Race cond
 **Problem**: Complex nested structure requires recursive serialization
 
 **Measured costs**:
+
 - JSON serialization: ~30-50ms
 - Pickle: ~20-30ms
 - Message passing between services: ~80-100ms total overhead
@@ -144,6 +156,7 @@ config.data_pipeline.validation.quality_thresholds = new_thresholds  # Race cond
 **Issue**: Each microservice needs different config subsets
 
 **Current approach forces**:
+
 - Loading entire 50KB config per service
 - Parsing all 23 classes even if using 1
 - Network overhead for config synchronization
@@ -151,6 +164,7 @@ config.data_pipeline.validation.quality_thresholds = new_thresholds  # Race cond
 ### 2. Service Discovery Integration
 
 **Missing**: No support for dynamic service configuration
+
 - No consul/etcd integration points
 - No configuration versioning
 - No partial update capability
@@ -160,6 +174,7 @@ config.data_pipeline.validation.quality_thresholds = new_thresholds  # Race cond
 **Problem**: Nested structure makes cache invalidation complex
 
 **Scenario**: Update `max_retries` in `ResilienceConfig`
+
 - Must invalidate entire `DataPipelineConfig` cache
 - Must notify all services using `DataPipelineConfig`
 - No granular invalidation possible
@@ -202,7 +217,7 @@ Full traversal: 150-200ms
 ```python
 class ConfigStore:
     __slots__ = ['_data', '_version', '_lock']
-    
+
     def get(self, key: str, default=None):
         # O(1) access, no object traversal
         return self._data.get(key, default)
@@ -233,6 +248,7 @@ class ConfigService:
 ### 4. Schema-First Approach
 
 Use protobuf/flatbuffers for configuration:
+
 - Binary format: 10x smaller
 - Zero-copy deserialization
 - Forward/backward compatibility

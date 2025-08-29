@@ -205,7 +205,7 @@ class TestPortfolioPositionManagement:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
 
@@ -227,7 +227,7 @@ class TestPortfolioPositionManagement:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         portfolio.positions["AAPL"] = position
@@ -249,7 +249,7 @@ class TestPortfolioPositionManagement:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         portfolio.positions["AAPL"] = position
@@ -276,7 +276,7 @@ class TestPortfolioPositionManagement:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         portfolio.positions["AAPL"] = position
@@ -302,7 +302,7 @@ class TestPortfolioPositionManagement:
             position = Position(
                 symbol=symbol,
                 quantity=Quantity(Decimal("100")),
-                entry_price=Price(Decimal("150.00")),
+                average_entry_price=Price(Decimal("150.00")),
                 current_price=Price(Decimal("155.00")),
             )
             portfolio.positions[symbol] = position
@@ -330,7 +330,7 @@ class TestPortfolioCalculations:
             position = Position(
                 symbol=symbol,
                 quantity=Quantity(qty),
-                entry_price=Price(entry),
+                average_entry_price=Price(entry),
                 current_price=Price(current),
             )
             portfolio.positions[symbol] = position
@@ -364,7 +364,7 @@ class TestPortfolioCalculations:
             position = Position(
                 symbol=symbol,
                 quantity=Quantity(qty),
-                entry_price=Price(entry),
+                average_entry_price=Price(entry),
                 current_price=Price(current),
             )
             portfolio.positions[symbol] = position
@@ -403,7 +403,7 @@ class TestPortfolioCalculations:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),  # +$500 unrealized
         )
         portfolio.positions["AAPL"] = position
@@ -461,7 +461,7 @@ class TestPortfolioRiskManagement:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("1000")),  # Large position
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         portfolio.positions["AAPL"] = position
@@ -490,7 +490,7 @@ class TestPortfolioRiskManagement:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         portfolio.positions["AAPL"] = position
@@ -529,7 +529,7 @@ class TestPortfolioRiskManagement:
             position = Position(
                 symbol=symbol,
                 quantity=Quantity(Decimal("100")),
-                entry_price=Price(Decimal("150.00")),
+                average_entry_price=Price(Decimal("150.00")),
                 current_price=Price(Decimal("155.00")),
             )
             portfolio.positions[symbol] = position
@@ -693,7 +693,7 @@ class TestPortfolioEdgeCases:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         portfolio.positions["AAPL"] = position
@@ -714,7 +714,7 @@ class TestPortfolioEdgeCases:
             position = Position(
                 symbol=symbol,
                 quantity=Quantity(Decimal("100")),
-                entry_price=Price(Decimal("100.00")),
+                average_entry_price=Price(Decimal("100.00")),
                 current_price=Price(Decimal("105.00")),
             )
             portfolio.positions[symbol] = position
@@ -779,7 +779,7 @@ class TestPortfolioEdgeCases:
         position = Position(
             symbol="AAPL",
             quantity=Quantity(Decimal("100")),
-            entry_price=Price(Decimal("150.00")),
+            average_entry_price=Price(Decimal("150.00")),
             current_price=Price(Decimal("155.00")),
         )
         original.positions["AAPL"] = position

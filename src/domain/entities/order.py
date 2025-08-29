@@ -2,6 +2,8 @@
 Order Entity - Core trading order with business logic
 """
 
+from __future__ import annotations
+
 # Standard library imports
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -136,7 +138,7 @@ class Order:
             raise ValueError("Filled quantity cannot exceed order quantity")
 
     @classmethod
-    def create_market_order(cls, request: OrderRequest) -> "Order":
+    def create_market_order(cls, request: OrderRequest) -> Order:
         """Factory method to create a market order"""
         return cls(
             symbol=request.symbol,
@@ -150,7 +152,7 @@ class Order:
     def create_limit_order(
         cls,
         request: OrderRequest,
-    ) -> "Order":
+    ) -> Order:
         """Factory method to create a limit order.
 
         Args:
@@ -179,7 +181,7 @@ class Order:
     def create_stop_order(
         cls,
         request: OrderRequest,
-    ) -> "Order":
+    ) -> Order:
         """Factory method to create a stop order.
 
         Args:
@@ -207,7 +209,7 @@ class Order:
     def create_stop_limit_order(
         cls,
         request: OrderRequest,
-    ) -> "Order":
+    ) -> Order:
         """Factory method to create a stop-limit order.
 
         Args:
@@ -291,7 +293,7 @@ class Order:
 
     def reject(self, reason: str) -> None:
         """Reject the order"""
-        if self.status != OrderStatus.PENDING:
+        if self.status not in [OrderStatus.PENDING, OrderStatus.SUBMITTED]:
             raise ValueError(f"Cannot reject order in {self.status} status")
 
         self.status = OrderStatus.REJECTED

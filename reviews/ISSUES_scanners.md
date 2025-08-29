@@ -1,22 +1,23 @@
 # Scanners Module - Issue Tracking
 
-**Module**: scanners  
-**Total Files**: 34  
-**Files Reviewed**: 25/34 (73.5%)  
-**Total Issues Found**: 108  
-**Critical Issues**: 11  
-**High Priority**: 38  
-**Medium Priority**: 39  
-**Low Priority**: 20  
-**Status**: IN PROGRESS  
-**Review Started**: 2025-08-11  
-**Methodology**: Enhanced 11-Phase Review v2.0  
+**Module**: scanners
+**Total Files**: 34
+**Files Reviewed**: 25/34 (73.5%)
+**Total Issues Found**: 108
+**Critical Issues**: 11
+**High Priority**: 38
+**Medium Priority**: 39
+**Low Priority**: 20
+**Status**: IN PROGRESS
+**Review Started**: 2025-08-11
+**Methodology**: Enhanced 11-Phase Review v2.0
 
 ---
 
 ## 📊 Module Overview
 
 The scanners module is responsible for:
+
 - Market scanning and symbol selection
 - Layer-based symbol management (Layer 0-3)
 - Catalyst detection across multiple dimensions
@@ -30,6 +31,7 @@ The scanners module is responsible for:
 ## 🔍 Review Progress
 
 ### Batch 1: Core Scanner Infrastructure (5 files) ✅ COMPLETE
+
 - **Status**: COMPLETE
 - **Files**: `__init__.py`, `base_scanner.py`, `catalyst_scanner_base.py`, `scanner_factory_v2.py`, `scanner_orchestrator.py`
 - **Lines Reviewed**: 1,653
@@ -37,6 +39,7 @@ The scanners module is responsible for:
 - **Key Finding**: Missing StorageRouterV2 import causes immediate runtime failure
 
 ### Batch 2: Scanner Adapters & Management (5 files) ✅ COMPLETE
+
 - **Status**: COMPLETE
 - **Files**: `scanner_adapter.py`, `scanner_adapter_factory.py`, `scanner_cache_manager.py`, `scanner_orchestrator_factory.py`, `scanner_pipeline.py`
 - **Lines Reviewed**: 2,091
@@ -44,6 +47,7 @@ The scanners module is responsible for:
 - **Key Finding**: Multiple datetime.utcnow() deprecations, missing imports, MD5 hash usage
 
 ### Batch 3: Layer Scanners Part 1 (5 files) ✅ COMPLETE
+
 - **Status**: COMPLETE
 - **Files**: `layer0_static_universe.py`, `layer1_liquidity_filter.py`, `layer1_5_strategy_affinity.py`, `layer2_catalyst_orchestrator.py`, `layers/__init__.py`
 - **Lines Reviewed**: 1,691
@@ -51,6 +55,7 @@ The scanners module is responsible for:
 - **Key Finding**: Layer scanners have good architecture but datetime issues and direct import violations
 
 ### Batch 4: Layer Scanners Part 2 (5 files) ✅ COMPLETE
+
 - **Status**: COMPLETE
 - **Files**: `layer3_premarket_scanner.py`, `layer3_realtime_scanner.py`, `parallel_scanner_engine.py`, `realtime_websocket_stream.py`, `scanner_pipeline_utils.py`
 - **Lines Reviewed**: 2,665
@@ -58,6 +63,7 @@ The scanners module is responsible for:
 - **Key Finding**: Layer 3 scanners have advanced features but critical import and datetime issues
 
 ### Batch 5: Catalyst Scanners Part 1 (5 files) ✅ COMPLETE
+
 - **Status**: COMPLETE
 - **Files**: `earnings_scanner.py`, `news_scanner.py`, `technical_scanner.py`, `volume_scanner.py`, `catalysts/__init__.py`
 - **Lines Reviewed**: 1,367
@@ -65,10 +71,12 @@ The scanners module is responsible for:
 - **Key Finding**: MD5 hash usage for deduplication, direct concrete imports, missing initialization
 
 ### Batch 6: Catalyst Scanners Part 2 (5 files)
+
 - **Status**: PENDING
 - **Files**: Options, insider, social, sector, intermarket scanners
 
 ### Batch 7: Final Catalyst Scanners & Metrics (4 files)
+
 - **Status**: PENDING
 - **Files**: Advanced sentiment, coordinated activity, market validation, metrics
 
@@ -86,6 +94,7 @@ The scanners module is responsible for:
 ### Batch 4 Issue Details
 
 #### ISSUE-1213: Missing create_event_tracker Import (CRITICAL)
+
 - **File**: parallel_scanner_engine.py
 - **Line**: 101
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -94,6 +103,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add `from main.utils.core import create_event_tracker`
 
 #### ISSUE-1214: Missing create_task_safely Import (CRITICAL)
+
 - **File**: parallel_scanner_engine.py
 - **Line**: 170
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -102,6 +112,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add to existing import statement on line 19
 
 #### ISSUE-1215: Undefined clear_query Variable (HIGH)
+
 - **File**: layer3_premarket_scanner.py
 - **Line**: 534
 - **Phase**: 7 (Business Logic Correctness)
@@ -110,6 +121,7 @@ The scanners module is responsible for:
 - **Fix Required**: Define clear_query or remove the line
 
 #### ISSUE-1216: Direct Pool Access Violation (HIGH)
+
 - **File**: layer3_premarket_scanner.py
 - **Lines**: 46-48
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -118,6 +130,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use factory pattern consistently
 
 #### ISSUE-1217: timezone Constructor Error (HIGH)
+
 - **File**: layer3_premarket_scanner.py
 - **Line**: 81
 - **Phase**: 7 (Business Logic Correctness)
@@ -126,6 +139,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use pytz or proper timezone handling
 
 #### ISSUE-1218: Import Path Error (HIGH)
+
 - **File**: layer3_premarket_scanner.py
 - **Line**: 592
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -134,6 +148,7 @@ The scanners module is responsible for:
 - **Fix Required**: Fix import path
 
 #### ISSUE-1219: asyncio.create_task Without Error Handling (HIGH)
+
 - **File**: layer3_realtime_scanner.py
 - **Lines**: 115, 118
 - **Phase**: 5 (Error Handling & Configuration)
@@ -142,6 +157,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use create_task_safely or add error handling
 
 #### ISSUE-1220: Attribute Error on ws_conn (HIGH)
+
 - **File**: layer3_realtime_scanner.py
 - **Line**: 541
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -150,6 +166,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add null check before accessing attribute
 
 #### ISSUE-1221: datetime.utcnow() Deprecated (HIGH)
+
 - **File**: parallel_scanner_engine.py
 - **Line**: 335
 - **Phase**: 7 (Business Logic Correctness)
@@ -158,6 +175,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use datetime.now(timezone.utc)
 
 #### ISSUE-1222: Missing chunk_list Import (HIGH)
+
 - **File**: parallel_scanner_engine.py
 - **Line**: 230
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -166,6 +184,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add to import statement
 
 #### ISSUE-1223: Missing async_retry Import (HIGH)
+
 - **File**: parallel_scanner_engine.py
 - **Line**: 278
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -174,6 +193,7 @@ The scanners module is responsible for:
 - **Fix Required**: Import from utils.core
 
 #### ISSUE-1224: timedelta Import Needed (HIGH)
+
 - **File**: realtime_websocket_stream.py
 - **Line**: 417
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -182,6 +202,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add to datetime import
 
 #### ISSUE-1225: Synchronous Callbacks in Async Context (MEDIUM)
+
 - **File**: realtime_websocket_stream.py
 - **Lines**: 314, 333, 359, 373
 - **Phase**: 6 (End-to-End Integration Testing)
@@ -190,6 +211,7 @@ The scanners module is responsible for:
 - **Fix Required**: Ensure callbacks are async or use asyncio.create_task
 
 #### ISSUE-1226: Unchecked Division by Zero (MEDIUM)
+
 - **File**: layer3_premarket_scanner.py
 - **Line**: 307
 - **Phase**: 7 (Business Logic Correctness)
@@ -198,6 +220,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add zero check before division
 
 #### ISSUE-1227: Missing Error Handling in Stream Loop (MEDIUM)
+
 - **File**: realtime_websocket_stream.py
 - **Lines**: 260-270
 - **Phase**: 5 (Error Handling & Configuration)
@@ -206,6 +229,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add specific error handling and recovery logic
 
 #### ISSUE-1228: No Rate Limiting for WebSocket (MEDIUM)
+
 - **File**: realtime_websocket_stream.py
 - **Lines**: 178-222
 - **Phase**: 10 (Resource Management & Scalability)
@@ -214,6 +238,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add rate limiting or batching
 
 #### ISSUE-1229: Hardcoded Timezone Offset (MEDIUM)
+
 - **File**: scanner_pipeline_utils.py
 - **Line**: 535
 - **Phase**: 9 (Production Readiness)
@@ -222,6 +247,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use pytz for proper timezone handling
 
 #### ISSUE-1230: Missing WebSocket Heartbeat (MEDIUM)
+
 - **File**: realtime_websocket_stream.py
 - **Phase**: 10 (Resource Management & Scalability)
 - **Impact**: Connection may timeout without heartbeat
@@ -229,6 +255,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add periodic ping/pong messages
 
 #### ISSUE-1231: Unbounded Buffer Growth (MEDIUM)
+
 - **File**: realtime_websocket_stream.py
 - **Lines**: 101-102
 - **Phase**: 10 (Resource Management & Scalability)
@@ -237,6 +264,7 @@ The scanners module is responsible for:
 - **Fix Required**: Implement automatic cleanup or size limits
 
 #### ISSUE-1232: SQL Injection Risk (MEDIUM)
+
 - **File**: scanner_pipeline_utils.py
 - **Line**: 179
 - **Phase**: Security (Cross-Phase)
@@ -245,6 +273,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use parameterized query
 
 #### ISSUE-1233: HTML Generation Without Escaping (MEDIUM)
+
 - **File**: scanner_pipeline_utils.py
 - **Lines**: 336-484
 - **Phase**: Security (Cross-Phase)
@@ -253,6 +282,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use HTML escaping for all user data
 
 #### ISSUE-1234: Deprecated pandas Usage (LOW)
+
 - **File**: scanner_pipeline_utils.py
 - **Line**: 189
 - **Phase**: 4 (Data Flow & Integration)
@@ -261,6 +291,7 @@ The scanners module is responsible for:
 - **Fix Required**: Update to modern pandas patterns
 
 #### ISSUE-1235: Magic Numbers Without Constants (LOW)
+
 - **File**: layer3_premarket_scanner.py
 - **Lines**: 64-72
 - **Phase**: 4 (Code Quality)
@@ -269,6 +300,7 @@ The scanners module is responsible for:
 - **Fix Required**: Move to configuration
 
 #### ISSUE-1236: Inefficient Symbol Validation (LOW)
+
 - **File**: scanner_pipeline_utils.py
 - **Lines**: 120-132
 - **Phase**: 7 (Business Logic Correctness)
@@ -277,6 +309,7 @@ The scanners module is responsible for:
 - **Fix Required**: Optimize validation logic
 
 #### ISSUE-1237: Missing Type Hints (LOW)
+
 - **File**: All files in batch
 - **Phase**: 4 (Code Quality)
 - **Impact**: Reduced code maintainability
@@ -288,6 +321,7 @@ The scanners module is responsible for:
 ## 🚨 Critical Issues (P0 - System Breaking)
 
 #### ISSUE-1198: Missing StorageRouterV2 Import (CRITICAL)
+
 - **File**: scanner_factory_v2.py
 - **Line**: 106
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -296,6 +330,7 @@ The scanners module is responsible for:
 - **Fix Required**: Either import `StorageRouterV2` or use the existing `StorageRouter` class
 
 #### ISSUE-1199: datetime.now() Without Timezone (CRITICAL)
+
 - **Files**: base_scanner.py (79), catalyst_scanner_base.py (204)
 - **Phase**: 7 (Business Logic Correctness)
 - **Impact**: Timezone-naive datetime objects cause comparison errors
@@ -303,6 +338,7 @@ The scanners module is responsible for:
 - **Fix Required**: Replace all instances with `datetime.now(timezone.utc)`
 
 #### ISSUE-1200: Incorrect Attribute Access (CRITICAL)
+
 - **File**: scanner_orchestrator.py
 - **Line**: 752
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -311,6 +347,7 @@ The scanners module is responsible for:
 - **Fix Required**: Change to `if self.cache:`
 
 #### ISSUE-1201: Potential AttributeError on ScanAlert (CRITICAL)
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 556-557, 562
 - **Phase**: 8 (Data Consistency & Integrity)
@@ -323,6 +360,7 @@ The scanners module is responsible for:
 ## 🚨 Critical Issues - Batch 2 (Scanner Adapters & Management)
 
 #### ISSUE-1202: datetime.utcnow() Deprecated Usage (CRITICAL)
+
 - **Files**: scanner_adapter.py (lines 300, 349, 554)
 - **Phase**: 7 (Business Logic Correctness)
 - **Impact**: Will fail in Python 3.12+ causing runtime errors
@@ -330,6 +368,7 @@ The scanners module is responsible for:
 - **Fix Required**: Replace all instances with `datetime.now(timezone.utc)`
 
 #### ISSUE-1203: Missing create_event_tracker Import (CRITICAL)
+
 - **File**: scanner_adapter.py
 - **Line**: 45
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -338,6 +377,7 @@ The scanners module is responsible for:
 - **Fix Required**: Verify import paths and ensure functions exist in utils.core
 
 #### ISSUE-1204: Missing create_task_safely Import (CRITICAL)
+
 - **File**: scanner_adapter.py
 - **Line**: 45, used at 228
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -346,6 +386,7 @@ The scanners module is responsible for:
 - **Fix Required**: Implement or import from correct location
 
 #### ISSUE-1205: MD5 Hash Usage for Cache Keys (CRITICAL)
+
 - **File**: scanner_cache_manager.py
 - **Line**: 54
 - **Phase**: 7 (Business Logic Correctness)
@@ -360,6 +401,7 @@ The scanners module is responsible for:
 ### Batch 2 High Priority Issues
 
 #### ISSUE-1206: Inconsistent Import Pattern (HIGH)
+
 - **File**: scanner_orchestrator_factory.py
 - **Line**: 25
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -368,6 +410,7 @@ The scanners module is responsible for:
 - **Fix Required**: Verify correct import path
 
 #### ISSUE-1207: datetime.now() Without Timezone (HIGH)
+
 - **File**: scanner_pipeline.py
 - **Lines**: 120, 167, 209, 227, 243, 254, 275, 293, 305, 370, 433, 462, 477, 495, 602
 - **Phase**: 7 (Business Logic Correctness)
@@ -376,6 +419,7 @@ The scanners module is responsible for:
 - **Fix Required**: Ensure all datetime operations are timezone-aware
 
 #### ISSUE-1208: Hardcoded ET Timezone Offset (HIGH)
+
 - **File**: scanner_pipeline.py
 - **Lines**: 603-604, 625-626
 - **Phase**: 9 (Production Readiness)
@@ -384,6 +428,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use proper timezone library like pytz or zoneinfo
 
 #### ISSUE-1209: StorageRouter Import Issue (HIGH)
+
 - **File**: scanner_pipeline.py
 - **Line**: 562
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -392,6 +437,7 @@ The scanners module is responsible for:
 - **Fix Required**: Ensure StorageRouter is properly imported and available
 
 #### ISSUE-1210: Missing Await for Async Operations (HIGH)
+
 - **File**: scanner_adapter.py
 - **Lines**: Throughout
 - **Phase**: 4 (Data Flow & Integration)
@@ -400,6 +446,7 @@ The scanners module is responsible for:
 - **Fix Required**: Review all async operations
 
 #### ISSUE-1211: Global State Anti-Pattern (HIGH)
+
 - **File**: scanner_cache_manager.py
 - **Lines**: 241-249
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -408,6 +455,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use dependency injection instead
 
 #### ISSUE-1212: Race Condition in Cache Cleanup (HIGH)
+
 - **File**: scanner_cache_manager.py
 - **Lines**: 143-149
 - **Phase**: 10 (Resource Management & Scalability)
@@ -418,6 +466,7 @@ The scanners module is responsible for:
 ### Batch 1 High Priority Issues
 
 #### ISSUE-1226: Fragile Cache Key Extraction
+
 - **File**: catalyst_scanner_base.py
 - **Lines**: 164, 179
 - **Phase**: 4 (Data Flow & Integration)
@@ -426,6 +475,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add validation and error handling
 
 #### ISSUE-1227: Swallowed Exceptions in Batch Processing
+
 - **File**: catalyst_scanner_base.py
 - **Lines**: 327-329, 376-378
 - **Phase**: 5 (Error Handling & Configuration)
@@ -434,6 +484,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add error tracking and partial failure handling
 
 #### ISSUE-1228: Missing Validation for Scanner Implementations
+
 - **File**: scanner_factory_v2.py
 - **Lines**: 22-34
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -442,6 +493,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add conditional imports with fallback
 
 #### ISSUE-1229: Potential Deadlock in Hybrid Mode
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 514-538
 - **Phase**: 10 (Resource Management & Scalability)
@@ -450,6 +502,7 @@ The scanners module is responsible for:
 - **Fix Required**: Track registered scanners and ensure cleanup
 
 #### ISSUE-1230: Missing Error Propagation
+
 - **File**: base_scanner.py
 - **Lines**: 202-218
 - **Phase**: 5 (Error Handling & Configuration)
@@ -458,6 +511,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add error callback or return status
 
 #### ISSUE-1231: Race Condition in Cache Cleanup
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 585-592
 - **Phase**: 10 (Resource Management & Scalability)
@@ -466,6 +520,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add lock or check _is_scanning flag
 
 #### ISSUE-1232: Inconsistent Error Tracking
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 463-472
 - **Phase**: 11 (Observability & Debugging)
@@ -474,6 +529,7 @@ The scanners module is responsible for:
 - **Fix Required**: Standardize error tracking across all modes
 
 #### ISSUE-1233: Memory Leak in Alert Cache
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 151, 566-568
 - **Phase**: 10 (Resource Management & Scalability)
@@ -488,6 +544,7 @@ The scanners module is responsible for:
 ### Batch 2 Medium Priority Issues
 
 #### ISSUE-1213: Legacy AlertType Mappings (MEDIUM)
+
 - **File**: scanner_adapter.py
 - **Lines**: 456-458
 - **Phase**: 8 (Data Consistency & Integrity)
@@ -496,6 +553,7 @@ The scanners module is responsible for:
 - **Fix Required**: Remove or update legacy mappings
 
 #### ISSUE-1214: Unbounded defaultdict Memory Leak (MEDIUM)
+
 - **File**: scanner_adapter.py
 - **Line**: 398
 - **Phase**: 10 (Resource Management & Scalability)
@@ -504,6 +562,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add size limits or use regular dict
 
 #### ISSUE-1215: No Validation on Config Structure (MEDIUM)
+
 - **File**: scanner_adapter_factory.py
 - **Lines**: Throughout
 - **Phase**: 5 (Error Handling & Configuration)
@@ -512,6 +571,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add config schema validation
 
 #### ISSUE-1216: Hardcoded Timeout Values (MEDIUM)
+
 - **File**: scanner_orchestrator_factory.py
 - **Lines**: 93, 134, 158, 202, 239
 - **Phase**: 9 (Production Readiness)
@@ -520,6 +580,7 @@ The scanners module is responsible for:
 - **Fix Required**: Move to configuration
 
 #### ISSUE-1217: Test Mode Uses Production Database (MEDIUM)
+
 - **File**: scanner_pipeline.py
 - **Line**: 89
 - **Phase**: 9 (Production Readiness)
@@ -528,6 +589,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use mock or test database in test mode
 
 #### ISSUE-1218: JSON Serialization Issues (MEDIUM)
+
 - **File**: scanner_adapter.py
 - **Line**: 504
 - **Phase**: 8 (Data Consistency & Integrity)
@@ -536,6 +598,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add serialization validation
 
 #### ISSUE-1219: Mutable Default Factory (MEDIUM)
+
 - **File**: scanner_adapter.py
 - **Lines**: 58-104
 - **Phase**: 7 (Business Logic Correctness)
@@ -544,6 +607,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use field(default_factory) pattern correctly
 
 #### ISSUE-1220: Cache Statistics Not Thread-Safe (MEDIUM)
+
 - **File**: scanner_cache_manager.py
 - **Lines**: 115-126
 - **Phase**: 10 (Resource Management & Scalability)
@@ -554,54 +618,63 @@ The scanners module is responsible for:
 ### Batch 1 Medium Priority Issues
 
 #### ISSUE-1234: Inefficient Symbol Batching
+
 - **File**: catalyst_scanner_base.py
 - **Line**: 318
 - **Impact**: Creates all batches in memory at once
 - **Details**: List comprehension creates all batches before processing
 
 #### ISSUE-1235: Missing Configuration Validation
+
 - **File**: scanner_factory_v2.py
 - **Lines**: 119-124
 - **Impact**: Invalid config could cause runtime errors
 - **Details**: RepositoryConfig created without validation
 
 #### ISSUE-1236: Hardcoded Magic Numbers
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 589, 598, 716
 - **Impact**: Difficult to configure and maintain
 - **Details**: Hardcoded 3600 seconds, 10 minimum runs, 30 second timeout
 
 #### ISSUE-1237: Inefficient Alert Deduplication
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 559-568
 - **Impact**: O(n) lookup for each alert
 - **Details**: Using set for deduplication but checking each alert individually
 
 #### ISSUE-1238: Missing Type Hints
+
 - **File**: base_scanner.py
 - **Lines**: Throughout
 - **Impact**: Reduced code clarity and IDE support
 - **Details**: Many methods missing return type hints
 
 #### ISSUE-1239: Deprecated Usage of defaultdict
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 412, 571, 621, 662
 - **Impact**: Could be replaced with more explicit data structures
 - **Details**: defaultdict used extensively where dict.setdefault might be clearer
 
 #### ISSUE-1240: No Connection Pooling for Scanners
+
 - **File**: scanner_factory_v2.py
 - **Lines**: Throughout
 - **Impact**: Each scanner might create own database connections
 - **Details**: No connection pool management visible
 
 #### ISSUE-1241: Missing Retry Logic
+
 - **File**: catalyst_scanner_base.py
 - **Lines**: 143-183
 - **Impact**: Transient failures not handled
 - **Details**: No retry mechanism for failed fetch operations
 
 #### ISSUE-1242: Synchronous Cleanup in Async Context
+
 - **File**: scanner_orchestrator.py
 - **Lines**: 734-740
 - **Impact**: Cleanup could block event loop
@@ -614,6 +687,7 @@ The scanners module is responsible for:
 ### Batch 2 Low Priority Issues
 
 #### ISSUE-1221: Incomplete Exception Handling (LOW)
+
 - **File**: scanner_adapter.py
 - **Lines**: 530-531
 - **Phase**: 5 (Error Handling & Configuration)
@@ -622,6 +696,7 @@ The scanners module is responsible for:
 - **Fix Required**: Implement error event publishing
 
 #### ISSUE-1222: Magic Numbers in Code (LOW)
+
 - **File**: scanner_orchestrator_factory.py
 - **Lines**: Throughout
 - **Phase**: 7 (Business Logic Correctness)
@@ -630,6 +705,7 @@ The scanners module is responsible for:
 - **Fix Required**: Define named constants
 
 #### ISSUE-1223: Duplicate Scanner Type Lists (LOW)
+
 - **File**: scanner_pipeline.py
 - **Lines**: 550-558, 574-594
 - **Phase**: 11 (Observability & Debugging)
@@ -638,6 +714,7 @@ The scanners module is responsible for:
 - **Fix Required**: Centralize scanner type definitions
 
 #### ISSUE-1224: File I/O in Async Context (LOW)
+
 - **File**: scanner_pipeline.py
 - **Lines**: 721-722, 728-730
 - **Phase**: 4 (Data Flow & Integration)
@@ -646,6 +723,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use aiofiles or run in executor
 
 #### ISSUE-1225: Excessive Logging Impact (LOW)
+
 - **File**: scanner_pipeline.py
 - **Lines**: Throughout
 - **Phase**: 11 (Observability & Debugging)
@@ -656,31 +734,37 @@ The scanners module is responsible for:
 ### Batch 1 Low Priority Issues
 
 #### ISSUE-1243: Inconsistent Logging Levels
+
 - **File**: Throughout all files
 - **Impact**: Difficult to filter logs appropriately
 - **Details**: Mix of info, debug, warning without clear pattern
 
 #### ISSUE-1244: Unused Imports
+
 - **File**: scanner_orchestrator.py
 - **Line**: 47
 - **Details**: EventType imported but not used directly
 
 #### ISSUE-1245: Code Duplication
+
 - **File**: catalyst_scanner_base.py
 - **Lines**: 324-329, 373-378
 - **Details**: Error handling pattern duplicated
 
 #### ISSUE-1246: Missing Docstrings
+
 - **File**: scanner_factory_v2.py
 - **Lines**: Various private methods
 - **Details**: Private methods lack documentation
 
 #### ISSUE-1247: Inconsistent Naming
+
 - **File**: base_scanner.py
 - **Lines**: Throughout
 - **Details**: Mix of snake_case and camelCase in method names
 
 #### ISSUE-1248: TODO Comments
+
 - **File**: catalyst_scanner_base.py
 - **Line**: 89
 - **Details**: Comment says "These can be overridden by subclasses" but no clear mechanism
@@ -690,6 +774,7 @@ The scanners module is responsible for:
 ## ✅ Positive Findings
 
 ### Batch 2: Scanner Adapters & Management
+
 1. **Clean Adapter Pattern**: Excellent adapter pattern for converting alerts to signals
 2. **Factory Pattern Implementation**: Well-structured factory classes with DI support
 3. **Comprehensive Alert Mapping**: Detailed mapping of all alert types to signal types
@@ -702,6 +787,7 @@ The scanners module is responsible for:
 10. **Event Bus Support**: Clean event bus integration for real-time alerts
 
 ### Batch 1: Core Infrastructure
+
 1. **Excellent Architecture**: Clean separation of concerns with interfaces and abstract base classes
 2. **Comprehensive Orchestration**: Multiple execution strategies (parallel, sequential, hybrid)
 3. **Good Event Bus Integration**: Proper event publishing for real-time alerts
@@ -718,17 +804,20 @@ The scanners module is responsible for:
 ## 📋 Integration Analysis
 
 ### Cross-Module Dependencies
+
 - ✅ Proper use of interfaces (IScanner, IScannerRepository, IEventBus)
 - ✅ Clean dependency injection throughout
 - ❌ Missing StorageRouterV2 breaks storage system integration
 - ⚠️ Heavy dependency on event system for alert propagation
 
 ### Data Flow Issues
+
 - ❌ Cache key extraction assumes specific format (fragile)
 - ⚠️ Alert transformation between legacy and new formats
 - ✅ Good data flow from scanners → orchestrator → event bus
 
 ### Contract Violations
+
 - ❌ ScanAlert missing confidence attribute assumption
 - ❌ Incorrect attribute access (cache_manager vs cache)
 - ✅ Most interface contracts properly implemented
@@ -738,17 +827,21 @@ The scanners module is responsible for:
 ## 🎯 Root Cause Analysis: "Not Working" Status
 
 ### PRIMARY CAUSE IDENTIFIED
+
 **ISSUE-1198**: Missing `StorageRouterV2` import in `scanner_factory_v2.py:106`
+
 - This causes immediate NameError when trying to create any scanner
 - The factory is the entry point for all scanner creation
 - Without working factory, no scanners can be instantiated
 
 ### SECONDARY CAUSES
+
 1. **Timezone Issues**: datetime.now() without timezone causes comparison failures
 2. **Attribute Errors**: Wrong attribute names cause runtime crashes
 3. **Missing Validation**: No validation of scanner imports or configurations
 
 ### IMPACT CHAIN
+
 1. Factory fails to initialize → No scanners can be created
 2. Even if fixed, timezone issues would cause operational failures
 3. Cleanup operations would fail due to wrong attribute access
@@ -759,12 +852,14 @@ The scanners module is responsible for:
 ## 📝 Recommendations
 
 ### Immediate Fixes Required (To Make Module Functional)
+
 1. **Fix ISSUE-1198**: Change `StorageRouterV2` to `StorageRouter` in scanner_factory_v2.py:106
 2. **Fix ISSUE-1199**: Add timezone to all datetime.now() calls
 3. **Fix ISSUE-1200**: Correct attribute access from cache_manager to cache
 4. **Fix ISSUE-1201**: Add safe attribute access for alert.confidence
 
 ### High Priority Improvements
+
 1. Implement proper error tracking across all execution strategies
 2. Add validation for scanner imports with graceful fallback
 3. Improve cache key handling with proper validation
@@ -772,6 +867,7 @@ The scanners module is responsible for:
 5. Implement connection pooling for database access
 
 ### Architecture Recommendations
+
 1. Consider implementing a scanner health dashboard
 2. Add circuit breaker pattern for failing scanners
 3. Implement proper backpressure handling for high-volume scanning
@@ -797,6 +893,7 @@ The scanners module is responsible for:
 ### High Priority Issues (P1 - Major Functionality)
 
 #### ISSUE-1206: datetime.now() Without Timezone (HIGH)
+
 - **File**: layer2_catalyst_orchestrator.py
 - **Lines**: 302, 593
 - **Phase**: 7 (Business Logic Correctness)
@@ -805,6 +902,7 @@ The scanners module is responsible for:
 - **Fix Required**: Replace with `datetime.now(timezone.utc)`
 
 #### ISSUE-1207: Direct Import of Concrete Repository (HIGH)
+
 - **File**: layer1_5_strategy_affinity.py
 - **Line**: 22
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -813,14 +911,16 @@ The scanners module is responsible for:
 - **Fix Required**: Use factory pattern to get ICompanyRepository interface
 
 #### ISSUE-1208: Direct Pool Access Violates Interface (HIGH)
+
 - **File**: layer1_liquidity_filter.py
 - **Line**: 174
-- **Phase**: 2 (Interface & Contract Analysis)  
+- **Phase**: 2 (Interface & Contract Analysis)
 - **Impact**: Breaks abstraction, assumes implementation details
 - **Details**: Accessing `self.db_adapter._pool.acquire()` directly
 - **Fix Required**: Use db_adapter methods, not internal pool
 
 #### ISSUE-1209: Direct Import from config.py (HIGH)
+
 - **File**: layer1_5_strategy_affinity.py
 - **Line**: 502
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -829,6 +929,7 @@ The scanners module is responsible for:
 - **Fix Required**: Fix import path
 
 #### ISSUE-1210: Missing await for Async Methods (HIGH)
+
 - **File**: layer1_5_strategy_affinity.py
 - **Line**: 212
 - **Phase**: 5 (Error Handling & Configuration)
@@ -837,6 +938,7 @@ The scanners module is responsible for:
 - **Fix Required**: Check if method is async and handle appropriately
 
 #### ISSUE-1211: Direct Pool Access in Layer1.5 (HIGH)
+
 - **File**: layer1_5_strategy_affinity.py
 - **Line**: 245
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -845,6 +947,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use db_adapter.fetch_all() method
 
 #### ISSUE-1212: Missing Cleanup in Finally Block (HIGH)
+
 - **File**: layer1_5_strategy_affinity.py
 - **Lines**: 537-541
 - **Phase**: 10 (Resource Management & Scalability)
@@ -866,6 +969,7 @@ The scanners module is responsible for:
 ### Batch 5 Issue Details
 
 #### ISSUE-1215: MD5 Hash Usage for Deduplication (CRITICAL)
+
 - **File**: news_scanner.py
 - **Line**: 356
 - **Phase**: Security Checklist
@@ -874,6 +978,7 @@ The scanners module is responsible for:
 - **Fix Required**: Replace with SHA256 or use non-cryptographic hash like xxhash
 
 #### ISSUE-1216: Direct Concrete Import (HIGH)
+
 - **File**: volume_scanner.py
 - **Line**: 11
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -882,14 +987,16 @@ The scanners module is responsible for:
 - **Fix Required**: Remove import, use IScannerRepository interface only
 
 #### ISSUE-1217: Missing _initialized Attribute (HIGH)
+
 - **File**: volume_scanner.py
 - **Lines**: 79, 80
 - **Phase**: 2 (Interface & Contract Analysis)
 - **Impact**: AttributeError at runtime - scanner will crash
-- **Details**: Uses `self._initialized` but never defined in __init__
-- **Fix Required**: Add `self._initialized = False` in __init__ method
+- **Details**: Uses `self._initialized` but never defined in **init**
+- **Fix Required**: Add `self._initialized = False` in **init** method
 
 #### ISSUE-1218: datetime.now() Without Timezone (HIGH)
+
 - **File**: earnings_scanner.py
 - **Lines**: 107, 125, 126
 - **Phase**: 7 (Business Logic Correctness)
@@ -898,6 +1005,7 @@ The scanners module is responsible for:
 - **Fix Required**: Ensure all datetime operations are timezone-aware
 
 #### ISSUE-1219: datetime.now() Without Timezone (HIGH)
+
 - **File**: news_scanner.py
 - **Lines**: 133, 151, 152, 273
 - **Phase**: 7 (Business Logic Correctness)
@@ -906,6 +1014,7 @@ The scanners module is responsible for:
 - **Fix Required**: Standardize on timezone-aware datetimes
 
 #### ISSUE-1220: datetime.now() Without Timezone (HIGH)
+
 - **File**: technical_scanner.py
 - **Line**: 111
 - **Phase**: 7 (Business Logic Correctness)
@@ -914,6 +1023,7 @@ The scanners module is responsible for:
 - **Fix Required**: Ensure all datetime operations use timezone
 
 #### ISSUE-1221: datetime.now() Without Timezone (HIGH)
+
 - **File**: volume_scanner.py
 - **Lines**: 87, 165, 209, 221
 - **Phase**: 7 (Business Logic Correctness)
@@ -922,6 +1032,7 @@ The scanners module is responsible for:
 - **Fix Required**: Standardize timezone usage
 
 #### ISSUE-1222: Potential Division by Zero (MEDIUM)
+
 - **File**: technical_scanner.py
 - **Lines**: 269, 289
 - **Phase**: 7 (Business Logic Correctness)
@@ -930,6 +1041,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add check for zero before division
 
 #### ISSUE-1223: Unbounded Collection Growth (MEDIUM)
+
 - **File**: news_scanner.py
 - **Line**: 93
 - **Phase**: 10 (Resource Management & Scalability)
@@ -938,6 +1050,7 @@ The scanners module is responsible for:
 - **Fix Required**: Implement LRU cache or periodic cleanup
 
 #### ISSUE-1224: Type Hint Issue (MEDIUM)
+
 - **File**: news_scanner.py
 - **Line**: 322
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -946,6 +1059,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use `Tuple[str, float]` from typing module
 
 #### ISSUE-1225: Missing Error Handling (MEDIUM)
+
 - **File**: technical_scanner.py
 - **Lines**: 151-155
 - **Phase**: 5 (Error Handling & Configuration)
@@ -954,6 +1068,7 @@ The scanners module is responsible for:
 - **Fix Required**: Add try-except for type conversion
 
 #### ISSUE-1226: Cache Key Not Used (MEDIUM)
+
 - **File**: volume_scanner.py
 - **Lines**: 98-101
 - **Phase**: 4 (Data Flow & Integration)
@@ -962,6 +1077,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use consistent cache key format
 
 #### ISSUE-1227: Inconsistent Score Calculation (MEDIUM)
+
 - **File**: earnings_scanner.py
 - **Line**: 288
 - **Phase**: 7 (Business Logic Correctness)
@@ -969,16 +1085,18 @@ The scanners module is responsible for:
 - **Details**: Score divided by 5.0 but raw_score can be 5.0 max
 - **Fix Required**: Consistent normalization approach
 
-#### ISSUE-1228: Missing __all__ Export (LOW)
-- **File**: catalysts/__init__.py
+#### ISSUE-1228: Missing **all** Export (LOW)
+
+- **File**: catalysts/**init**.py
 - **Lines**: 11-22
 - **Phase**: 1 (Import & Dependency Analysis)
-- **Impact**: Not all imports are exported in __all__
-- **Details**: ScanAlert and AlertType imported but not in __all__ list
-- **Fix Required**: Either remove imports or add to __all__
+- **Impact**: Not all imports are exported in **all**
+- **Details**: ScanAlert and AlertType imported but not in **all** list
+- **Fix Required**: Either remove imports or add to **all**
 
 #### ISSUE-1229: Inconsistent Naming (LOW)
-- **File**: catalysts/__init__.py
+
+- **File**: catalysts/**init**.py
 - **Line**: 15
 - **Phase**: 3 (Architecture Pattern Analysis)
 - **Impact**: Import alias creates confusion
@@ -986,6 +1104,7 @@ The scanners module is responsible for:
 - **Fix Required**: Use consistent naming convention
 
 #### ISSUE-1230: Magic Numbers (LOW)
+
 - **File**: technical_scanner.py
 - **Lines**: 242, 243, 254, 258
 - **Phase**: 11 (Observability & Debugging)
@@ -994,6 +1113,7 @@ The scanners module is responsible for:
 - **Fix Required**: Move to configuration parameters
 
 ### Batch 6: Catalyst Scanners Part 2 (5 files) ✅ COMPLETE
+
 - **Status**: COMPLETE
 - **Files**: `options_scanner.py`, `insider_scanner.py`, `social_scanner.py`, `sector_scanner.py`, `intermarket_scanner.py`
 - **Lines Reviewed**: 2,268
@@ -1011,6 +1131,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ## 🟡 High Priority Issues (Batch 6)
 
 #### ISSUE-1231: datetime.now() Without Timezone Awareness (HIGH)
+
 - **File**: options_scanner.py
 - **Lines**: 115, 133, 134
 - **Phase**: 7 (Business Logic Correctness)
@@ -1019,6 +1140,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Standardize all datetime operations to use timezone.utc
 
 #### ISSUE-1232: Undefined Variable in Local Scope Check (HIGH)
+
 - **File**: sector_scanner.py
 - **Line**: 389
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -1027,6 +1149,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Initialize recent_return = 0 before conditional block
 
 #### ISSUE-1233: Missing Error Attribute on Timer (HIGH)
+
 - **File**: social_scanner.py
 - **Lines**: 196, 203
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -1035,6 +1158,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use consistent timer attribute names
 
 #### ISSUE-1234: Missing Error Attribute on Timer (HIGH)
+
 - **File**: intermarket_scanner.py
 - **Lines**: 225, 232
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -1047,6 +1171,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ## 🟠 Medium Priority Issues (Batch 6)
 
 #### ISSUE-1235: Direct Import from Main Config (MEDIUM)
+
 - **File**: All 5 files in batch
 - **Lines**: Various import sections
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -1055,6 +1180,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use event factory pattern consistently
 
 #### ISSUE-1236: Magic Numbers Without Configuration (MEDIUM)
+
 - **File**: options_scanner.py
 - **Lines**: 70-74, 371
 - **Phase**: 11 (Observability & Debugging)
@@ -1063,6 +1189,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Move all thresholds to configuration
 
 #### ISSUE-1237: Unbounded Dictionary Growth (MEDIUM)
+
 - **File**: insider_scanner.py
 - **Line**: 323
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1071,6 +1198,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Implement max size limit or LRU cache
 
 #### ISSUE-1238: Type Conversion Without Validation (MEDIUM)
+
 - **File**: insider_scanner.py
 - **Line**: 329
 - **Phase**: 8 (Data Consistency & Integrity)
@@ -1079,6 +1207,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Add error handling for date parsing
 
 #### ISSUE-1239: Division Without Zero Check (MEDIUM)
+
 - **File**: social_scanner.py
 - **Line**: 382
 - **Phase**: 7 (Business Logic Correctness)
@@ -1087,6 +1216,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Check length before division
 
 #### ISSUE-1240: Potential IndexError (MEDIUM)
+
 - **File**: intermarket_scanner.py
 - **Lines**: 479-480
 - **Phase**: 7 (Business Logic Correctness)
@@ -1095,6 +1225,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Verify dataframe length before indexing
 
 #### ISSUE-1241: Inconsistent Cache TTL (MEDIUM)
+
 - **File**: Various files
 - **Phase**: 4 (Data Flow & Integration)
 - **Impact**: Cache effectiveness varies widely
@@ -1102,6 +1233,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Standardize cache TTL strategy
 
 #### ISSUE-1242: Missing await for Async Methods (MEDIUM)
+
 - **File**: sector_scanner.py
 - **Line**: 160
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -1114,6 +1246,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ## 🔵 Low Priority Issues (Batch 6)
 
 #### ISSUE-1243: Inefficient String Concatenation (LOW)
+
 - **File**: options_scanner.py
 - **Line**: 120
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1122,6 +1255,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use join() for better performance
 
 #### ISSUE-1244: Redundant Conditional (LOW)
+
 - **File**: social_scanner.py
 - **Line**: 606
 - **Phase**: 7 (Business Logic Correctness)
@@ -1130,6 +1264,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Remove redundant check
 
 #### ISSUE-1245: Unused Import Potential (LOW)
+
 - **File**: intermarket_scanner.py
 - **Line**: 18
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -1138,6 +1273,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Consider if scipy dependency justified
 
 #### ISSUE-1246: Type Hint Python Version (LOW)
+
 - **File**: intermarket_scanner.py
 - **Line**: 13
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -1150,23 +1286,27 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ## ✅ Positive Findings (Batch 6)
 
 ### Architecture & Design
+
 - **Excellent use of repository pattern**: All scanners properly use IScannerRepository
 - **Clean inheritance**: All extend CatalystScannerBase consistently
 - **Proper dependency injection**: No direct instantiation found
 - **Good separation of concerns**: Each scanner has clear, focused responsibility
 
 ### Implementation Quality
+
 - **Comprehensive metrics**: All scanners record detailed metrics
 - **Effective caching strategy**: Cache keys properly constructed
 - **Concurrent processing**: Good use of batch processing for performance
 - **Error handling**: Try-except blocks properly implemented
 
 ### Business Logic
+
 - **Sophisticated algorithms**: Complex correlation and divergence calculations
 - **Multi-factor scoring**: Well-designed score composition
 - **Domain expertise**: Clear understanding of financial indicators
 
 ### Data Management
+
 - **Efficient data access**: Proper use of hot/cold storage routing
 - **Good pandas usage**: Efficient DataFrame operations
 - **Proper data alignment**: Careful handling of time series alignment
@@ -1181,7 +1321,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
   2. Datetime timezone handling (1 occurrence)
   3. Magic numbers without config (multiple)
   4. Resource management concerns (2 occurrences)
-  
+
 - **Critical Finding**: NO CRITICAL ISSUES - This is the first batch with zero critical issues!
 - **Quality Assessment**: High quality code with sophisticated financial logic
 - **Main Concern**: Timer interface inconsistency needs immediate attention
@@ -1193,14 +1333,16 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ## 🔍 Batch 7: Final Scanner Files (4 files)
 
 ### Files Reviewed (Final Batch!)
+
 1. `advanced_sentiment_scanner.py` (408 lines) - NLP sentiment analysis with transformers
-2. `coordinated_activity_scanner.py` (386 lines) - Network analysis for coordinated behavior  
+2. `coordinated_activity_scanner.py` (386 lines) - Network analysis for coordinated behavior
 3. `market_validation_scanner.py` (384 lines) - Market data validation
 4. `scanner_metrics_collector.py` (169 lines) - Metrics aggregation
 
 ### ❌ Critical Issues Found (2)
 
 #### ISSUE-1235: Duplicate ScannerMetricsCollector Implementation (CRITICAL)
+
 - **File**: scanner_metrics_collector.py
 - **Lines**: 1-169 (entire file)
 - **Phase**: 1 (Import & Dependency Analysis)
@@ -1211,6 +1353,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Remove duplicate file, use only utils version
 
 #### ISSUE-1236: Private Cache Method Access Violates Encapsulation (CRITICAL)
+
 - **File**: advanced_sentiment_scanner.py
 - **Lines**: 330, 341
 - **Phase**: 4 (Data Flow & Integration)
@@ -1221,6 +1364,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ### ⚠️ High Priority Issues (8)
 
 #### ISSUE-1237: Transformer Model Memory Management
+
 - **File**: advanced_sentiment_scanner.py
 - **Lines**: 84-86, 110-113
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1229,6 +1373,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Add `torch.cuda.empty_cache()` in cleanup
 
 #### ISSUE-1238: Network Graph Memory Unbounded
+
 - **File**: coordinated_activity_scanner.py
 - **Lines**: 312-335
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1237,6 +1382,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Implement MAX_NODES limit and graph cleanup
 
 #### ISSUE-1239: Nested Loop Performance O(n²)
+
 - **File**: coordinated_activity_scanner.py
 - **Lines**: 328-331
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1245,6 +1391,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use `itertools.combinations` for better performance
 
 #### ISSUE-1240: Non-Deterministic Hash for Cache Keys
+
 - **File**: advanced_sentiment_scanner.py
 - **Line**: 328
 - **Phase**: 8 (Data Consistency & Integrity)
@@ -1253,6 +1400,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use SHA256 or MD5 for deterministic hashing
 
 #### ISSUE-1241: Synchronous Model Inference Without Batching
+
 - **File**: advanced_sentiment_scanner.py
 - **Lines**: 324-342
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1261,6 +1409,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Implement batch processing for transformer models
 
 #### ISSUE-1242: Unbounded Price History Dictionary
+
 - **File**: market_validation_scanner.py
 - **Line**: 82
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1269,6 +1418,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Implement LRU cache or size limits
 
 #### ISSUE-1243: Global Singleton Anti-Pattern
+
 - **File**: scanner_metrics_collector.py
 - **Lines**: 161-169
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -1277,6 +1427,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Implement proper singleton class pattern
 
 #### ISSUE-1244: Asyncio Lock for Synchronous Operations
+
 - **File**: scanner_metrics_collector.py
 - **Line**: 32
 - **Phase**: 9 (Production Readiness)
@@ -1287,6 +1438,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ### 🟡 Medium Priority Issues (12)
 
 #### ISSUE-1245: Missing Model Inference Error Handling
+
 - **File**: advanced_sentiment_scanner.py
 - **Lines**: 336-337, 348-350
 - **Phase**: 5 (Error Handling & Configuration)
@@ -1294,6 +1446,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Wrap model calls in try-except
 
 #### ISSUE-1246: Sequential Await Calls Could Be Parallel
+
 - **File**: market_validation_scanner.py
 - **Lines**: 156-161, 275-280
 - **Phase**: 9 (Production Readiness)
@@ -1301,6 +1454,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use `asyncio.gather()` for parallel fetching
 
 #### ISSUE-1247: Inefficient Pandas Operations in Loop
+
 - **File**: market_validation_scanner.py
 - **Lines**: 364-369
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1308,6 +1462,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Vectorize volume spike calculations
 
 #### ISSUE-1248: DefaultDict Lambda Without Cleanup
+
 - **File**: coordinated_activity_scanner.py
 - **Line**: 358
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1315,18 +1470,21 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Use regular defaultdict with factory function
 
 #### ISSUE-1249: Missing Query Filter Date Validation
+
 - **File**: All scanner files
 - **Phase**: 8 (Data Consistency & Integrity)
 - **Impact**: Could lead to empty results or API errors
 - **Fix Required**: Validate start_date < end_date
 
 #### ISSUE-1250: Duplicate Scan Method Structure (DRY Violation)
+
 - **Files**: All 3 main scanners
 - **Phase**: 3 (Architecture Pattern Analysis)
 - **Impact**: ~40% code duplication across scanners
 - **Fix Required**: Extract common workflow to base class
 
 #### ISSUE-1251: Magic Numbers Without Constants
+
 - **Files**: All scanner files (multiple locations)
 - **Phase**: 7 (Business Logic Correctness)
 - **Impact**: Hard to maintain and understand
@@ -1334,6 +1492,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Define named constants
 
 #### ISSUE-1252: Duplicate Legacy Compatibility Methods
+
 - **Files**: All 3 main scanners
 - **Lines**: Various `run()` methods
 - **Phase**: 3 (Architecture Pattern Analysis)
@@ -1341,12 +1500,14 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Move to base class
 
 #### ISSUE-1253: Duplicate Initialization Pattern
+
 - **Files**: All 3 main scanners
 - **Phase**: 3 (Architecture Pattern Analysis)
 - **Impact**: Redundant code
 - **Fix Required**: Use base class implementation
 
 #### ISSUE-1254: Unbounded Metrics Storage
+
 - **File**: scanner_metrics_collector.py
 - **Line**: 22
 - **Phase**: 10 (Resource Management & Scalability)
@@ -1354,6 +1515,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Implement metric rotation/archiving
 
 #### ISSUE-1255: Inconsistent Async/Sync Methods
+
 - **File**: scanner_metrics_collector.py
 - **Lines**: 91 (async) vs 135 (sync)
 - **Phase**: 2 (Interface & Contract Analysis)
@@ -1361,6 +1523,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Make all public methods consistently async
 
 #### ISSUE-1256: Generic Exception Catching
+
 - **Files**: All scanner files
 - **Phase**: 5 (Error Handling & Configuration)
 - **Impact**: Hides specific errors
@@ -1369,24 +1532,28 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ### 🔵 Low Priority Issues (6)
 
 #### ISSUE-1257: Inconsistent Logging with Emojis
+
 - **Files**: All scanner files
 - **Phase**: 11 (Observability & Debugging)
 - **Impact**: Makes log parsing difficult
 - **Fix Required**: Standardize logging format for production
 
 #### ISSUE-1258: Incomplete Type Hints
+
 - **Files**: All scanner files
 - **Phase**: 2 (Interface & Contract Analysis)
 - **Impact**: Reduced type safety
 - **Fix Required**: Add TypedDict for complex return types
 
 #### ISSUE-1259: Dictionary Access Without get()
+
 - **Files**: Multiple locations
 - **Phase**: 7 (Business Logic Correctness)
 - **Impact**: Potential KeyError
 - **Fix Required**: Use dict.get() with defaults
 
 #### ISSUE-1260: Complex Method Needs Refactoring
+
 - **File**: advanced_sentiment_scanner.py
 - **Lines**: 315-352 (_analyze_content)
 - **Phase**: 7 (Business Logic Correctness)
@@ -1394,12 +1561,14 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Fix Required**: Split into smaller methods
 
 #### ISSUE-1261: Missing Context Managers for Resources
+
 - **Files**: All scanner files
 - **Phase**: 10 (Resource Management & Scalability)
 - **Impact**: Resource cleanup not guaranteed
 - **Fix Required**: Implement context managers
 
 #### ISSUE-1262: String Concatenation in Logs
+
 - **Files**: Various locations
 - **Phase**: 11 (Observability & Debugging)
 - **Impact**: Non-Pythonic
@@ -1410,23 +1579,27 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 ## ✅ Positive Findings (Batch 7)
 
 ### Architecture Excellence
+
 - **Sophisticated NLP Integration**: Excellent use of transformer models (FinBERT, BART)
 - **Advanced Network Analysis**: Clever use of NetworkX for coordinated activity detection
 - **Multi-level Validation**: Well-designed market validation scoring system
 - **Clean Repository Pattern**: Consistent use of IScannerRepository throughout
 
 ### Implementation Quality
+
 - **Comprehensive Error Handling**: All scanners have proper try-catch blocks
 - **Good Async Patterns**: Proper use of async/await throughout
 - **Effective Caching**: Multi-level caching with appropriate TTLs
 - **Detailed Metrics**: Comprehensive metrics collection and aggregation
 
 ### Business Logic
+
 - **Financial Sophistication**: Advanced algorithms for sentiment, network, and market analysis
 - **Domain Expertise**: Clear understanding of trading patterns and market behavior
 - **Score Normalization**: Consistent 0-1 score normalization across scanners
 
 ### Code Quality
+
 - **Good Documentation**: Comprehensive docstrings for all classes and methods
 - **Type Hints**: Most methods have proper type annotations
 - **Configuration Management**: Good use of DictConfig for settings
@@ -1443,25 +1616,27 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
   2. Code duplication (~40% across scanners)
   3. Magic numbers without constants
   4. Performance optimizations needed
-  
-- **Critical Findings**: 
+
+- **Critical Findings**:
   - Duplicate metrics collector implementation
   - Private cache method access violation
-  
+
 - **Quality Assessment**: High-quality sophisticated scanners with advanced ML/network analysis
 - **Main Concerns**: Resource management and code duplication need attention
 
 ---
 
-## 🎯 SCANNERS MODULE COMPLETE!
+## 🎯 SCANNERS MODULE COMPLETE
 
 ### Final Module Statistics
+
 - **Total Files**: 34
 - **Files Reviewed**: 34/34 (100%)
 - **Total Lines**: ~14,214
 - **Total Issues Found**: 152 (13 critical, 50 high, 59 medium, 30 low)
 
 ### Critical Issues Summary (All 13)
+
 1. ISSUE-1198: Missing StorageRouterV2 import
 2. ISSUE-1199: datetime.now() without timezone
 3. ISSUE-1200: Incorrect attribute access
@@ -1477,6 +1652,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 13. ISSUE-1236: Private cache method access
 
 ### Module Assessment
+
 - **Architecture**: ⭐⭐⭐⭐ Excellent design with clean patterns
 - **Implementation**: ⭐⭐⭐ Good but needs resource management fixes
 - **Business Logic**: ⭐⭐⭐⭐⭐ Sophisticated financial algorithms
@@ -1484,6 +1660,7 @@ No critical issues found in Batch 6. All catalyst scanners properly extend Catal
 - **Code Quality**: ⭐⭐⭐ Good but significant duplication
 
 ### Top Priority Fixes
+
 1. Fix missing imports to make module functional
 2. Remove duplicate metrics collector
 3. Replace datetime.utcnow() usage

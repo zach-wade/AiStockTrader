@@ -28,6 +28,8 @@ from src.domain.entities.position import Position
 from src.domain.services.position_manager import PositionManager
 from src.domain.services.risk_calculator import RiskCalculator
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 class TestGetPortfolioUseCase:
@@ -64,23 +66,23 @@ class TestGetPortfolioUseCase:
         """Create sample portfolio with positions."""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("50000"),
-            max_position_size=Decimal("10000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
+            max_position_size=Money(Decimal("10000")),
             max_positions=10,
             max_leverage=Decimal("2.0"),
             max_portfolio_risk=Decimal("0.02"),
         )
         portfolio.id = uuid4()
-        portfolio.total_realized_pnl = Decimal("5000")
+        portfolio.total_realized_pnl = Money(Decimal("5000"))
 
         # Add open position
         position1 = Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("150.00"),
-            current_price=Decimal("155.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
+            current_price=Price(Decimal("155.00")),
             opened_at=datetime.now(UTC),
         )
 
@@ -88,12 +90,12 @@ class TestGetPortfolioUseCase:
         position2 = Position(
             id=uuid4(),
             symbol="GOOGL",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("2500.00"),
-            current_price=Decimal("2600.00"),
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("2500.00")),
+            current_price=Price(Decimal("2600.00")),
             opened_at=datetime.now(UTC),
             closed_at=datetime.now(UTC),
-            realized_pnl=Decimal("5000"),
+            realized_pnl=Money(Decimal("5000")),
         )
 
         portfolio.positions = {"AAPL": position1, "GOOGL": position2}
@@ -192,8 +194,8 @@ class TestGetPortfolioUseCase:
         # Setup
         portfolio = Portfolio(
             name="Empty Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("100000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("100000")),
         )
         portfolio.id = uuid4()
 
@@ -259,7 +261,9 @@ class TestUpdatePortfolioUseCase:
     def sample_portfolio(self):
         """Create sample portfolio."""
         portfolio = Portfolio(
-            name="Test Portfolio", initial_capital=Decimal("100000"), cash_balance=Decimal("50000")
+            name="Test Portfolio",
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
         )
         portfolio.id = uuid4()
         return portfolio
@@ -417,29 +421,29 @@ class TestGetPositionsUseCase:
         position1 = Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("150.00"),
-            current_price=Decimal("155.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
+            current_price=Price(Decimal("155.00")),
             opened_at=datetime.now(UTC),
         )
 
         position2 = Position(
             id=uuid4(),
             symbol="GOOGL",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("2500.00"),
-            current_price=Decimal("2600.00"),
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("2500.00")),
+            current_price=Price(Decimal("2600.00")),
             opened_at=datetime.now(UTC),
             closed_at=datetime.now(UTC),
-            realized_pnl=Decimal("5000"),
+            realized_pnl=Money(Decimal("5000")),
         )
 
         position3 = Position(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("-50"),  # Short position
-            average_entry_price=Decimal("300.00"),
-            current_price=Decimal("295.00"),
+            quantity=Quantity(Decimal("-50")),  # Short position
+            average_entry_price=Price(Decimal("300.00")),
+            current_price=Price(Decimal("295.00")),
             opened_at=datetime.now(UTC),
         )
 
@@ -449,7 +453,9 @@ class TestGetPositionsUseCase:
     def sample_portfolio_with_positions(self, sample_positions):
         """Create sample portfolio with positions."""
         portfolio = Portfolio(
-            name="Test Portfolio", initial_capital=Decimal("100000"), cash_balance=Decimal("50000")
+            name="Test Portfolio",
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
         )
         portfolio.id = uuid4()
         portfolio.positions = {
@@ -487,7 +493,7 @@ class TestGetPositionsUseCase:
 
         # Verify total value calculation
         expected_total = Decimal("100") * Decimal("155") + abs(Decimal("-50")) * Decimal("295")
-        assert response.total_value == expected_total
+        assert response.total_value == Money(expected_total)
 
     @pytest.mark.asyncio
     async def test_get_all_positions(
@@ -541,7 +547,7 @@ class TestGetPositionsUseCase:
     async def test_get_positions_empty_portfolio(self, use_case, mock_unit_of_work):
         """Test retrieving positions from empty portfolio."""
         # Setup
-        portfolio = Portfolio(name="Empty Portfolio", initial_capital=Decimal("100000"))
+        portfolio = Portfolio(name="Empty Portfolio", initial_capital=Money(Decimal("100000")))
         portfolio.id = uuid4()
 
         request = GetPositionsRequest(portfolio_id=portfolio.id)
@@ -635,9 +641,9 @@ class TestClosePositionUseCase:
         position = Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("150.00"),
-            current_price=Decimal("155.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
+            current_price=Price(Decimal("155.00")),
             opened_at=datetime.now(UTC),
         )
         return position
@@ -646,7 +652,9 @@ class TestClosePositionUseCase:
     def sample_portfolio(self):
         """Create sample portfolio."""
         portfolio = Portfolio(
-            name="Test Portfolio", initial_capital=Decimal("100000"), cash_balance=Decimal("50000")
+            name="Test Portfolio",
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
         )
         portfolio.id = uuid4()
         return portfolio
@@ -691,7 +699,7 @@ class TestClosePositionUseCase:
         mock_position_manager.close_position.assert_called_once()
         call_args = mock_position_manager.close_position.call_args
         assert call_args[1]["position"] == sample_position
-        assert call_args[1]["exit_price"] == exit_price
+        assert call_args[1]["exit_price"] == Price(exit_price)
 
         # Verify repositories were updated
         mock_unit_of_work.positions.update_position.assert_called_once_with(sample_position)
@@ -746,9 +754,9 @@ class TestClosePositionUseCase:
         short_position = Position(
             id=uuid4(),
             symbol="TSLA",
-            quantity=Decimal("-50"),  # Short position
-            average_entry_price=Decimal("700.00"),
-            current_price=Decimal("680.00"),
+            quantity=Quantity(Decimal("-50")),  # Short position
+            average_entry_price=Price(Decimal("700.00")),
+            current_price=Price(Decimal("680.00")),
             opened_at=datetime.now(UTC),
         )
         # Position is open by default
@@ -922,13 +930,13 @@ class TestEdgeCasesAndIntegration:
         # Setup
         portfolio = Portfolio(
             name="Extreme Portfolio",
-            initial_capital=Decimal("999999999999.99"),
-            cash_balance=Decimal("0.01"),
-            max_position_size=Decimal("999999999.99"),
+            initial_capital=Money(Decimal("999999999999.99")),
+            cash_balance=Money(Decimal("0.01")),
+            max_position_size=Money(Decimal("999999999.99")),
             max_leverage=Decimal("100.0"),
         )
         portfolio.id = uuid4()
-        portfolio.total_realized_pnl = Decimal("-999999999.99")
+        portfolio.total_realized_pnl = Money(Decimal("-999999999.99"))
 
         risk_calculator = Mock(spec=RiskCalculator)
         risk_calculator.calculate_sharpe_ratio = Mock(return_value=Decimal("-99.99"))
@@ -962,9 +970,9 @@ class TestEdgeCasesAndIntegration:
             positions[symbol] = Position(
                 id=uuid4(),
                 symbol=symbol,
-                quantity=Decimal("10"),
-                average_entry_price=Decimal("100.00"),
-                current_price=Decimal("105.00"),
+                quantity=Quantity(Decimal("10")),
+                average_entry_price=Price(Decimal("100.00")),
+                current_price=Price(Decimal("105.00")),
             )
 
         portfolio.positions = positions
@@ -979,7 +987,7 @@ class TestEdgeCasesAndIntegration:
         # Assert
         assert response.success is True
         assert len(response.positions) == 100
-        assert response.total_value == Decimal("10") * Decimal("105.00") * 100
+        assert response.total_value == Money(Decimal("10") * Decimal("105.00") * 100)
 
     @pytest.mark.asyncio
     async def test_position_with_none_values(self, mock_unit_of_work):
@@ -988,8 +996,8 @@ class TestEdgeCasesAndIntegration:
         position = Position(
             id=uuid4(),
             symbol="TEST",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("50.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("50.00")),
             current_price=None,  # No current price
             realized_pnl=None,
             opened_at=datetime.now(UTC),
@@ -1040,7 +1048,9 @@ class TestEdgeCasesAndIntegration:
         portfolio.id = uuid4()
         portfolio.positions = {
             "AAPL": Position(
-                symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+                symbol="AAPL",
+                quantity=Quantity(Decimal("100")),
+                average_entry_price=Price(Decimal("150.00")),
             )
         }
 

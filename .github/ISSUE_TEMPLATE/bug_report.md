@@ -10,7 +10,9 @@ assignees: ''
 <!-- A clear and concise description of what the bug is -->
 
 ## 📋 To Reproduce
+
 Steps to reproduce the behavior:
+
 1. Go to '...'
 2. Click on '....'
 3. Scroll down to '....'
@@ -26,6 +28,7 @@ Steps to reproduce the behavior:
 ```
 
 ## 🌍 Environment
+
 - **OS**: [e.g., macOS 14.0, Ubuntu 22.04]
 - **Python Version**: [e.g., 3.11.5]
 - **Project Version/Commit**: [e.g., v1.0.0 or commit hash]
@@ -41,6 +44,7 @@ Steps to reproduce the behavior:
 <!-- Add any other context about the problem here -->
 
 ## ✅ Checklist
+
 - [ ] I have searched for similar issues
 - [ ] I have provided all the necessary information
 - [ ] I have included relevant logs/screenshots

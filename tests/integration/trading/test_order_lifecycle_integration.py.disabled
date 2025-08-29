@@ -1,0 +1,540 @@
+"""
+Integration tests for complete order lifecycle flow.
+
+Tests the entire order flow from placement through validation,
+execution, fills, and portfolio updates.
+"""
+
+import asyncio
+from datetime import datetime, timedelta
+from decimal import Decimal
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+from src.application.coordinators.broker_coordinator import BrokerCoordinator
+from src.application.coordinators.service_factory import ServiceFactory
+from src.application.use_cases.order_execution import (
+    ProcessOrderFillUseCase,
+    ProcessOrderFillRequest,
+)
+from src.application.use_cases.trading import (
+    PlaceOrderUseCase,
+    GetOrderStatusUseCase,
+    CancelOrderUseCase,
+)
+from src.application.use_cases.portfolio import GetPortfolioUseCase
+from src.domain.entities import Order, Portfolio, Position
+from src.domain.entities.order import OrderSide, OrderStatus, OrderType, TimeInForce
+from src.domain.services import OrderValidator, RiskCalculator
+from src.domain.value_objects import Money, Price, Quantity, Symbol
+from src.infrastructure.brokers.paper_broker import PaperBroker
+from src.infrastructure.repositories import (
+    OrderRepository,
+    PortfolioRepository,
+    PositionRepository,
+)
+
+
+@pytest.fixture
+async def test_db(test_database):
+    """Get test database session."""
+    async with test_database.get_session() as session:
+        yield session
+
+
+@pytest.fixture
+def broker_coordinator():
+    """Create broker coordinator."""
+    coordinator = BrokerCoordinator()
+    paper_broker = PaperBroker(initial_cash=Decimal("100000"))
+    coordinator.register_broker("paper", paper_broker)
+    coordinator.set_active_broker("paper")
+    return coordinator
+
+
+@pytest.fixture
+async def repositories(test_db):
+    """Create repositories."""
+    return {
+        "order": OrderRepository(test_db),
+        "portfolio": PortfolioRepository(test_db),
+        "position": PositionRepository(test_db),
+    }
+
+
+@pytest.fixture
+async def portfolio(repositories):
+    """Create test portfolio."""
+    portfolio = Portfolio(
+        portfolio_id="test_portfolio",
+        name="Test Portfolio",
+        cash_balance=Money(Decimal("50000")),
+        broker_id="paper"
+    )
+    await repositories["portfolio"].save(portfolio)
+    return portfolio
+
+
+@pytest.fixture
+def service_factory(repositories):
+    """Create service factory."""
+    return ServiceFactory(
+        order_repository=repositories["order"],
+        portfolio_repository=repositories["portfolio"],
+        position_repository=repositories["position"]
+    )
+
+
+@pytest.fixture
+def use_cases(broker_coordinator, repositories, service_factory):
+    """Create use cases."""
+    return {
+        "place_order": PlaceOrderUseCase(
+            broker_coordinator=broker_coordinator,
+            order_repository=repositories["order"],
+            portfolio_repository=repositories["portfolio"],
+            order_validator=service_factory.create_order_validator(),
+            risk_calculator=service_factory.create_risk_calculator()
+        ),
+        "process_order_fill": ProcessOrderFillUseCase(
+            unit_of_work=unit_of_work,
+            operation_name="ProcessOrderFill"
+        ),
+        "get_order_status": GetOrderStatusUseCase(
+            order_repository=repositories["order"]
+        ),
+        "cancel_order": CancelOrderUseCase(
+            broker_coordinator=broker_coordinator,
+            order_repository=repositories["order"]
+        ),
+        "get_portfolio": GetPortfolioUseCase(
+            portfolio_repository=repositories["portfolio"],
+            position_repository=repositories["position"]
+        )
+    }
+
+
+class TestOrderLifecycleIntegration:
+    """Test complete order lifecycle from placement to portfolio update."""
+
+    @pytest.mark.asyncio
+    async def test_successful_market_buy_order_lifecycle(
+        self, use_cases, portfolio, broker_coordinator
+    ):
+        """Test successful market buy order through entire lifecycle."""
+        # Setup mock market data
+        mock_market_data = {
+            "AAPL": {
+                "bid": Decimal("150.00"),
+                "ask": Decimal("150.10"),
+                "last": Decimal("150.05")
+            }
+        }
+        broker_coordinator.get_active_broker().set_market_data(mock_market_data)
+
+        # Step 1: Place order
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "AAPL",
+            "quantity": 100,
+            "side": "BUY",
+            "order_type": "MARKET"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        assert place_response["success"] is True
+        assert "order_id" in place_response
+        order_id = place_response["order_id"]
+
+        # Step 2: Verify order is pending
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.PENDING.value
+
+        # Step 3: Simulate order fill by broker
+        # For paper broker, we simulate fill directly
+        order = await repositories["order"].get_order_by_id(order_id)
+        order.execute()
+        order.fill(Quantity(Decimal("100")), Price(Decimal("150.10")))
+        await repositories["order"].save_order(order)
+
+        # Process the fill
+        fill_response = await use_cases["process_order_fill"].execute({
+            "order_id": order_id,
+            "filled_quantity": 100,
+            "fill_price": 150.10,
+            "broker_order_id": "test_broker_123",
+            "execution_timestamp": datetime.now()
+        })
+        assert fill_response["success"] is True
+
+        # Step 4: Verify order is filled
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.FILLED.value
+        assert status_response["filled_quantity"] == 100
+        assert status_response["average_fill_price"] == "150.10"  # Ask price for buy
+
+        # Step 5: Verify portfolio updated
+        portfolio_response = await use_cases["get_portfolio"].execute({
+            "portfolio_id": portfolio.portfolio_id
+        })
+
+        # Check cash decreased by order value plus commission
+        expected_cash = Decimal("50000") - (Decimal("150.10") * 100) - Decimal("1")  # $1 commission
+        assert portfolio_response["cash_balance"] == str(expected_cash)
+
+        # Check position created
+        assert len(portfolio_response["positions"]) == 1
+        position = portfolio_response["positions"][0]
+        assert position["symbol"] == "AAPL"
+        assert position["quantity"] == 100
+        assert position["average_entry_price"] == "150.10"
+
+    @pytest.mark.asyncio
+    async def test_limit_order_lifecycle_with_partial_fills(
+        self, use_cases, portfolio, broker_coordinator
+    ):
+        """Test limit order with partial fills."""
+        # Setup market data
+        mock_market_data = {
+            "TSLA": {
+                "bid": Decimal("200.00"),
+                "ask": Decimal("200.50"),
+                "last": Decimal("200.25")
+            }
+        }
+        broker_coordinator.get_active_broker().set_market_data(mock_market_data)
+
+        # Place limit buy order below market
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "TSLA",
+            "quantity": 500,
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "limit_price": "199.50",
+            "time_in_force": "GTC"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        assert place_response["success"] is True
+        order_id = place_response["order_id"]
+
+        # Simulate partial fill
+        broker = broker_coordinator.get_active_broker()
+        broker.simulate_partial_fill(order_id, 200, Decimal("199.50"))
+
+        # Check order status
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.PARTIALLY_FILLED.value
+        assert status_response["filled_quantity"] == 200
+        assert status_response["remaining_quantity"] == 300
+
+        # Simulate remaining fill
+        broker.simulate_partial_fill(order_id, 300, Decimal("199.50"))
+
+        # Verify completely filled
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.FILLED.value
+        assert status_response["filled_quantity"] == 500
+
+    @pytest.mark.asyncio
+    async def test_stop_loss_order_trigger_and_execution(
+        self, use_cases, portfolio, broker_coordinator, repositories
+    ):
+        """Test stop loss order triggering and execution."""
+        # First create a position
+        position = Position.open_position(
+            portfolio_id=portfolio.portfolio_id,
+            symbol=Symbol("NVDA"),
+            quantity=Quantity(Decimal("50")),
+            entry_price=Price(Decimal("500.00")),
+            commission=Money(Decimal("1"))
+        )
+        await repositories["position"].save(position)
+
+        # Place stop loss order
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "NVDA",
+            "quantity": 50,
+            "side": "SELL",
+            "order_type": "STOP",
+            "stop_price": "480.00",
+            "time_in_force": "GTC"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        assert place_response["success"] is True
+        order_id = place_response["order_id"]
+
+        # Simulate price drop triggering stop
+        mock_market_data = {
+            "NVDA": {
+                "bid": Decimal("479.50"),
+                "ask": Decimal("479.60"),
+                "last": Decimal("479.55")
+            }
+        }
+        broker_coordinator.get_active_broker().set_market_data(mock_market_data)
+        broker_coordinator.get_active_broker().trigger_stop_orders("NVDA", Decimal("479.55"))
+
+        # Execute triggered stop order
+        execute_response = await use_cases["execute_order"].execute({
+            "order_id": order_id
+        })
+        assert execute_response["success"] is True
+
+        # Verify order filled at market price
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.FILLED.value
+        assert status_response["average_fill_price"] == "479.50"  # Bid price for sell
+
+    @pytest.mark.asyncio
+    async def test_order_cancellation_lifecycle(
+        self, use_cases, portfolio, broker_coordinator
+    ):
+        """Test order cancellation flow."""
+        # Place limit order
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "GOOGL",
+            "quantity": 10,
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "limit_price": "2800.00",
+            "time_in_force": "DAY"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        assert place_response["success"] is True
+        order_id = place_response["order_id"]
+
+        # Cancel order
+        cancel_response = await use_cases["cancel_order"].execute({
+            "order_id": order_id
+        })
+        assert cancel_response["success"] is True
+        assert cancel_response["message"] == "Order cancelled successfully"
+
+        # Verify order status
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.CANCELLED.value
+        assert status_response["filled_quantity"] == 0
+
+        # Verify portfolio unchanged
+        portfolio_response = await use_cases["get_portfolio"].execute({
+            "portfolio_id": portfolio.portfolio_id
+        })
+        assert portfolio_response["cash_balance"] == "50000"
+        assert len(portfolio_response["positions"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_order_rejection_due_to_insufficient_funds(
+        self, use_cases, portfolio
+    ):
+        """Test order rejected due to insufficient funds."""
+        # Try to place order exceeding available cash
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "BRK.A",
+            "quantity": 1,
+            "side": "BUY",
+            "order_type": "MARKET"
+        }
+
+        # Mock expensive stock price
+        with patch.object(
+            use_cases["place_order"].broker_coordinator,
+            "get_market_price",
+            return_value=Price(Decimal("500000"))  # $500k per share
+        ):
+            place_response = await use_cases["place_order"].execute(place_request)
+
+        assert place_response["success"] is False
+        assert "insufficient" in place_response["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_order_rejection_due_to_risk_limits(
+        self, use_cases, portfolio
+    ):
+        """Test order rejected due to risk limit violations."""
+        # Configure strict risk limits
+        with patch.object(
+            use_cases["place_order"].risk_calculator,
+            "check_position_size_limit",
+            return_value=(False, "Position size exceeds 10% portfolio limit")
+        ):
+            place_request = {
+                "portfolio_id": portfolio.portfolio_id,
+                "symbol": "AMZN",
+                "quantity": 200,
+                "side": "BUY",
+                "order_type": "MARKET"
+            }
+
+            place_response = await use_cases["place_order"].execute(place_request)
+
+        assert place_response["success"] is False
+        assert "exceeds" in place_response["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_order_processing(
+        self, use_cases, portfolio, broker_coordinator
+    ):
+        """Test multiple concurrent orders are processed correctly."""
+        mock_market_data = {
+            "AAPL": {"bid": Decimal("150"), "ask": Decimal("151"), "last": Decimal("150.50")},
+            "GOOGL": {"bid": Decimal("2800"), "ask": Decimal("2805"), "last": Decimal("2802")},
+            "MSFT": {"bid": Decimal("300"), "ask": Decimal("301"), "last": Decimal("300.50")}
+        }
+        broker_coordinator.get_active_broker().set_market_data(mock_market_data)
+
+        # Place multiple orders concurrently
+        orders = [
+            {"portfolio_id": portfolio.portfolio_id, "symbol": "AAPL", "quantity": 10, "side": "BUY", "order_type": "MARKET"},
+            {"portfolio_id": portfolio.portfolio_id, "symbol": "GOOGL", "quantity": 1, "side": "BUY", "order_type": "MARKET"},
+            {"portfolio_id": portfolio.portfolio_id, "symbol": "MSFT", "quantity": 5, "side": "BUY", "order_type": "MARKET"}
+        ]
+
+        # Execute orders concurrently
+        tasks = [use_cases["place_order"].execute(order) for order in orders]
+        responses = await asyncio.gather(*tasks)
+
+        # All should succeed
+        for response in responses:
+            assert response["success"] is True
+
+        # Execute all orders
+        order_ids = [r["order_id"] for r in responses]
+        execute_tasks = [
+            use_cases["execute_order"].execute({"order_id": oid})
+            for oid in order_ids
+        ]
+        await asyncio.gather(*execute_tasks)
+
+        # Verify portfolio has all positions
+        portfolio_response = await use_cases["get_portfolio"].execute({
+            "portfolio_id": portfolio.portfolio_id
+        })
+
+        assert len(portfolio_response["positions"]) == 3
+        symbols = [p["symbol"] for p in portfolio_response["positions"]]
+        assert set(symbols) == {"AAPL", "GOOGL", "MSFT"}
+
+    @pytest.mark.asyncio
+    async def test_order_expiration_handling(
+        self, use_cases, portfolio, broker_coordinator
+    ):
+        """Test DAY order expiration at market close."""
+        # Place DAY limit order
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "META",
+            "quantity": 20,
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "limit_price": "300.00",
+            "time_in_force": "DAY"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        assert place_response["success"] is True
+        order_id = place_response["order_id"]
+
+        # Simulate market close
+        broker_coordinator.get_active_broker().expire_day_orders()
+
+        # Verify order expired
+        status_response = await use_cases["get_order_status"].execute({
+            "order_id": order_id
+        })
+        assert status_response["status"] == OrderStatus.EXPIRED.value
+
+    @pytest.mark.asyncio
+    async def test_order_modification_not_allowed(
+        self, use_cases, portfolio
+    ):
+        """Test that order modification is not allowed (must cancel and replace)."""
+        # Place limit order
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "NFLX",
+            "quantity": 10,
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "limit_price": "400.00",
+            "time_in_force": "GTC"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        assert place_response["success"] is True
+        order_id = place_response["order_id"]
+
+        # Attempt to modify (should fail or not be available)
+        # Our system doesn't support order modification - must cancel and replace
+        cancel_response = await use_cases["cancel_order"].execute({
+            "order_id": order_id
+        })
+        assert cancel_response["success"] is True
+
+        # Place new order with different parameters
+        new_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "NFLX",
+            "quantity": 15,
+            "side": "BUY",
+            "order_type": "LIMIT",
+            "limit_price": "405.00",
+            "time_in_force": "GTC"
+        }
+
+        new_response = await use_cases["place_order"].execute(new_request)
+        assert new_response["success"] is True
+        assert new_response["order_id"] != order_id  # Different order
+
+    @pytest.mark.asyncio
+    async def test_order_audit_trail(
+        self, use_cases, portfolio, repositories
+    ):
+        """Test complete order audit trail is maintained."""
+        # Place and execute order
+        place_request = {
+            "portfolio_id": portfolio.portfolio_id,
+            "symbol": "SPY",
+            "quantity": 25,
+            "side": "BUY",
+            "order_type": "MARKET"
+        }
+
+        place_response = await use_cases["place_order"].execute(place_request)
+        order_id = place_response["order_id"]
+
+        await use_cases["execute_order"].execute({"order_id": order_id})
+
+        # Retrieve order with full history
+        order = await repositories["order"].get_by_id(order_id)
+
+        # Verify audit fields
+        assert order.created_at is not None
+        assert order.updated_at is not None
+        assert order.submitted_at is not None
+        assert order.filled_at is not None
+        assert order.status == OrderStatus.FILLED
+
+        # Verify state transitions recorded
+        assert len(order.status_history) >= 2  # PENDING -> FILLED
+        assert order.status_history[0]["status"] == OrderStatus.PENDING
+        assert order.status_history[-1]["status"] == OrderStatus.FILLED

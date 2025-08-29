@@ -121,7 +121,7 @@ class PositionManager:
 
         # Determine entry price
         if fill_price:
-            entry_price = fill_price.value
+            entry_price = fill_price
         elif order.average_fill_price:
             entry_price = order.average_fill_price
         else:
@@ -134,7 +134,7 @@ class PositionManager:
             symbol=order.symbol,
             quantity=quantity,
             entry_price=entry_price,
-            commission=Decimal("0"),  # Commission tracked separately
+            commission=Money(Decimal("0")),  # Commission tracked separately
             strategy=order.tags.get("strategy"),
         )
 
@@ -166,7 +166,7 @@ class PositionManager:
 
         # Determine fill price
         if fill_price:
-            price = fill_price.value
+            price = fill_price
         elif order.average_fill_price:
             price = order.average_fill_price
         else:
@@ -236,7 +236,7 @@ class PositionManager:
 
         # Determine fill price
         if fill_price:
-            price = fill_price.value
+            price = fill_price
         elif order.average_fill_price:
             price = order.average_fill_price
         else:
@@ -302,13 +302,14 @@ class PositionManager:
 
         # Determine exit price
         if exit_price:
-            price = exit_price.value
+            price = exit_price
         elif order.average_fill_price:
             price = order.average_fill_price
         else:
             raise ValueError("No exit price available")
 
-        return position.close_position(price)
+        realized_pnl = position.close_position(price)
+        return realized_pnl.amount
 
     async def close_position_async(
         self, position: Position, order: Order, exit_price: Price | None = None
@@ -325,7 +326,7 @@ class PositionManager:
 
         # Determine exit price
         if exit_price:
-            price = exit_price.value
+            price = exit_price
         elif order.average_fill_price:
             price = order.average_fill_price
         else:
@@ -335,22 +336,22 @@ class PositionManager:
         quantity_to_reduce = abs(position.quantity)
         position.reduce_position(quantity_to_reduce, price)
 
-        return position.realized_pnl
+        return position.realized_pnl.amount
 
     async def calculate_pnl_async(self, position: Position, current_price: Price) -> Money:
         """Calculate P&L for a position (thread-safe async version).
 
         See calculate_pnl for full documentation.
         """
-        position.update_market_price(current_price.value)
+        position.update_market_price(current_price)
 
         if position.is_closed():
             pnl = position.realized_pnl
         else:
             total_pnl = position.get_total_pnl()
-            pnl = total_pnl if total_pnl is not None else Decimal("0")
+            pnl = total_pnl if total_pnl is not None else Money(Decimal("0"))
 
-        return Money(pnl, "USD")
+        return pnl if isinstance(pnl, Money) else Money(pnl.amount, "USD")
 
     def calculate_pnl(self, position: Position, current_price: Price) -> Money:
         """Calculate P&L for a position.
@@ -378,15 +379,15 @@ class PositionManager:
             This method updates the position's internal market price before
             calculating P&L, ensuring consistent state.
         """
-        position.update_market_price(current_price.value)
+        position.update_market_price(current_price)
 
         if position.is_closed():
             pnl = position.realized_pnl
         else:
             total_pnl = position.get_total_pnl()
-            pnl = total_pnl if total_pnl is not None else Decimal("0")
+            pnl = total_pnl if total_pnl is not None else Money(Decimal("0"))
 
-        return Money(pnl, "USD")
+        return pnl if isinstance(pnl, Money) else Money(pnl.amount, "USD")
 
     def merge_positions(self, positions: list[Position]) -> Position | None:
         """Merge multiple positions of the same symbol.
@@ -439,36 +440,36 @@ class PositionManager:
             raise ValueError("Cannot merge positions with different symbols")
 
         # Calculate weighted average entry
-        total_quantity = Decimal("0")
-        total_cost = Decimal("0")
-        total_pnl = Decimal("0")
-        total_commission = Decimal("0")
+        total_quantity = Quantity(Decimal("0"))
+        total_cost = Money(Decimal("0"))
+        total_pnl = Money(Decimal("0"))
+        total_commission = Money(Decimal("0"))
 
         for pos in positions:
-            qty = abs(pos.quantity)
-            total_quantity += pos.quantity
-            total_cost += qty * pos.average_entry_price
-            total_pnl += pos.realized_pnl
-            total_commission += pos.commission_paid
+            qty = abs(pos.quantity.value)
+            total_quantity = Quantity(total_quantity.value + pos.quantity.value)
+            total_cost = Money(total_cost.amount + (qty * pos.average_entry_price.value))
+            total_pnl = Money(total_pnl.amount + pos.realized_pnl.amount)
+            total_commission = Money(total_commission.amount + pos.commission_paid.amount)
 
-        if total_quantity == 0:
+        if total_quantity.value == 0:
             # All positions cancelled out
             merged = Position(
                 symbol=symbol,
-                quantity=Decimal("0"),
-                average_entry_price=Decimal("0"),
+                quantity=Quantity(Decimal("0")),
+                average_entry_price=Price(Decimal("0")),
                 realized_pnl=total_pnl,
                 commission_paid=total_commission,
             )
             merged.closed_at = positions[-1].closed_at
         else:
             # Safe division - we've already checked total_quantity != 0
-            abs_quantity = abs(total_quantity)
+            abs_quantity = abs(total_quantity.value)
             if abs_quantity == 0:
                 # Defensive check (should never happen given the if-else structure)
-                avg_entry = Decimal("0")
+                avg_entry = Price(Decimal("0"))
             else:
-                avg_entry = total_cost / abs_quantity
+                avg_entry = Price(total_cost.amount / abs_quantity)
 
             merged = Position(
                 symbol=symbol,
@@ -532,7 +533,7 @@ class PositionManager:
             Multiple conditions may be true, but only the first triggered
             condition is returned.
         """
-        position.update_market_price(current_price.value)
+        position.update_market_price(current_price)
 
         # Check stop loss
         if position.should_stop_loss():

@@ -14,15 +14,17 @@ from src.application.interfaces.unit_of_work import IUnitOfWork
 from src.domain.entities.order import Order, OrderSide, OrderType, TimeInForce
 from src.domain.services.order_validator import OrderValidator
 from src.domain.services.risk_calculator import RiskCalculator
+from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.price import Price
 from src.domain.value_objects.quantity import Quantity
 
 from .base import TransactionalUseCase, UseCaseResponse
+from .base_request import BaseRequestDTO
 
 
 # Request/Response DTOs
 @dataclass
-class PlaceOrderRequest:
+class PlaceOrderRequest(BaseRequestDTO):
     """Request to place a new order."""
 
     portfolio_id: UUID
@@ -34,16 +36,6 @@ class PlaceOrderRequest:
     stop_price: float | None = None
     time_in_force: str = "day"
     strategy_id: str | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -56,21 +48,11 @@ class PlaceOrderResponse(UseCaseResponse):
 
 
 @dataclass
-class CancelOrderRequest:
+class CancelOrderRequest(BaseRequestDTO):
     """Request to cancel an order."""
 
     order_id: UUID
     reason: str | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -82,23 +64,13 @@ class CancelOrderResponse(UseCaseResponse):
 
 
 @dataclass
-class ModifyOrderRequest:
+class ModifyOrderRequest(BaseRequestDTO):
     """Request to modify an existing order."""
 
     order_id: UUID
     new_quantity: int | None = None
     new_limit_price: float | None = None
     new_stop_price: float | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -110,20 +82,10 @@ class ModifyOrderResponse(UseCaseResponse):
 
 
 @dataclass
-class GetOrderStatusRequest:
+class GetOrderStatusRequest(BaseRequestDTO):
     """Request to get order status."""
 
     order_id: UUID
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -488,9 +450,15 @@ class GetOrderStatusUseCase(TransactionalUseCase[GetOrderStatusRequest, GetOrder
             return GetOrderStatusResponse(
                 success=True,
                 status=order.status.value,
-                filled_quantity=int(order.filled_quantity) if order.filled_quantity else 0,
+                filled_quantity=(
+                    int(ValueObjectConverter.extract_value(order.filled_quantity))
+                    if order.filled_quantity
+                    else 0
+                ),
                 average_fill_price=(
-                    float(order.average_fill_price) if order.average_fill_price else None
+                    float(ValueObjectConverter.extract_value(order.average_fill_price))
+                    if order.average_fill_price
+                    else None
                 ),
                 request_id=request.request_id,
             )
@@ -501,9 +469,15 @@ class GetOrderStatusUseCase(TransactionalUseCase[GetOrderStatusRequest, GetOrder
             return GetOrderStatusResponse(
                 success=True,
                 status=order.status.value,
-                filled_quantity=int(order.filled_quantity) if order.filled_quantity else 0,
+                filled_quantity=(
+                    int(ValueObjectConverter.extract_value(order.filled_quantity))
+                    if order.filled_quantity
+                    else 0
+                ),
                 average_fill_price=(
-                    float(order.average_fill_price) if order.average_fill_price else None
+                    float(ValueObjectConverter.extract_value(order.average_fill_price))
+                    if order.average_fill_price
+                    else None
                 ),
                 request_id=request.request_id,
             )

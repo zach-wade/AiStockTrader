@@ -14,12 +14,13 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 import pytz
 
 from src.domain.services.market_hours_service import MarketHoursService
 from src.domain.services.market_hours_service import MarketStatus as DomainMarketStatus
+from src.infrastructure.time.timezone_service import LocalizedDatetimeAdapter, PythonTimeService
 
 from ..resilience.health import HealthCheck, HealthChecker, HealthCheckResult, HealthStatus
 from .telemetry import trace_trading_operation
@@ -91,7 +92,9 @@ class MarketHoursChecker:
         self.timezone = pytz.timezone(self.market_hours.timezone)
 
         # Initialize domain service for market hours logic
+        time_service = PythonTimeService()
         self._market_hours_service = MarketHoursService(
+            time_service=time_service,
             timezone=self.market_hours.timezone,
             holidays=(
                 set(self.market_hours.holidays) if hasattr(self.market_hours, "holidays") else None
@@ -132,7 +135,14 @@ class MarketHoursChecker:
         This method is kept for backward compatibility but delegates
         all business logic to the domain service.
         """
-        return self._market_hours_service.is_holiday(date)
+        # Convert datetime to LocalizedDatetime for domain service
+        if date.tzinfo is None:
+            # Add timezone info if it's naive
+            date = self.timezone.localize(date)
+        from src.domain.interfaces.time_service import LocalizedDatetime
+
+        localized_date = cast(LocalizedDatetime, LocalizedDatetimeAdapter(date))
+        return self._market_hours_service.is_holiday(localized_date)
 
     def get_market_info(self) -> dict[str, Any]:
         """Get comprehensive market information."""

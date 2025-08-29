@@ -28,6 +28,7 @@ assignees: ''
 <!-- If you have ideas on how to implement this, please share -->
 
 ## 📈 Impact Assessment
+
 - **User Impact**: Low / Medium / High
 - **Development Effort**: Small / Medium / Large
 - **Priority**: P0 (Critical) / P1 (High) / P2 (Medium) / P3 (Low)
@@ -36,6 +37,7 @@ assignees: ''
 <!-- Add any other context, mockups, or examples about the feature request here -->
 
 ## ✅ Checklist
+
 - [ ] I have searched for similar feature requests
 - [ ] This feature aligns with the project's goals
 - [ ] I have considered the implementation complexity

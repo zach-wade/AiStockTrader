@@ -113,6 +113,7 @@ def sample_position_record():
 class TestPortfolioRepositoryCRUD:
     """Test portfolio CRUD operations."""
 
+    @pytest.mark.asyncio
     async def test_save_portfolio_insert_new(self, repository, mock_adapter, sample_portfolio):
         """Test saving a new portfolio."""
         mock_adapter.fetch_one.return_value = None  # Portfolio doesn't exist
@@ -129,6 +130,7 @@ class TestPortfolioRepositoryCRUD:
         assert call_args[0][2] == sample_portfolio.name
         assert call_args[0][3] == sample_portfolio.initial_capital
 
+    @pytest.mark.asyncio
     async def test_save_portfolio_update_existing(
         self, repository, mock_adapter, sample_portfolio, sample_portfolio_record
     ):
@@ -144,6 +146,7 @@ class TestPortfolioRepositoryCRUD:
         call_args = mock_adapter.execute_query.call_args
         assert "UPDATE portfolios SET" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_save_portfolio_error(self, repository, mock_adapter, sample_portfolio):
         """Test save portfolio with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Database error")
@@ -151,6 +154,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to save portfolio"):
             await repository.save_portfolio(sample_portfolio)
 
+    @pytest.mark.asyncio
     async def test_insert_portfolio_all_fields(self, repository, mock_adapter, sample_portfolio):
         """Test inserting portfolio with all fields."""
         await repository._insert_portfolio(sample_portfolio)
@@ -187,6 +191,7 @@ class TestPortfolioRepositoryCRUD:
         params = call_args[0][1:]
         assert len(params) == 18  # All portfolio fields including version
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_id_found(
         self, repository, mock_adapter, sample_portfolio_record
     ):
@@ -204,6 +209,7 @@ class TestPortfolioRepositoryCRUD:
         # Verify position loading was attempted
         assert mock_adapter.fetch_all.called
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_id_not_found(self, repository, mock_adapter):
         """Test getting portfolio by ID when it doesn't exist."""
         mock_adapter.fetch_one.return_value = None
@@ -212,6 +218,7 @@ class TestPortfolioRepositoryCRUD:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_id_error(self, repository, mock_adapter):
         """Test get portfolio by ID with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Database error")
@@ -219,6 +226,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to retrieve portfolio"):
             await repository.get_portfolio_by_id(uuid4())
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_name(self, repository, mock_adapter, sample_portfolio_record):
         """Test getting portfolio by name."""
         mock_adapter.fetch_one.return_value = sample_portfolio_record
@@ -234,6 +242,7 @@ class TestPortfolioRepositoryCRUD:
         assert "WHERE name = %s" in call_args[0][0]
         assert call_args[0][1] == "Test Portfolio"
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_name_not_found(self, repository, mock_adapter):
         """Test getting portfolio by name when none exists."""
         mock_adapter.fetch_one.return_value = None
@@ -242,6 +251,7 @@ class TestPortfolioRepositoryCRUD:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_name_error(self, repository, mock_adapter):
         """Test get portfolio by name with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Database error")
@@ -249,6 +259,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to retrieve portfolio by name"):
             await repository.get_portfolio_by_name("Test Portfolio")
 
+    @pytest.mark.asyncio
     async def test_get_current_portfolio(self, repository, mock_adapter, sample_portfolio_record):
         """Test getting the current active portfolio."""
         mock_adapter.fetch_one.return_value = sample_portfolio_record
@@ -264,6 +275,7 @@ class TestPortfolioRepositoryCRUD:
         assert "ORDER BY COALESCE(last_updated, created_at) DESC" in call_args[0][0]
         assert "LIMIT 1" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_get_current_portfolio_not_found(self, repository, mock_adapter):
         """Test getting current portfolio when none exists."""
         mock_adapter.fetch_one.return_value = None
@@ -272,6 +284,7 @@ class TestPortfolioRepositoryCRUD:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_get_current_portfolio_error(self, repository, mock_adapter):
         """Test get current portfolio with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Database error")
@@ -279,6 +292,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to retrieve current portfolio"):
             await repository.get_current_portfolio()
 
+    @pytest.mark.asyncio
     async def test_get_all_portfolios(self, repository, mock_adapter, sample_portfolio_record):
         """Test getting all portfolios."""
         mock_adapter.fetch_all.return_value = [sample_portfolio_record, sample_portfolio_record]
@@ -294,6 +308,7 @@ class TestPortfolioRepositoryCRUD:
         assert "FROM portfolios" in call_args[0][0]
         assert "ORDER BY created_at DESC" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_get_all_portfolios_empty(self, repository, mock_adapter):
         """Test getting all portfolios when none exist."""
         mock_adapter.fetch_all.return_value = []
@@ -302,6 +317,7 @@ class TestPortfolioRepositoryCRUD:
 
         assert result == []
 
+    @pytest.mark.asyncio
     async def test_get_all_portfolios_error(self, repository, mock_adapter):
         """Test get all portfolios with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Database error")
@@ -309,6 +325,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to retrieve all portfolios"):
             await repository.get_all_portfolios()
 
+    @pytest.mark.asyncio
     async def test_get_portfolios_by_strategy(
         self, repository, mock_adapter, sample_portfolio_record
     ):
@@ -327,6 +344,7 @@ class TestPortfolioRepositoryCRUD:
         assert "WHERE strategy = %s" in call_args[0][0]
         assert call_args[0][1] == "balanced"
 
+    @pytest.mark.asyncio
     async def test_get_portfolios_by_strategy_error(self, repository, mock_adapter):
         """Test get portfolios by strategy with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Database error")
@@ -334,6 +352,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to retrieve portfolios for strategy"):
             await repository.get_portfolios_by_strategy("balanced")
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_history(self, repository, mock_adapter, sample_portfolio_record):
         """Test getting portfolio history within date range."""
         start_date = datetime.now(UTC) - timedelta(days=7)
@@ -359,6 +378,7 @@ class TestPortfolioRepositoryCRUD:
         assert call_args[0][2] == start_date
         assert call_args[0][3] == end_date
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_history_error(self, repository, mock_adapter):
         """Test get portfolio history with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Database error")
@@ -366,6 +386,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to retrieve portfolio history"):
             await repository.get_portfolio_history(uuid4(), datetime.now(UTC), datetime.now(UTC))
 
+    @pytest.mark.asyncio
     async def test_update_portfolio_success(self, repository, mock_adapter, sample_portfolio):
         """Test successful portfolio update."""
         mock_adapter.execute_query.return_value = "UPDATE 1"
@@ -388,6 +409,7 @@ class TestPortfolioRepositoryCRUD:
         # Version in WHERE clause should be the initial version
         assert call_args[0][-1] == initial_version
 
+    @pytest.mark.asyncio
     async def test_update_portfolio_not_found(self, repository, mock_adapter, sample_portfolio):
         """Test updating non-existent portfolio."""
         mock_adapter.execute_query.return_value = "UPDATE 0"
@@ -396,6 +418,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(PortfolioNotFoundError):
             await repository.update_portfolio(sample_portfolio)
 
+    @pytest.mark.asyncio
     async def test_update_portfolio_error(self, repository, mock_adapter, sample_portfolio):
         """Test update portfolio with database error."""
         mock_adapter.execute_query.side_effect = Exception("Database error")
@@ -403,6 +426,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to update portfolio"):
             await repository.update_portfolio(sample_portfolio)
 
+    @pytest.mark.asyncio
     async def test_delete_portfolio_success(self, repository, mock_adapter):
         """Test successful portfolio deletion."""
         portfolio_id = uuid4()
@@ -417,6 +441,7 @@ class TestPortfolioRepositoryCRUD:
         assert "DELETE FROM portfolios WHERE id = %s" in call_args[0][0]
         assert call_args[0][1] == portfolio_id
 
+    @pytest.mark.asyncio
     async def test_delete_portfolio_not_found(self, repository, mock_adapter):
         """Test deleting non-existent portfolio."""
         mock_adapter.execute_query.return_value = "DELETE 0"
@@ -425,6 +450,7 @@ class TestPortfolioRepositoryCRUD:
 
         assert result is False
 
+    @pytest.mark.asyncio
     async def test_delete_portfolio_error(self, repository, mock_adapter):
         """Test delete portfolio with database error."""
         mock_adapter.execute_query.side_effect = Exception("Database error")
@@ -432,6 +458,7 @@ class TestPortfolioRepositoryCRUD:
         with pytest.raises(RepositoryError, match="Failed to delete portfolio"):
             await repository.delete_portfolio(uuid4())
 
+    @pytest.mark.asyncio
     async def test_create_portfolio_snapshot(self, repository, mock_adapter, sample_portfolio):
         """Test creating portfolio snapshot."""
         mock_adapter.execute_query.return_value = "UPDATE 1"
@@ -444,6 +471,7 @@ class TestPortfolioRepositoryCRUD:
         # Should call update with new timestamp
         assert mock_adapter.execute_query.called
 
+    @pytest.mark.asyncio
     async def test_create_portfolio_snapshot_error(
         self, repository, mock_adapter, sample_portfolio
     ):
@@ -458,6 +486,7 @@ class TestPortfolioRepositoryCRUD:
 class TestPortfolioPositionManagement:
     """Test portfolio position loading and management."""
 
+    @pytest.mark.asyncio
     async def test_load_positions_success(
         self, repository, mock_adapter, sample_portfolio, sample_position_record
     ):
@@ -475,6 +504,7 @@ class TestPortfolioPositionManagement:
         assert "FROM positions" in call_args[0][0]
         assert "WHERE closed_at IS NULL" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_load_positions_multiple(self, repository, mock_adapter, sample_portfolio):
         """Test loading multiple positions for a portfolio."""
         position_records = [
@@ -521,6 +551,7 @@ class TestPortfolioPositionManagement:
         assert "AAPL" in sample_portfolio.positions
         assert "GOOGL" in sample_portfolio.positions
 
+    @pytest.mark.asyncio
     async def test_load_positions_clears_existing(self, repository, mock_adapter, sample_portfolio):
         """Test that loading positions clears existing positions."""
         # Add existing position
@@ -539,6 +570,7 @@ class TestPortfolioPositionManagement:
         assert len(sample_portfolio.positions) == 0
         assert "TSLA" not in sample_portfolio.positions
 
+    @pytest.mark.asyncio
     async def test_load_positions_error_suppressed(
         self, repository, mock_adapter, sample_portfolio
     ):
@@ -636,6 +668,7 @@ class TestPortfolioEntityMapping:
 class TestPortfolioRepositoryIntegration:
     """Test portfolio repository integration scenarios."""
 
+    @pytest.mark.asyncio
     async def test_portfolio_lifecycle(self, repository, mock_adapter):
         """Test complete portfolio lifecycle from creation to deletion."""
         portfolio = Portfolio(
@@ -686,6 +719,7 @@ class TestPortfolioRepositoryIntegration:
         result = await repository.delete_portfolio(portfolio.id)
         assert result is True
 
+    @pytest.mark.asyncio
     async def test_portfolio_with_positions(self, repository, mock_adapter):
         """Test portfolio with multiple positions."""
         portfolio_record = {
@@ -757,6 +791,7 @@ class TestPortfolioRepositoryIntegration:
         assert portfolio.positions["AAPL"].quantity == Decimal("100")
         assert portfolio.positions["GOOGL"].quantity == Decimal("20")
 
+    @pytest.mark.asyncio
     async def test_repository_initialization(self):
         """Test repository initialization."""
         mock_adapter = AsyncMock()
@@ -764,6 +799,7 @@ class TestPortfolioRepositoryIntegration:
 
         assert repo.adapter is mock_adapter
 
+    @pytest.mark.asyncio
     async def test_error_propagation(self, repository, mock_adapter, sample_portfolio):
         """Test that specific errors are properly propagated."""
         # Test PortfolioNotFoundError propagation in update
@@ -783,6 +819,7 @@ class TestPortfolioRepositoryIntegration:
 class TestPortfolioRepositoryConcurrency:
     """Test portfolio repository concurrent access and locking scenarios."""
 
+    @pytest.mark.asyncio
     async def test_concurrent_portfolio_updates(self, repository, mock_adapter, sample_portfolio):
         """Test handling concurrent portfolio updates."""
         # Simulate optimistic locking failure
@@ -793,6 +830,7 @@ class TestPortfolioRepositoryConcurrency:
         with pytest.raises(PortfolioNotFoundError):
             await repository.update_portfolio(sample_portfolio)
 
+    @pytest.mark.asyncio
     async def test_concurrent_position_loading(self, repository, mock_adapter, sample_portfolio):
         """Test concurrent position loading for same portfolio."""
         position_records = [
@@ -830,6 +868,7 @@ class TestPortfolioRepositoryConcurrency:
         assert "GOOGL" in sample_portfolio.positions
         assert "AAPL" not in sample_portfolio.positions
 
+    @pytest.mark.asyncio
     async def test_deadlock_recovery(self, repository, mock_adapter, sample_portfolio):
         """Test recovery from database deadlock."""
         # Simulate deadlock error
@@ -843,6 +882,7 @@ class TestPortfolioRepositoryConcurrency:
 class TestPortfolioRepositoryDataIntegrity:
     """Test data integrity and validation scenarios."""
 
+    @pytest.mark.asyncio
     async def test_portfolio_data_validation(self, repository, mock_adapter):
         """Test portfolio data validation before persistence."""
         # Create portfolio with edge case values
@@ -863,6 +903,7 @@ class TestPortfolioRepositoryDataIntegrity:
         await repository.save_portfolio(portfolio)
         assert mock_adapter.execute_query.called
 
+    @pytest.mark.asyncio
     async def test_null_handling_in_database_records(self, repository):
         """Test handling of NULL values from database."""
         record_with_nulls = {
@@ -894,6 +935,7 @@ class TestPortfolioRepositoryDataIntegrity:
         assert portfolio.strategy is None  # Strategy can be None
         assert portfolio.last_updated is None  # last_updated can be None
 
+    @pytest.mark.asyncio
     async def test_transaction_isolation(self, repository, mock_adapter, sample_portfolio):
         """Test transaction isolation between operations."""
         # Save portfolio
@@ -910,6 +952,7 @@ class TestPortfolioRepositoryDataIntegrity:
 class TestPortfolioRepositoryPerformance:
     """Test performance-related scenarios."""
 
+    @pytest.mark.asyncio
     async def test_bulk_portfolio_loading(self, repository, mock_adapter):
         """Test loading many portfolios efficiently."""
         # Create 100 portfolio records
@@ -944,6 +987,7 @@ class TestPortfolioRepositoryPerformance:
 
         assert len(portfolios) == 100
 
+    @pytest.mark.asyncio
     async def test_query_optimization_for_history(self, repository, mock_adapter):
         """Test optimized query for portfolio history."""
         portfolio_id = uuid4()
@@ -960,6 +1004,7 @@ class TestPortfolioRepositoryPerformance:
         assert "BETWEEN" in query
         assert "ORDER BY" in query
 
+    @pytest.mark.asyncio
     async def test_connection_pool_exhaustion(self, repository, mock_adapter):
         """Test handling when connection pool is exhausted."""
         mock_adapter.fetch_one.side_effect = Exception("connection pool exhausted")

@@ -85,6 +85,7 @@ def sample_position_record():
 class TestPositionRepositoryCRUD:
     """Test position CRUD operations."""
 
+    @pytest.mark.asyncio
     async def test_persist_position_insert_new(self, repository, mock_adapter, sample_position):
         """Test saving a new position."""
         mock_adapter.fetch_one.return_value = None  # Position doesn't exist
@@ -101,6 +102,7 @@ class TestPositionRepositoryCRUD:
         assert call_args[0][2] == sample_position.symbol
         assert call_args[0][3] == sample_position.quantity
 
+    @pytest.mark.asyncio
     async def test_persist_position_update_existing(
         self, repository, mock_adapter, sample_position, sample_position_record
     ):
@@ -114,6 +116,7 @@ class TestPositionRepositoryCRUD:
         call_args = mock_adapter.execute_query.call_args
         assert "UPDATE positions SET" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_insert_position_all_fields(self, repository, mock_adapter, sample_position):
         """Test inserting position with all fields."""
         await repository._insert_position(sample_position)
@@ -135,6 +138,7 @@ class TestPositionRepositoryCRUD:
         params = call_args[0][1:]
         assert len(params) == 15  # All position fields
 
+    @pytest.mark.asyncio
     async def test_get_position_by_id_found(self, repository, mock_adapter, sample_position_record):
         """Test getting position by ID when it exists."""
         mock_adapter.fetch_one.return_value = sample_position_record
@@ -147,6 +151,7 @@ class TestPositionRepositoryCRUD:
         assert result.quantity == sample_position_record["quantity"]
         assert result.average_entry_price == sample_position_record["average_entry_price"]
 
+    @pytest.mark.asyncio
     async def test_get_position_by_id_not_found(self, repository, mock_adapter):
         """Test getting position by ID when it doesn't exist."""
         mock_adapter.fetch_one.return_value = None
@@ -155,6 +160,7 @@ class TestPositionRepositoryCRUD:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_get_position_by_symbol(self, repository, mock_adapter, sample_position_record):
         """Test getting current position by symbol."""
         mock_adapter.fetch_one.return_value = sample_position_record
@@ -170,6 +176,7 @@ class TestPositionRepositoryCRUD:
         assert "closed_at IS NULL" in call_args[0][0]
         assert call_args[0][1] == "AAPL"
 
+    @pytest.mark.asyncio
     async def test_get_position_by_symbol_not_found(self, repository, mock_adapter):
         """Test getting position by symbol when none exists."""
         mock_adapter.fetch_one.return_value = None
@@ -178,6 +185,7 @@ class TestPositionRepositoryCRUD:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_get_positions_by_symbol(self, repository, mock_adapter, sample_position_record):
         """Test getting all positions (including historical) for a symbol."""
         mock_adapter.fetch_all.return_value = [sample_position_record, sample_position_record]
@@ -192,6 +200,7 @@ class TestPositionRepositoryCRUD:
         assert "WHERE symbol = %s" in call_args[0][0]
         assert call_args[0][1] == "AAPL"
 
+    @pytest.mark.asyncio
     async def test_get_active_positions(self, repository, mock_adapter, sample_position_record):
         """Test getting active positions."""
         mock_adapter.fetch_all.return_value = [sample_position_record]
@@ -205,6 +214,7 @@ class TestPositionRepositoryCRUD:
         call_args = mock_adapter.fetch_all.call_args
         assert "WHERE closed_at IS NULL" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_get_closed_positions(self, repository, mock_adapter):
         """Test getting closed positions."""
         sample_record = {
@@ -235,6 +245,7 @@ class TestPositionRepositoryCRUD:
         call_args = mock_adapter.fetch_all.call_args
         assert "WHERE closed_at IS NOT NULL" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_get_positions_by_strategy(
         self, repository, mock_adapter, sample_position_record
     ):
@@ -251,6 +262,7 @@ class TestPositionRepositoryCRUD:
         assert "WHERE strategy = %s" in call_args[0][0]
         assert call_args[0][1] == "momentum"
 
+    @pytest.mark.asyncio
     async def test_get_positions_by_date_range(
         self, repository, mock_adapter, sample_position_record
     ):
@@ -269,6 +281,7 @@ class TestPositionRepositoryCRUD:
         assert call_args[0][1] == start_date
         assert call_args[0][2] == end_date
 
+    @pytest.mark.asyncio
     async def test_update_position_success(self, repository, mock_adapter, sample_position):
         """Test successful position update."""
         mock_adapter.execute_query.return_value = "UPDATE 1"
@@ -284,6 +297,7 @@ class TestPositionRepositoryCRUD:
         # ID should be last parameter
         assert call_args[0][-1] == sample_position.id
 
+    @pytest.mark.asyncio
     async def test_update_position_not_found(self, repository, mock_adapter, sample_position):
         """Test updating non-existent position."""
         mock_adapter.execute_query.return_value = "UPDATE 0"
@@ -291,6 +305,7 @@ class TestPositionRepositoryCRUD:
         with pytest.raises(PositionNotFoundError):
             await repository.update_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_close_position_success(self, repository, mock_adapter):
         """Test successful position closure."""
         position_id = uuid4()
@@ -308,6 +323,7 @@ class TestPositionRepositoryCRUD:
         assert "WHERE id = %s AND closed_at IS NULL" in call_args[0][0]
         assert call_args[0][1] == position_id
 
+    @pytest.mark.asyncio
     async def test_close_position_not_found(self, repository, mock_adapter):
         """Test closing non-existent position."""
         mock_adapter.execute_query.return_value = "UPDATE 0"
@@ -316,6 +332,7 @@ class TestPositionRepositoryCRUD:
 
         assert result is False
 
+    @pytest.mark.asyncio
     async def test_delete_position_success(self, repository, mock_adapter):
         """Test successful position deletion."""
         position_id = uuid4()
@@ -330,6 +347,7 @@ class TestPositionRepositoryCRUD:
         assert "DELETE FROM positions WHERE id = %s" in call_args[0][0]
         assert call_args[0][1] == position_id
 
+    @pytest.mark.asyncio
     async def test_delete_position_not_found(self, repository, mock_adapter):
         """Test deleting non-existent position."""
         mock_adapter.execute_query.return_value = "DELETE 0"
@@ -442,6 +460,7 @@ class TestPositionEntityMapping:
 class TestPositionErrorHandling:
     """Test position repository error handling."""
 
+    @pytest.mark.asyncio
     async def test_persist_position_error(self, repository, mock_adapter, sample_position):
         """Test persist position with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Database connection failed")
@@ -449,6 +468,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to save position"):
             await repository.persist_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_get_position_by_id_error(self, repository, mock_adapter):
         """Test get position by ID with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Query failed")
@@ -456,6 +476,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve position"):
             await repository.get_position_by_id(uuid4())
 
+    @pytest.mark.asyncio
     async def test_get_position_by_symbol_error(self, repository, mock_adapter):
         """Test get position by symbol with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Query failed")
@@ -463,6 +484,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve position for symbol"):
             await repository.get_position_by_symbol("AAPL")
 
+    @pytest.mark.asyncio
     async def test_get_positions_by_symbol_error(self, repository, mock_adapter):
         """Test get positions by symbol with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -470,6 +492,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve positions for symbol"):
             await repository.get_positions_by_symbol("AAPL")
 
+    @pytest.mark.asyncio
     async def test_get_active_positions_error(self, repository, mock_adapter):
         """Test get active positions with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -477,6 +500,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve active positions"):
             await repository.get_active_positions()
 
+    @pytest.mark.asyncio
     async def test_get_closed_positions_error(self, repository, mock_adapter):
         """Test get closed positions with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -484,6 +508,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve closed positions"):
             await repository.get_closed_positions()
 
+    @pytest.mark.asyncio
     async def test_get_positions_by_strategy_error(self, repository, mock_adapter):
         """Test get positions by strategy with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -491,6 +516,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve positions for strategy"):
             await repository.get_positions_by_strategy("momentum")
 
+    @pytest.mark.asyncio
     async def test_get_positions_by_date_range_error(self, repository, mock_adapter):
         """Test get positions by date range with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -498,6 +524,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve positions by date range"):
             await repository.get_positions_by_date_range(datetime.now(UTC), datetime.now(UTC))
 
+    @pytest.mark.asyncio
     async def test_update_position_error(self, repository, mock_adapter, sample_position):
         """Test update position with database error."""
         mock_adapter.execute_query.side_effect = Exception("Update failed")
@@ -505,6 +532,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to update position"):
             await repository.update_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_close_position_error(self, repository, mock_adapter):
         """Test close position with database error."""
         mock_adapter.execute_query.side_effect = Exception("Update failed")
@@ -512,6 +540,7 @@ class TestPositionErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to close position"):
             await repository.close_position(uuid4())
 
+    @pytest.mark.asyncio
     async def test_delete_position_error(self, repository, mock_adapter):
         """Test delete position with database error."""
         mock_adapter.execute_query.side_effect = Exception("Delete failed")
@@ -524,6 +553,7 @@ class TestPositionErrorHandling:
 class TestPositionLifecycle:
     """Test position lifecycle operations."""
 
+    @pytest.mark.asyncio
     async def test_position_opening_flow(self, repository, mock_adapter):
         """Test position from opening to tracking."""
         # Create new position using factory method
@@ -544,6 +574,7 @@ class TestPositionLifecycle:
         call_args = mock_adapter.execute_query.call_args
         assert "INSERT INTO positions" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_position_update_flow(self, repository, mock_adapter, sample_position_record):
         """Test position price update."""
         position = Position(
@@ -562,6 +593,7 @@ class TestPositionLifecycle:
         result = await repository.persist_position(position)
         assert result.current_price == Decimal("152.00")
 
+    @pytest.mark.asyncio
     async def test_position_closing_flow(self, repository, mock_adapter):
         """Test position closing process."""
         position_id = uuid4()
@@ -582,6 +614,7 @@ class TestPositionLifecycle:
 class TestPositionQueryOptimizations:
     """Test query optimization and edge cases."""
 
+    @pytest.mark.asyncio
     async def test_get_positions_with_empty_results(self, repository, mock_adapter):
         """Test methods that return empty lists."""
         mock_adapter.fetch_all.return_value = []
@@ -613,6 +646,7 @@ class TestPositionQueryOptimizations:
         result = await repository.get_positions_by_date_range(start_date, end_date)
         assert result == []
 
+    @pytest.mark.asyncio
     async def test_persist_position_exception_during_get(
         self, repository, mock_adapter, sample_position
     ):
@@ -622,6 +656,7 @@ class TestPositionQueryOptimizations:
         with pytest.raises(RepositoryError, match="Failed to save position"):
             await repository.persist_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_persist_position_exception_during_update(
         self, repository, mock_adapter, sample_position, sample_position_record
     ):
@@ -632,6 +667,7 @@ class TestPositionQueryOptimizations:
         with pytest.raises(RepositoryError, match="Failed to update position"):
             await repository.persist_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_persist_position_exception_during_insert(
         self, repository, mock_adapter, sample_position
     ):
@@ -642,6 +678,7 @@ class TestPositionQueryOptimizations:
         with pytest.raises(RepositoryError, match="Failed to save position"):
             await repository.persist_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_update_position_not_found_exception_propagation(
         self, repository, mock_adapter, sample_position
     ):
@@ -651,6 +688,7 @@ class TestPositionQueryOptimizations:
         with pytest.raises(PositionNotFoundError):
             await repository.update_position(sample_position)
 
+    @pytest.mark.asyncio
     async def test_repository_initialization(self):
         """Test repository initialization."""
         mock_adapter = AsyncMock()
@@ -658,6 +696,7 @@ class TestPositionQueryOptimizations:
 
         assert repo.adapter is mock_adapter
 
+    @pytest.mark.asyncio
     async def test_private_insert_position_method(self, repository, mock_adapter, sample_position):
         """Test the private _insert_position method directly."""
         result = await repository._insert_position(sample_position)
@@ -671,6 +710,7 @@ class TestPositionQueryOptimizations:
         # Verify all 15 parameters are passed
         assert len(call_args[0]) == 16  # query + 15 params
 
+    @pytest.mark.asyncio
     async def test_multiple_positions_same_symbol(self, repository, mock_adapter):
         """Test retrieving multiple positions for the same symbol."""
         position_records = [
@@ -719,6 +759,7 @@ class TestPositionQueryOptimizations:
         assert any(pos.is_closed() for pos in result)
         assert any(not pos.is_closed() for pos in result)
 
+    @pytest.mark.asyncio
     async def test_bulk_operations_with_different_strategies(self, repository, mock_adapter):
         """Test bulk operations with positions from different strategies."""
         strategy_records = {
@@ -774,6 +815,7 @@ class TestPositionQueryOptimizations:
 class TestPositionRepositoryConcurrency:
     """Test position repository concurrent access and transaction scenarios."""
 
+    @pytest.mark.asyncio
     async def test_concurrent_position_updates(self, repository, mock_adapter):
         """Test handling concurrent position updates."""
         position1 = Position(
@@ -799,6 +841,7 @@ class TestPositionRepositoryConcurrency:
         with pytest.raises(PositionNotFoundError):
             await repository.update_position(position2)
 
+    @pytest.mark.asyncio
     async def test_race_condition_in_close_position(self, repository, mock_adapter):
         """Test race condition when closing position multiple times."""
         position_id = uuid4()
@@ -813,6 +856,7 @@ class TestPositionRepositoryConcurrency:
         result2 = await repository.close_position(position_id)
         assert result2 is False
 
+    @pytest.mark.asyncio
     async def test_transaction_rollback_scenario(self, repository, mock_adapter):
         """Test position changes during transaction rollback."""
         position = Position(
@@ -836,6 +880,7 @@ class TestPositionRepositoryConcurrency:
 class TestPositionRepositoryDataIntegrity:
     """Test data integrity and edge cases."""
 
+    @pytest.mark.asyncio
     async def test_position_with_extreme_values(self, repository, mock_adapter):
         """Test positions with extreme numerical values."""
         extreme_position = Position(
@@ -852,6 +897,7 @@ class TestPositionRepositoryDataIntegrity:
         result = await repository.persist_position(extreme_position)
         assert result == extreme_position
 
+    @pytest.mark.asyncio
     async def test_position_symbol_validation(self, repository, mock_adapter):
         """Test positions with various symbol formats."""
         symbols = [
@@ -876,6 +922,7 @@ class TestPositionRepositoryDataIntegrity:
             result = await repository.persist_position(position)
             assert result.symbol == symbol
 
+    @pytest.mark.asyncio
     async def test_partial_fill_handling(self, repository, mock_adapter):
         """Test handling positions with partial fills."""
         # Initial position
@@ -920,6 +967,7 @@ class TestPositionRepositoryDataIntegrity:
 class TestPositionRepositoryPerformance:
     """Test performance and scalability scenarios."""
 
+    @pytest.mark.asyncio
     async def test_bulk_position_retrieval(self, repository, mock_adapter):
         """Test retrieving large number of positions."""
         # Create 1000 position records
@@ -949,6 +997,7 @@ class TestPositionRepositoryPerformance:
         positions = await repository.get_positions_by_strategy("bulk_test")
         assert len(positions) == 1000
 
+    @pytest.mark.asyncio
     async def test_position_history_query_optimization(self, repository, mock_adapter):
         """Test optimized queries for position history."""
         # Test date range query optimization
@@ -966,6 +1015,7 @@ class TestPositionRepositoryPerformance:
         assert "opened_at <=" in query
         assert "ORDER BY opened_at DESC" in query
 
+    @pytest.mark.asyncio
     async def test_connection_timeout_handling(self, repository, mock_adapter):
         """Test handling of database connection timeouts."""
         mock_adapter.fetch_one.side_effect = Exception("timeout expired")
@@ -978,6 +1028,7 @@ class TestPositionRepositoryPerformance:
 class TestPositionRepositoryComplexScenarios:
     """Test complex business scenarios."""
 
+    @pytest.mark.asyncio
     async def test_position_split_adjustment(self, repository, mock_adapter):
         """Test handling stock split adjustments."""
         # Position before split
@@ -1018,6 +1069,7 @@ class TestPositionRepositoryComplexScenarios:
         assert result.quantity == Decimal("400")
         assert result.average_entry_price == Decimal("150.00")
 
+    @pytest.mark.asyncio
     async def test_position_transfer_between_accounts(self, repository, mock_adapter):
         """Test position transfer scenarios."""
         # Original position
@@ -1041,6 +1093,7 @@ class TestPositionRepositoryComplexScenarios:
         result = await repository.persist_position(new_position)
         assert result.strategy == "transferred"
 
+    @pytest.mark.asyncio
     async def test_position_with_complex_tags(self, repository, mock_adapter):
         """Test positions with complex tag structures."""
         complex_tags = {

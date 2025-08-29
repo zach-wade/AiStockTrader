@@ -24,6 +24,7 @@ from .portfolio_analytics_service import (
 )
 from .position_manager import PositionManager
 from .risk_calculator import RiskCalculator
+from .risk_manager import RiskManager
 from .strategy_analytics_service import (
     StrategyAnalyticsService,
     StrategyComparison,
@@ -43,6 +44,7 @@ from .trading_validation_service import TradingValidationService
 __all__ = [
     "PositionManager",
     "RiskCalculator",
+    "RiskManager",
     "OrderProcessor",
     "FillDetails",
     "ICommissionCalculator",

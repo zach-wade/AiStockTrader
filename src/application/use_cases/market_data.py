@@ -8,37 +8,28 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from src.application.interfaces.market_data import IMarketDataProvider
 from src.application.interfaces.unit_of_work import IUnitOfWork
+from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.symbol import Symbol
 
 from .base import TransactionalUseCase, UseCaseResponse
+from .base_request import BaseRequestDTO
 
-# UTC timezone
-UTC = UTC
+# UTC timezone already imported from datetime above
 
 
 # Request/Response DTOs
 @dataclass
-class GetMarketDataRequest:
+class GetMarketDataRequest(BaseRequestDTO):
     """Request to get market data."""
 
     symbol: str
     start_date: datetime
     end_date: datetime
     timeframe: str = "1min"
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -54,20 +45,10 @@ class GetMarketDataResponse(UseCaseResponse):
 
 
 @dataclass
-class GetLatestPriceRequest:
+class GetLatestPriceRequest(BaseRequestDTO):
     """Request to get latest price."""
 
     symbol: str
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -81,22 +62,12 @@ class GetLatestPriceResponse(UseCaseResponse):
 
 
 @dataclass
-class GetHistoricalDataRequest:
+class GetHistoricalDataRequest(BaseRequestDTO):
     """Request to get historical market data."""
 
     symbol: str
     days: int = 30
     timeframe: str = "1day"
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -161,12 +132,14 @@ class GetMarketDataUseCase(TransactionalUseCase[GetMarketDataRequest, GetMarketD
             bars_data.append(
                 {
                     "timestamp": bar.timestamp.isoformat(),
-                    "open": float(bar.open.value),
-                    "high": float(bar.high.value),
-                    "low": float(bar.low.value),
-                    "close": float(bar.close.value),
+                    "open": float(ValueObjectConverter.extract_value(bar.open)),
+                    "high": float(ValueObjectConverter.extract_value(bar.high)),
+                    "low": float(ValueObjectConverter.extract_value(bar.low)),
+                    "close": float(ValueObjectConverter.extract_value(bar.close)),
                     "volume": bar.volume,
-                    "vwap": float(bar.vwap.value) if bar.vwap else None,
+                    "vwap": (
+                        float(ValueObjectConverter.extract_value(bar.vwap)) if bar.vwap else None
+                    ),
                 }
             )
 
@@ -227,7 +200,7 @@ class GetLatestPriceUseCase(TransactionalUseCase[GetLatestPriceRequest, GetLates
             return GetLatestPriceResponse(
                 success=True,
                 symbol=request.symbol,
-                price=latest_bar.close.value,
+                price=ValueObjectConverter.extract_value(latest_bar.close),
                 timestamp=latest_bar.timestamp,
                 volume=latest_bar.volume,
                 request_id=request.request_id,
@@ -290,14 +263,14 @@ class GetHistoricalDataUseCase(
             data.append(
                 {
                     "date": bar.timestamp.date().isoformat(),
-                    "open": float(bar.open.value),
-                    "high": float(bar.high.value),
-                    "low": float(bar.low.value),
-                    "close": float(bar.close.value),
+                    "open": float(ValueObjectConverter.extract_value(bar.open)),
+                    "high": float(ValueObjectConverter.extract_value(bar.high)),
+                    "low": float(ValueObjectConverter.extract_value(bar.low)),
+                    "close": float(ValueObjectConverter.extract_value(bar.close)),
                     "volume": bar.volume,
                 }
             )
-            prices.append(float(bar.close.value))
+            prices.append(float(ValueObjectConverter.extract_value(bar.close)))
 
         # Calculate statistics
         statistics = None

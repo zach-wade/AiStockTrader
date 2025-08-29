@@ -711,6 +711,7 @@ class TestLogTradingOperationDecorator:
         mock_get_logger.return_value = mock_logger
 
         @log_trading_operation("async_operation")
+        @pytest.mark.asyncio
         async def test_func(x):
             await asyncio.sleep(0.01)
             return x * 2
@@ -731,6 +732,7 @@ class TestLogTradingOperationDecorator:
         mock_get_logger.return_value = mock_logger
 
         @log_trading_operation("async_operation")
+        @pytest.mark.asyncio
         async def test_func():
             await asyncio.sleep(0.01)
             raise RuntimeError("Async error")

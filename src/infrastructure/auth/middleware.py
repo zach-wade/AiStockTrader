@@ -53,7 +53,7 @@ class JWTBearer(HTTPBearer):
         self.jwt_service = jwt_service
         self.db = db_session
 
-    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:  # type: ignore[override]
+    async def __call__(self, request: Request) -> dict[str, Any] | None:  # type: ignore[override]
         """
         Validate JWT token from Authorization header.
 
@@ -66,7 +66,7 @@ class JWTBearer(HTTPBearer):
         Raises:
             HTTPException: If token is invalid
         """
-        credentials: HTTPAuthorizationCredentials = await super().__call__(request)
+        credentials: HTTPAuthorizationCredentials | None = await super().__call__(request)
 
         if not credentials:
             if self.auto_error:
@@ -101,7 +101,7 @@ class JWTBearer(HTTPBearer):
 
                 # Update session activity
                 session.update_activity()
-                await self.db.commit()
+                self.db.commit()
 
             # Store user context in request state
             request.state.user_id = payload["sub"]
@@ -121,7 +121,7 @@ class JWTBearer(HTTPBearer):
                         f"token IP {payload['ip']} != request IP {client_ip}"
                     )
 
-            return payload
+            return dict(payload)
 
         except TokenExpiredException:
             raise HTTPException(
@@ -176,7 +176,7 @@ class APIKeyAuth:
         self.auto_error = auto_error
         self.api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:  # type: ignore[override]
+    async def __call__(self, request: Request) -> dict[str, Any] | None:
         """
         Validate API key from header or query parameter.
 
@@ -246,17 +246,18 @@ class APIKeyAuth:
         key = f"rate_limit:api_key:{key_id}"
 
         # Remove old entries
-        self.redis.zremrangebyscore(key, 0, window_start)
+        if self.redis:
+            await self.redis.zremrangebyscore(key, 0, window_start)
 
-        # Count requests in window
-        request_count = self.redis.zcard(key)
+            # Count requests in window
+            request_count = await self.redis.zcard(key)
 
-        if request_count >= limit:
-            return False
+            if request_count >= limit:
+                return False
 
-        # Add current request
-        self.redis.zadd(key, {str(now): now})
-        self.redis.expire(key, 3600)
+            # Add current request
+            await self.redis.zadd(key, {str(now): now})
+            await self.redis.expire(key, 3600)
 
         return True
 
@@ -361,7 +362,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     Adds security headers to all responses.
     """
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         """Add security headers to response."""
         response = await call_next(request)
 
@@ -393,7 +394,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     Adds unique request ID for tracing.
     """
 
-    async def dispatch(self, request: Request, call_next) -> Any:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         """Add request ID to request and response."""
         # Get or generate request ID
         request_id = request.headers.get("X-Request-ID")
@@ -430,7 +431,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.db = db_session
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         """Log request for audit."""
         start_time = time.time()
 
@@ -458,7 +459,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
             )
 
             self.db.add(audit_log)
-            await self.db.commit()
+            self.db.commit()
 
         return response  # type: ignore[no-any-return]
 
@@ -486,8 +487,8 @@ class RateLimitMiddleware:
         self.window = window_seconds
 
     async def __call__(
-        self, request: Request, call_next: Callable[..., Any], limit: int | None = None
-    ):
+        self, request: Request, call_next: Callable[[Request], Any], limit: int | None = None
+    ) -> Response:
         """
         Check rate limit for request.
 
@@ -506,7 +507,7 @@ class RateLimitMiddleware:
             identifier = f"ip:{request.client.host}"
         else:
             # Can't rate limit without identifier
-            return await call_next(request)
+            return await call_next(request)  # type: ignore[no-any-return]
 
         # Check rate limit
         limit = limit or self.default_limit
@@ -516,33 +517,36 @@ class RateLimitMiddleware:
         window_start = now - self.window
 
         # Remove old entries
-        self.redis.zremrangebyscore(key, 0, window_start)
+        if self.redis:
+            await self.redis.zremrangebyscore(key, 0, window_start)
 
-        # Count requests in window
-        request_count = self.redis.zcard(key)
+            # Count requests in window
+            request_count = await self.redis.zcard(key)
 
-        if request_count >= limit:
-            # Get oldest request time to calculate retry-after
-            oldest = self.redis.zrange(key, 0, 0, withscores=True)
-            if oldest:
-                retry_after = int(self.window - (now - oldest[0][1]))
-            else:
-                retry_after = self.window
+            if request_count >= limit:
+                # Get oldest request time to calculate retry-after
+                oldest = await self.redis.zrange(key, 0, 0, withscores=True)
+                if oldest:
+                    retry_after = int(self.window - (now - oldest[0][1]))
+                else:
+                    retry_after = self.window
 
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded",
-                headers={
-                    "Retry-After": str(retry_after),
-                    "X-RateLimit-Limit": str(limit),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(int(now + retry_after)),
-                },
-            )
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Rate limit exceeded",
+                    headers={
+                        "Retry-After": str(retry_after),
+                        "X-RateLimit-Limit": str(limit),
+                        "X-RateLimit-Remaining": "0",
+                        "X-RateLimit-Reset": str(int(now + retry_after)),
+                    },
+                )
 
-        # Add current request
-        self.redis.zadd(key, {str(now): now})
-        self.redis.expire(key, self.window)
+            # Add current request
+            await self.redis.zadd(key, {str(now): now})
+            await self.redis.expire(key, self.window)
+        else:
+            request_count = 0
 
         # Process request
         response = await call_next(request)
@@ -583,7 +587,7 @@ class SessionManagementMiddleware(BaseHTTPMiddleware):
         self.session_timeout = timedelta(minutes=session_timeout_minutes)
         self.refresh_threshold = timedelta(minutes=refresh_threshold_minutes)
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         """Manage user session."""
         response = await call_next(request)
 
@@ -602,7 +606,7 @@ class SessionManagementMiddleware(BaseHTTPMiddleware):
                 if time_until_expiry < self.refresh_threshold:
                     # Extend session
                     session.extend(self.session_timeout)
-                    await self.db.commit()
+                    self.db.commit()
 
                     # Add header to indicate session was refreshed
                     response.headers["X-Session-Refreshed"] = "true"
@@ -686,13 +690,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         ]
         self.require_auth = require_auth
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         """Process request through authentication pipeline."""
         start_time = time.time()
 
         # Check if path is excluded from authentication
         if self._is_excluded_path(request.url.path):
-            return await call_next(request)
+            return await call_next(request)  # type: ignore[no-any-return]
 
         # Try to authenticate request
         auth_result = await self._authenticate_request(request)
@@ -709,9 +713,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         # Log audit event if authenticated
         if auth_result:
-            await self._log_request(request, response, time.time() - start_time)
+            self._log_request(request, response, time.time() - start_time)
 
-        return response
+        return response  # type: ignore[no-any-return]
 
     async def _authenticate_request(self, request: Request) -> bool:
         """
@@ -812,17 +816,18 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         key = f"rate_limit:api_key:{key_id}"
 
         # Remove old entries
-        self.redis.zremrangebyscore(key, 0, window_start)
+        if self.redis:
+            await self.redis.zremrangebyscore(key, 0, window_start)
 
-        # Count requests in window
-        request_count = self.redis.zcard(key)
+            # Count requests in window
+            request_count = await self.redis.zcard(key)
 
-        if request_count >= limit:
-            return False
+            if request_count >= limit:
+                return False
 
-        # Add current request
-        self.redis.zadd(key, {str(now): now})
-        self.redis.expire(key, 3600)
+            # Add current request
+            await self.redis.zadd(key, {str(now): now})
+            await self.redis.expire(key, 3600)
 
         return True
 
@@ -833,7 +838,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 return True
         return False
 
-    async def _log_request(self, request: Request, response: Response, duration: float) -> None:
+    def _log_request(self, request: Request, response: Response, duration: float) -> None:
         """Log authenticated request for audit."""
         if not hasattr(request.state, "user_id"):
             return
@@ -863,7 +868,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 )
 
                 self.db.add(audit_log)
-                await self.db.commit()
+                self.db.commit()
 
 
 class CORSMiddleware(BaseHTTPMiddleware):
@@ -888,7 +893,7 @@ class CORSMiddleware(BaseHTTPMiddleware):
         self.allow_credentials = allow_credentials
         self.max_age = max_age
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         """Handle CORS headers."""
         # Handle preflight requests
         if request.method == "OPTIONS":
@@ -906,7 +911,7 @@ class CORSMiddleware(BaseHTTPMiddleware):
             ).lower()
             response.headers["Vary"] = "Origin"
 
-        return response
+        return response  # type: ignore[no-any-return]
 
     def _create_preflight_response(self, request: Request) -> Response:
         """Create preflight response for OPTIONS requests."""

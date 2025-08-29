@@ -93,6 +93,7 @@ class TestUnitOfWorkInitialization:
 class TestTransactionManagement:
     """Test transaction management operations."""
 
+    @pytest.mark.asyncio
     async def test_begin_transaction_success(self, unit_of_work, mock_adapter):
         """Test beginning a new transaction."""
         mock_adapter.has_active_transaction = False
@@ -101,6 +102,7 @@ class TestTransactionManagement:
 
         mock_adapter.begin_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_begin_transaction_already_active(self, unit_of_work, mock_adapter):
         """Test beginning transaction when one is already active."""
         mock_adapter.has_active_transaction = True
@@ -108,6 +110,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionAlreadyActiveError):
             await unit_of_work.begin_transaction()
 
+    @pytest.mark.asyncio
     async def test_begin_transaction_error(self, unit_of_work, mock_adapter):
         """Test begin transaction with database error."""
         mock_adapter.has_active_transaction = False
@@ -116,6 +119,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionError, match="Failed to begin transaction"):
             await unit_of_work.begin_transaction()
 
+    @pytest.mark.asyncio
     async def test_commit_success(self, unit_of_work, mock_adapter):
         """Test committing a transaction."""
         mock_adapter.has_active_transaction = True
@@ -124,6 +128,7 @@ class TestTransactionManagement:
 
         mock_adapter.commit_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_commit_no_active_transaction(self, unit_of_work, mock_adapter):
         """Test committing when no transaction is active."""
         mock_adapter.has_active_transaction = False
@@ -131,6 +136,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionNotActiveError):
             await unit_of_work.commit()
 
+    @pytest.mark.asyncio
     async def test_commit_error(self, unit_of_work, mock_adapter):
         """Test commit with database error."""
         mock_adapter.has_active_transaction = True
@@ -139,6 +145,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionCommitError):
             await unit_of_work.commit()
 
+    @pytest.mark.asyncio
     async def test_rollback_success(self, unit_of_work, mock_adapter):
         """Test rolling back a transaction."""
         mock_adapter.has_active_transaction = True
@@ -147,6 +154,7 @@ class TestTransactionManagement:
 
         mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_rollback_no_active_transaction(self, unit_of_work, mock_adapter):
         """Test rolling back when no transaction is active."""
         mock_adapter.has_active_transaction = False
@@ -156,6 +164,7 @@ class TestTransactionManagement:
 
         mock_adapter.rollback_transaction.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_rollback_error(self, unit_of_work, mock_adapter):
         """Test rollback with database error."""
         mock_adapter.has_active_transaction = True
@@ -164,6 +173,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionRollbackError):
             await unit_of_work.rollback()
 
+    @pytest.mark.asyncio
     async def test_is_active(self, unit_of_work, mock_adapter):
         """Test checking if transaction is active."""
         mock_adapter.has_active_transaction = False
@@ -172,6 +182,7 @@ class TestTransactionManagement:
         mock_adapter.has_active_transaction = True
         assert await unit_of_work.is_active() is True
 
+    @pytest.mark.asyncio
     async def test_flush_success(self, unit_of_work, mock_adapter):
         """Test flushing pending changes."""
         mock_adapter.has_active_transaction = True
@@ -180,6 +191,7 @@ class TestTransactionManagement:
 
         # Flush is a no-op for PostgreSQL, just verify no error
 
+    @pytest.mark.asyncio
     async def test_flush_no_active_transaction(self, unit_of_work, mock_adapter):
         """Test flushing when no transaction is active."""
         mock_adapter.has_active_transaction = False
@@ -187,6 +199,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionNotActiveError):
             await unit_of_work.flush()
 
+    @pytest.mark.asyncio
     async def test_flush_error(self, unit_of_work, mock_adapter):
         """Test flush with error."""
         # Set initial state
@@ -209,6 +222,7 @@ class TestTransactionManagement:
         # Restore original
         unit_of_work.flush = original_flush
 
+    @pytest.mark.asyncio
     async def test_refresh_entity(self, unit_of_work, mock_adapter):
         """Test refreshing an entity."""
         entity = MagicMock()
@@ -218,6 +232,7 @@ class TestTransactionManagement:
 
         # Simplified implementation, just verify no error
 
+    @pytest.mark.asyncio
     async def test_refresh_entity_error(self, unit_of_work, mock_adapter):
         """Test refresh with error."""
         # Simple test - the refresh method is simplified and logs errors
@@ -235,6 +250,7 @@ class TestTransactionManagement:
 class TestContextManager:
     """Test async context manager functionality."""
 
+    @pytest.mark.asyncio
     async def test_context_manager_success(self, unit_of_work, mock_adapter):
         """Test successful transaction using context manager."""
         mock_adapter.has_active_transaction = False
@@ -246,6 +262,7 @@ class TestContextManager:
 
         mock_adapter.commit_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_context_manager_with_exception(self, unit_of_work, mock_adapter):
         """Test context manager rolls back on exception."""
         mock_adapter.has_active_transaction = False
@@ -259,6 +276,7 @@ class TestContextManager:
         mock_adapter.rollback_transaction.assert_called_once()
         mock_adapter.commit_transaction.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_context_manager_commit_failure(self, unit_of_work, mock_adapter):
         """Test context manager handles commit failure."""
         mock_adapter.has_active_transaction = False
@@ -273,6 +291,7 @@ class TestContextManager:
 
         mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_context_manager_commit_and_rollback_failure(self, unit_of_work, mock_adapter):
         """Test context manager when both commit and rollback fail."""
         mock_adapter.has_active_transaction = False
@@ -290,6 +309,7 @@ class TestContextManager:
         mock_adapter.commit_transaction.assert_called_once()
         mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_context_manager_rollback_failure_on_exception(self, unit_of_work, mock_adapter):
         """Test context manager when rollback fails after an exception."""
         mock_adapter.has_active_transaction = False
@@ -302,6 +322,7 @@ class TestContextManager:
 
         mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_context_manager_exit_types(self, unit_of_work, mock_adapter):
         """Test context manager exit with different exception types."""
         mock_adapter.has_active_transaction = False
@@ -358,6 +379,7 @@ class TestUnitOfWorkFactory:
             with pytest.raises(FactoryError, match="Failed to create Unit of Work"):
                 factory.create_unit_of_work()
 
+    @pytest.mark.asyncio
     async def test_create_unit_of_work_async(self, mock_connection):
         """Test creating unit of work asynchronously."""
         factory = PostgreSQLUnitOfWorkFactory()
@@ -372,6 +394,7 @@ class TestUnitOfWorkFactory:
             assert isinstance(uow, PostgreSQLUnitOfWork)
             assert uow.adapter is not None
 
+    @pytest.mark.asyncio
     async def test_create_unit_of_work_async_no_pool(self, mock_connection):
         """Test creating unit of work async when connection pool is None."""
         factory = PostgreSQLUnitOfWorkFactory()
@@ -385,6 +408,7 @@ class TestUnitOfWorkFactory:
             with pytest.raises(FactoryError, match="Database connection pool is not initialized"):
                 await factory.create_unit_of_work_async()
 
+    @pytest.mark.asyncio
     async def test_create_unit_of_work_async_error(self):
         """Test creating unit of work async with error."""
         factory = PostgreSQLUnitOfWorkFactory()
@@ -413,6 +437,7 @@ class TestTransactionManager:
         """Transaction manager with mocked factory."""
         return PostgreSQLTransactionManager(mock_factory)
 
+    @pytest.mark.asyncio
     async def test_execute_in_transaction_success(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -436,6 +461,7 @@ class TestTransactionManager:
         mock_adapter.begin_transaction.assert_called_once()
         mock_adapter.commit_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_execute_in_transaction_with_async_factory(
         self, transaction_manager, mock_adapter
     ):
@@ -465,6 +491,7 @@ class TestTransactionManager:
             assert result == "async_success"
             mock_create.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_execute_in_transaction_error(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -487,6 +514,7 @@ class TestTransactionManager:
 
         mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_success_first_attempt(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -510,6 +538,7 @@ class TestTransactionManager:
         # Should only be called once
         assert mock_adapter.begin_transaction.call_count == 1
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_success_after_retry(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -549,6 +578,7 @@ class TestTransactionManager:
         assert result == "success"
         assert call_count == 2
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_all_attempts_fail(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -576,6 +606,7 @@ class TestTransactionManager:
             with pytest.raises(TransactionError, match="Transaction failed after 4 attempts"):
                 await transaction_manager.execute_with_retry(failing_operation, max_retries=3)
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_exponential_backoff(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -610,6 +641,7 @@ class TestTransactionManager:
             actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
             assert actual_delays == expected_delays
 
+    @pytest.mark.asyncio
     async def test_execute_batch_success(self, transaction_manager, mock_factory, mock_adapter):
         """Test executing batch operations."""
         mock_uow = PostgreSQLUnitOfWork(mock_adapter)
@@ -638,6 +670,7 @@ class TestTransactionManager:
         mock_adapter.begin_transaction.assert_called_once()
         mock_adapter.commit_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_execute_batch_partial_failure(
         self, transaction_manager, mock_factory, mock_adapter
     ):
@@ -667,6 +700,7 @@ class TestTransactionManager:
         # Transaction should be rolled back
         mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_execute_batch_empty_list(self, transaction_manager, mock_factory, mock_adapter):
         """Test executing empty batch."""
         mock_uow = PostgreSQLUnitOfWork(mock_adapter)
@@ -691,6 +725,7 @@ class TestTransactionManager:
 class TestRepositoryIntegration:
     """Test unit of work with repository integration."""
 
+    @pytest.mark.asyncio
     async def test_order_repository_access(self, unit_of_work, mock_adapter):
         """Test accessing order repository through unit of work."""
         # Create a sample order
@@ -716,6 +751,7 @@ class TestRepositoryIntegration:
 
         mock_adapter.execute_query.assert_called()
 
+    @pytest.mark.asyncio
     async def test_position_repository_access(self, unit_of_work, mock_adapter):
         """Test accessing position repository through unit of work."""
         position = Position(
@@ -738,6 +774,7 @@ class TestRepositoryIntegration:
 
         mock_adapter.execute_query.assert_called()
 
+    @pytest.mark.asyncio
     async def test_portfolio_repository_access(self, unit_of_work, mock_adapter):
         """Test accessing portfolio repository through unit of work."""
         portfolio = Portfolio(
@@ -760,6 +797,7 @@ class TestRepositoryIntegration:
 
         mock_adapter.execute_query.assert_called()
 
+    @pytest.mark.asyncio
     async def test_cross_repository_transaction(self, unit_of_work, mock_adapter):
         """Test transaction across multiple repositories."""
         order_request = OrderRequest(
@@ -803,6 +841,7 @@ class TestRepositoryIntegration:
         mock_adapter.commit_transaction.assert_called_once()
         assert mock_adapter.execute_query.call_count >= 3  # At least one per repository
 
+    @pytest.mark.asyncio
     async def test_transaction_rollback_on_repository_error(self, unit_of_work, mock_adapter):
         """Test transaction rollback when repository operation fails."""
         order_request = OrderRequest(
@@ -848,6 +887,7 @@ class TestRepositoryIntegration:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
+    @pytest.mark.asyncio
     async def test_multiple_begin_transaction_calls(self, unit_of_work, mock_adapter):
         """Test multiple begin transaction calls."""
         mock_adapter.has_active_transaction = False
@@ -859,6 +899,7 @@ class TestEdgeCases:
         with pytest.raises(TransactionAlreadyActiveError):
             await unit_of_work.begin_transaction()
 
+    @pytest.mark.asyncio
     async def test_commit_after_rollback(self, unit_of_work, mock_adapter):
         """Test committing after rollback."""
         mock_adapter.has_active_transaction = True
@@ -869,6 +910,7 @@ class TestEdgeCases:
         with pytest.raises(TransactionNotActiveError):
             await unit_of_work.commit()
 
+    @pytest.mark.asyncio
     async def test_nested_context_managers(self, unit_of_work, mock_adapter):
         """Test nested context manager usage (should fail)."""
         mock_adapter.has_active_transaction = False
@@ -881,6 +923,7 @@ class TestEdgeCases:
                 async with unit_of_work:
                     pass
 
+    @pytest.mark.asyncio
     async def test_transaction_state_consistency(self, unit_of_work, mock_adapter):
         """Test transaction state remains consistent."""
         # Initially no transaction
@@ -897,6 +940,7 @@ class TestEdgeCases:
         mock_adapter.has_active_transaction = False
         assert await unit_of_work.is_active() is False
 
+    @pytest.mark.asyncio
     async def test_exception_types_in_context_manager(self, unit_of_work, mock_adapter):
         """Test different exception types in context manager."""
         mock_adapter.has_active_transaction = False
@@ -921,6 +965,7 @@ class TestEdgeCases:
 
             mock_adapter.rollback_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_factory_with_different_connection_types(self):
         """Test factory with different connection configurations."""
         factory = PostgreSQLUnitOfWorkFactory()
@@ -949,6 +994,7 @@ class TestEdgeCases:
             with pytest.raises(FactoryError, match="Database connection pool is not initialized"):
                 await factory.create_unit_of_work_async()
 
+    @pytest.mark.asyncio
     async def test_transaction_manager_type_casting(self):
         """Test transaction manager properly casts return types."""
         mock_adapter = AsyncMock()
@@ -988,6 +1034,7 @@ class TestEdgeCases:
 class TestUnitOfWorkAdvancedScenarios:
     """Test advanced unit of work scenarios."""
 
+    @pytest.mark.asyncio
     async def test_savepoint_simulation(self, unit_of_work, mock_adapter):
         """Test savepoint-like behavior within transactions."""
         mock_adapter.has_active_transaction = False
@@ -1028,6 +1075,7 @@ class TestUnitOfWorkAdvancedScenarios:
         mock_adapter.execute_query.side_effect = None
         await unit_of_work.commit()
 
+    @pytest.mark.asyncio
     async def test_distributed_transaction_pattern(self, unit_of_work, mock_adapter):
         """Test pattern for distributed transactions."""
         mock_adapter.has_active_transaction = False
@@ -1067,6 +1115,7 @@ class TestUnitOfWorkAdvancedScenarios:
         # Phase 3: Commit if all succeed
         await unit_of_work.commit()
 
+    @pytest.mark.asyncio
     async def test_nested_repository_calls(self, unit_of_work, mock_adapter):
         """Test nested repository calls within same transaction."""
         mock_adapter.has_active_transaction = False
@@ -1101,6 +1150,7 @@ class TestUnitOfWorkAdvancedScenarios:
             mock_adapter.execute_query.return_value = "UPDATE 1"
             await unit_of_work.portfolios.update_portfolio(portfolio)
 
+    @pytest.mark.asyncio
     async def test_transaction_timeout_handling(self, unit_of_work, mock_adapter):
         """Test handling of transaction timeouts."""
         mock_adapter.has_active_transaction = False
@@ -1114,6 +1164,7 @@ class TestUnitOfWorkAdvancedScenarios:
         with pytest.raises(TransactionCommitError):
             await unit_of_work.commit()
 
+    @pytest.mark.asyncio
     async def test_read_after_write_consistency(self, unit_of_work, mock_adapter):
         """Test read-after-write consistency within transaction."""
         mock_adapter.has_active_transaction = False
@@ -1158,6 +1209,7 @@ class TestUnitOfWorkAdvancedScenarios:
 class TestUnitOfWorkErrorRecovery:
     """Test error recovery and compensation scenarios."""
 
+    @pytest.mark.asyncio
     async def test_partial_rollback_compensation(self, unit_of_work, mock_adapter):
         """Test compensation logic for partial rollbacks."""
         mock_adapter.has_active_transaction = False
@@ -1195,6 +1247,7 @@ class TestUnitOfWorkErrorRecovery:
         # Transaction rolled back, completed_operations can be used for compensation
         assert len(completed_operations) == 1
 
+    @pytest.mark.asyncio
     async def test_connection_recovery(self, unit_of_work, mock_adapter):
         """Test recovery from connection loss."""
         mock_adapter.has_active_transaction = True
@@ -1211,6 +1264,7 @@ class TestUnitOfWorkErrorRecovery:
         with pytest.raises(TransactionRollbackError):
             await unit_of_work.rollback()
 
+    @pytest.mark.asyncio
     async def test_deadlock_retry_pattern(self):
         """Test automatic retry on deadlock detection."""
         mock_adapter = AsyncMock()
@@ -1258,6 +1312,7 @@ class TestUnitOfWorkErrorRecovery:
 class TestUnitOfWorkConcurrency:
     """Test concurrent transaction scenarios."""
 
+    @pytest.mark.asyncio
     async def test_concurrent_transaction_isolation(self, mock_adapter):
         """Test isolation between concurrent transactions."""
         # Create two unit of work instances
@@ -1272,6 +1327,7 @@ class TestUnitOfWorkConcurrency:
         with pytest.raises(TransactionAlreadyActiveError):
             await uow2.begin_transaction()
 
+    @pytest.mark.asyncio
     async def test_optimistic_locking_pattern(self, unit_of_work, mock_adapter):
         """Test optimistic locking pattern implementation."""
         mock_adapter.has_active_transaction = False
@@ -1311,6 +1367,7 @@ class TestUnitOfWorkConcurrency:
             mock_adapter.execute_query.return_value = "UPDATE 1"  # Version matched
             await unit_of_work.portfolios.update_portfolio(portfolio)
 
+    @pytest.mark.asyncio
     async def test_lock_acquisition_timeout(self, unit_of_work, mock_adapter):
         """Test timeout when acquiring locks."""
         mock_adapter.has_active_transaction = False
@@ -1324,6 +1381,7 @@ class TestUnitOfWorkConcurrency:
 class TestTransactionManagerAdvanced:
     """Test advanced transaction manager scenarios."""
 
+    @pytest.mark.asyncio
     async def test_saga_pattern_implementation(self, mock_adapter):
         """Test saga pattern for distributed transactions."""
         factory = PostgreSQLUnitOfWorkFactory()
@@ -1361,6 +1419,7 @@ class TestTransactionManagerAdvanced:
             assert len(saga_results) == 3
             assert results == ["step1_complete", "step2_complete", "step3_complete"]
 
+    @pytest.mark.asyncio
     async def test_circuit_breaker_pattern(self, mock_adapter):
         """Test circuit breaker pattern for failing database."""
         factory = PostgreSQLUnitOfWorkFactory()
@@ -1390,6 +1449,7 @@ class TestTransactionManagerAdvanced:
 
             assert failure_count == 4  # Initial + 3 retries
 
+    @pytest.mark.asyncio
     async def test_batch_with_dependencies(self, mock_adapter):
         """Test batch operations with dependencies."""
         factory = PostgreSQLUnitOfWorkFactory()

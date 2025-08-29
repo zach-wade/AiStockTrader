@@ -38,7 +38,6 @@ from src.application.use_cases.market_simulation import (
 )
 from src.domain.entities.order import OrderSide, OrderStatus, OrderType
 from src.domain.value_objects.price import Price
-from src.domain.value_objects.symbol import Symbol
 
 # =============================================================================
 # UpdateMarketPriceRequest Tests
@@ -351,7 +350,7 @@ class TestUpdateMarketPriceUseCase:
         # Create mock market order
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.MARKET
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -382,7 +381,7 @@ class TestUpdateMarketPriceUseCase:
         # Create mock buy limit order
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.LIMIT
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -405,7 +404,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.LIMIT
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -429,7 +428,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.LIMIT
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -452,7 +451,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.LIMIT
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -476,7 +475,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -502,7 +501,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -526,7 +525,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -550,7 +549,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -574,7 +573,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP_LIMIT
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -599,7 +598,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP_LIMIT
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -622,7 +621,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP_LIMIT
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
@@ -647,7 +646,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP_LIMIT
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -672,7 +671,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP_LIMIT
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -695,7 +694,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.STOP_LIMIT
         order.side = OrderSide.SELL
         order.quantity = Decimal("100")
@@ -718,7 +717,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("MSFT")
+        order.symbol = "MSFT"
         order.order_type = OrderType.MARKET
         order.is_active.return_value = True
 
@@ -737,7 +736,7 @@ class TestUpdateMarketPriceUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.MARKET
         order.is_active.return_value = False
 
@@ -761,7 +760,7 @@ class TestUpdateMarketPriceUseCase:
         for i in range(3):
             order = MagicMock()
             order.id = uuid4()
-            order.symbol = Symbol("AAPL")
+            order.symbol = "AAPL"
             order.order_type = OrderType.MARKET
             order.side = OrderSide.BUY
             order.quantity = Decimal("100")
@@ -915,7 +914,7 @@ class TestProcessPendingOrdersUseCase:
         """Test processing when no orders exist."""
         request = ProcessPendingOrdersRequest(current_prices={"AAPL": Decimal("150.00")})
 
-        mock_unit_of_work.orders.get_active_orders.return_value = []
+        mock_unit_of_work.orders.get_pending_orders.return_value = []
 
         response = await use_case.process(request)
 
@@ -935,7 +934,7 @@ class TestProcessPendingOrdersUseCase:
         # Create orders for different symbols
         order1 = MagicMock()
         order1.id = uuid4()
-        order1.symbol = Symbol("AAPL")
+        order1.symbol = "AAPL"
         order1.order_type = OrderType.MARKET
         order1.side = OrderSide.BUY
         order1.quantity = Decimal("100")
@@ -943,11 +942,11 @@ class TestProcessPendingOrdersUseCase:
 
         order2 = MagicMock()
         order2.id = uuid4()
-        order2.symbol = Symbol("MSFT")
+        order2.symbol = "MSFT"
         order2.order_type = OrderType.MARKET
         order2.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [order1, order2]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [order1, order2]
 
         response = await use_case.process(request)
 
@@ -965,7 +964,7 @@ class TestProcessPendingOrdersUseCase:
 
         order1 = MagicMock()
         order1.id = uuid4()
-        order1.symbol = Symbol("AAPL")
+        order1.symbol = "AAPL"
         order1.order_type = OrderType.MARKET
         order1.side = OrderSide.BUY
         order1.quantity = Decimal("100")
@@ -973,13 +972,13 @@ class TestProcessPendingOrdersUseCase:
 
         order2 = MagicMock()
         order2.id = uuid4()
-        order2.symbol = Symbol("MSFT")
+        order2.symbol = "MSFT"
         order2.order_type = OrderType.MARKET
         order2.side = OrderSide.BUY
         order2.quantity = Decimal("50")
         order2.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [order1, order2]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [order1, order2]
 
         response = await use_case.process(request)
 
@@ -995,11 +994,12 @@ class TestProcessPendingOrdersUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.MARKET
         order.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [order]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [order]
+        mock_unit_of_work.market_data.get_latest_bar.return_value = None
 
         response = await use_case.process(request)
 
@@ -1015,11 +1015,12 @@ class TestProcessPendingOrdersUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.MARKET
         order.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [order]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [order]
+        mock_unit_of_work.market_data.get_latest_bar.return_value = None
 
         response = await use_case.process(request)
 
@@ -1037,13 +1038,13 @@ class TestProcessPendingOrdersUseCase:
 
         order = MagicMock()
         order.id = uuid4()
-        order.symbol = Symbol("AAPL")
+        order.symbol = "AAPL"
         order.order_type = OrderType.MARKET
         order.side = OrderSide.BUY
         order.quantity = Decimal("100")
         order.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [order]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [order]
 
         response = await use_case.process(request)
 
@@ -1065,7 +1066,7 @@ class TestProcessPendingOrdersUseCase:
         # Buy limit - should trigger (price <= limit)
         buy_limit = MagicMock()
         buy_limit.id = uuid4()
-        buy_limit.symbol = Symbol("AAPL")
+        buy_limit.symbol = "AAPL"
         buy_limit.order_type = OrderType.LIMIT
         buy_limit.side = OrderSide.BUY
         buy_limit.limit_price = Decimal("150.00")
@@ -1075,14 +1076,14 @@ class TestProcessPendingOrdersUseCase:
         # Sell limit - should not trigger (price < limit)
         sell_limit = MagicMock()
         sell_limit.id = uuid4()
-        sell_limit.symbol = Symbol("AAPL")
+        sell_limit.symbol = "AAPL"
         sell_limit.order_type = OrderType.LIMIT
         sell_limit.side = OrderSide.SELL
         sell_limit.limit_price = Decimal("150.00")
         sell_limit.quantity = Decimal("100")
         sell_limit.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [buy_limit, sell_limit]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [buy_limit, sell_limit]
 
         response = await use_case.process(request)
 
@@ -1101,7 +1102,7 @@ class TestProcessPendingOrdersUseCase:
         # Buy stop - should trigger (price >= stop)
         buy_stop = MagicMock()
         buy_stop.id = uuid4()
-        buy_stop.symbol = Symbol("AAPL")
+        buy_stop.symbol = "AAPL"
         buy_stop.order_type = OrderType.STOP
         buy_stop.side = OrderSide.BUY
         buy_stop.stop_price = Decimal("150.00")
@@ -1111,14 +1112,14 @@ class TestProcessPendingOrdersUseCase:
         # Sell stop - should not trigger (price > stop)
         sell_stop = MagicMock()
         sell_stop.id = uuid4()
-        sell_stop.symbol = Symbol("AAPL")
+        sell_stop.symbol = "AAPL"
         sell_stop.order_type = OrderType.STOP
         sell_stop.side = OrderSide.SELL
         sell_stop.stop_price = Decimal("150.00")
         sell_stop.quantity = Decimal("100")
         sell_stop.is_active.return_value = True
 
-        mock_unit_of_work.orders.get_active_orders.return_value = [buy_stop, sell_stop]
+        mock_unit_of_work.orders.get_pending_orders.return_value = [buy_stop, sell_stop]
 
         response = await use_case.process(request)
 
@@ -1140,14 +1141,14 @@ class TestProcessPendingOrdersUseCase:
         for i in range(5):
             order = MagicMock()
             order.id = uuid4()
-            order.symbol = Symbol("AAPL" if i < 3 else "MSFT")
+            order.symbol = "AAPL" if i < 3 else "MSFT"
             order.order_type = OrderType.MARKET
             order.side = OrderSide.BUY
             order.quantity = Decimal("100")
             order.is_active.return_value = True
             orders.append(order)
 
-        mock_unit_of_work.orders.get_active_orders.return_value = orders
+        mock_unit_of_work.orders.get_pending_orders.return_value = orders
 
         response = await use_case.process(request)
 

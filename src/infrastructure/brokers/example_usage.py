@@ -9,6 +9,7 @@ from typing import Literal
 
 # Local imports
 from src.domain.entities.order import Order, OrderRequest, OrderSide
+from src.domain.value_objects import Price, Quantity
 from src.infrastructure.brokers import BrokerFactory
 
 # Configure logging
@@ -46,7 +47,7 @@ def example_paper_trading() -> None:
 
     # Create and submit a market order
     request1 = OrderRequest(
-        symbol="AAPL", quantity=Decimal("10"), side=OrderSide.BUY, reason="Testing paper trading"
+        symbol="AAPL", quantity=Quantity("10"), side=OrderSide.BUY, reason="Testing paper trading"
     )
     order1 = Order.create_market_order(request1)
 
@@ -61,9 +62,9 @@ def example_paper_trading() -> None:
     # Create and submit a limit order
     request2 = OrderRequest(
         symbol="GOOGL",
-        quantity=Decimal("1"),
+        quantity=Quantity("1"),
         side=OrderSide.BUY,
-        limit_price=Decimal("2750.00"),
+        limit_price=Price("2750.00"),
         reason="Limit order test",
     )
     order2 = Order.create_limit_order(request2)
@@ -111,7 +112,7 @@ def example_simulated_trading() -> None:
 
     # Sell to close position
     request3 = OrderRequest(
-        symbol="AAPL", quantity=Decimal("10"), side=OrderSide.SELL, reason="Taking profits"
+        symbol="AAPL", quantity=Quantity("10"), side=OrderSide.SELL, reason="Taking profits"
     )
     order3 = Order.create_market_order(request3)
 
@@ -202,7 +203,7 @@ def example_backtest_mode() -> None:
 
     # Execute a strategy
     request = OrderRequest(
-        symbol="SPY", quantity=Decimal("100"), side=OrderSide.BUY, reason="momentum strategy"
+        symbol="SPY", quantity=Quantity("100"), side=OrderSide.BUY, reason="momentum strategy"
     )
     order = Order.create_market_order(request)
     order.tags["strategy"] = "momentum"

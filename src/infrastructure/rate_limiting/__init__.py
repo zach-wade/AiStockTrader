@@ -25,6 +25,24 @@ from .decorators import (
     rate_limit,
     trading_rate_limit,
 )
+from .endpoint_limiting import (
+    EndpointConfig,
+    EndpointPriority,
+    EndpointRateLimiter,
+    create_development_endpoint_configs,
+    create_trading_endpoint_configs,
+)
+from .enhanced_algorithms import (
+    AdaptiveConfig,
+    BackoffConfig,
+    BackoffStrategy,
+    EnhancedRateLimitAlgorithm,
+    EnhancedSlidingWindow,
+    EnhancedTokenBucket,
+    create_enhanced_rate_limiter,
+    create_trading_adaptive_config,
+    create_trading_backoff_config,
+)
 from .exceptions import (
     APIRateLimitExceeded,
     IPRateLimitExceeded,
@@ -42,6 +60,22 @@ __all__ = [
     "TokenBucketRateLimit",
     "SlidingWindowRateLimit",
     "FixedWindowRateLimit",
+    # Enhanced algorithms
+    "EnhancedRateLimitAlgorithm",
+    "EnhancedTokenBucket",
+    "EnhancedSlidingWindow",
+    "BackoffConfig",
+    "BackoffStrategy",
+    "AdaptiveConfig",
+    "create_enhanced_rate_limiter",
+    "create_trading_backoff_config",
+    "create_trading_adaptive_config",
+    # Endpoint-specific limiting
+    "EndpointConfig",
+    "EndpointPriority",
+    "EndpointRateLimiter",
+    "create_trading_endpoint_configs",
+    "create_development_endpoint_configs",
     # Configuration
     "RateLimitConfig",
     "RateLimitTier",

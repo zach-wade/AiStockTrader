@@ -105,6 +105,7 @@ class TestAdapterInitialization:
 class TestConnectionManagement:
     """Test connection acquisition and management."""
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_from_pool(self, adapter, mock_pool, mock_connection):
         """Test acquiring connection from pool."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -115,6 +116,7 @@ class TestConnectionManagement:
 
         mock_pool.connection.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_with_existing_connection(self, adapter, mock_connection):
         """Test acquiring connection when one already exists (transaction)."""
         adapter._connection = mock_connection
@@ -124,6 +126,7 @@ class TestConnectionManagement:
 
         # Should not acquire new connection from pool
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_operational_error(self, adapter, mock_pool):
         """Test connection acquisition with operational error."""
         mock_pool.connection.side_effect = psycopg.OperationalError("Connection failed")
@@ -132,6 +135,7 @@ class TestConnectionManagement:
             async with adapter.acquire_connection():
                 pass
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_timeout(self, adapter, mock_pool):
         """Test connection acquisition timeout."""
         mock_pool.connection.side_effect = builtins.TimeoutError("Timeout")
@@ -147,6 +151,7 @@ class TestConnectionManagement:
 class TestQueryExecution:
     """Test query execution methods."""
 
+    @pytest.mark.asyncio
     async def test_execute_query_success(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test successful query execution."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -159,6 +164,7 @@ class TestQueryExecution:
         assert result == "EXECUTE 5"
         mock_cursor.execute.assert_called_once_with("UPDATE table SET x = %s", (1,))
 
+    @pytest.mark.asyncio
     async def test_execute_query_integrity_error(
         self, adapter, mock_pool, mock_connection, mock_cursor
     ):
@@ -171,6 +177,7 @@ class TestQueryExecution:
         with pytest.raises(IntegrityError, match="Unique constraint violated"):
             await adapter.execute_query("INSERT INTO table VALUES (%s)", 1)
 
+    @pytest.mark.asyncio
     async def test_execute_query_operational_error(
         self, adapter, mock_pool, mock_connection, mock_cursor
     ):
@@ -183,6 +190,7 @@ class TestQueryExecution:
         with pytest.raises(RepositoryError, match="Query execution failed"):
             await adapter.execute_query("SELECT * FROM table")
 
+    @pytest.mark.asyncio
     async def test_execute_query_timeout(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test query execution timeout."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -196,6 +204,7 @@ class TestQueryExecution:
         assert exc_info.operation == "execute_query"
         assert exc_info.timeout == 5.0
 
+    @pytest.mark.asyncio
     async def test_fetch_one_success(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test successful fetch one operation."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -209,6 +218,7 @@ class TestQueryExecution:
         mock_cursor.execute.assert_called_once_with("SELECT * FROM table WHERE id = %s", (1,))
         mock_cursor.fetchone.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_fetch_one_not_found(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test fetch one when no record found."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -220,6 +230,7 @@ class TestQueryExecution:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_fetch_one_error(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test fetch one with error."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -230,6 +241,7 @@ class TestQueryExecution:
         with pytest.raises(RepositoryError, match="Fetch one query failed"):
             await adapter.fetch_one("SELECT * FROM table")
 
+    @pytest.mark.asyncio
     async def test_fetch_all_success(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test successful fetch all operation."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -247,6 +259,7 @@ class TestQueryExecution:
         assert result[1]["name"] == "Test2"
         mock_cursor.fetchall.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_fetch_all_empty(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test fetch all with no results."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -258,6 +271,7 @@ class TestQueryExecution:
 
         assert result == []
 
+    @pytest.mark.asyncio
     async def test_fetch_all_error(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test fetch all with error."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -268,6 +282,7 @@ class TestQueryExecution:
         with pytest.raises(RepositoryError, match="Fetch all query failed"):
             await adapter.fetch_all("SELECT * FROM table")
 
+    @pytest.mark.asyncio
     async def test_fetch_values_success(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test successful fetch values operation."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -283,6 +298,7 @@ class TestQueryExecution:
 
         assert result == [1, 2, 3]
 
+    @pytest.mark.asyncio
     async def test_fetch_values_empty(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test fetch values with no results."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -294,6 +310,7 @@ class TestQueryExecution:
 
         assert result == []
 
+    @pytest.mark.asyncio
     async def test_fetch_values_error(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test fetch values with error."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -304,6 +321,7 @@ class TestQueryExecution:
         with pytest.raises(RepositoryError, match="Fetch values query failed"):
             await adapter.fetch_values("SELECT value FROM table")
 
+    @pytest.mark.asyncio
     async def test_execute_batch_success(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test successful batch execution."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -317,6 +335,7 @@ class TestQueryExecution:
             "INSERT INTO table VALUES (%s, %s)", args_list
         )
 
+    @pytest.mark.asyncio
     async def test_execute_batch_integrity_error(
         self, adapter, mock_pool, mock_connection, mock_cursor
     ):
@@ -329,6 +348,7 @@ class TestQueryExecution:
         with pytest.raises(IntegrityError, match="Duplicate key"):
             await adapter.execute_batch("INSERT INTO table VALUES (%s)", [(1,), (1,)])
 
+    @pytest.mark.asyncio
     async def test_execute_batch_error(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test batch execution with error."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -344,6 +364,7 @@ class TestQueryExecution:
 class TestTransactionManagement:
     """Test transaction management."""
 
+    @pytest.mark.asyncio
     async def test_begin_transaction_success(self, adapter, mock_pool):
         """Test successful transaction start."""
         mock_connection = AsyncMock(spec=AsyncConnection)
@@ -358,6 +379,7 @@ class TestTransactionManagement:
         assert adapter._connection is mock_connection
         assert adapter._transaction is mock_transaction
 
+    @pytest.mark.asyncio
     async def test_begin_transaction_already_active(self, adapter):
         """Test starting transaction when one is already active."""
         adapter._transaction = MagicMock()
@@ -365,6 +387,7 @@ class TestTransactionManagement:
         with pytest.raises(TransactionError, match="Transaction is already active"):
             await adapter.begin_transaction()
 
+    @pytest.mark.asyncio
     async def test_begin_transaction_error(self, adapter, mock_pool):
         """Test transaction start with error."""
         mock_pool.connection.side_effect = psycopg.OperationalError("Connection failed")
@@ -376,6 +399,7 @@ class TestTransactionManagement:
         assert adapter._connection is None
         assert adapter._transaction is None
 
+    @pytest.mark.asyncio
     async def test_commit_transaction_success(self, adapter):
         """Test successful transaction commit."""
         mock_transaction = AsyncMock()
@@ -390,11 +414,13 @@ class TestTransactionManagement:
         assert adapter._transaction is None
         assert adapter._connection is None
 
+    @pytest.mark.asyncio
     async def test_commit_transaction_no_active(self, adapter):
         """Test committing when no transaction is active."""
         with pytest.raises(TransactionError, match="No active transaction to commit"):
             await adapter.commit_transaction()
 
+    @pytest.mark.asyncio
     async def test_commit_transaction_error(self, adapter):
         """Test transaction commit with error."""
         mock_transaction = AsyncMock()
@@ -410,6 +436,7 @@ class TestTransactionManagement:
         assert adapter._transaction is None
         assert adapter._connection is None
 
+    @pytest.mark.asyncio
     async def test_rollback_transaction_success(self, adapter):
         """Test successful transaction rollback."""
         mock_transaction = AsyncMock()
@@ -427,11 +454,13 @@ class TestTransactionManagement:
         assert adapter._transaction is None
         assert adapter._connection is None
 
+    @pytest.mark.asyncio
     async def test_rollback_transaction_no_active(self, adapter):
         """Test rollback when no transaction is active."""
         # Should not raise error, just log warning
         await adapter.rollback_transaction()
 
+    @pytest.mark.asyncio
     async def test_rollback_transaction_error(self, adapter):
         """Test transaction rollback with error."""
         mock_transaction = AsyncMock()
@@ -447,6 +476,7 @@ class TestTransactionManagement:
         assert adapter._transaction is None
         assert adapter._connection is None
 
+    @pytest.mark.asyncio
     async def test_cleanup_transaction(self, adapter):
         """Test transaction cleanup."""
         mock_connection = AsyncMock()
@@ -460,6 +490,7 @@ class TestTransactionManagement:
         assert adapter._connection is None
         assert adapter._transaction is None
 
+    @pytest.mark.asyncio
     async def test_cleanup_transaction_connection_error(self, adapter):
         """Test transaction cleanup with connection release error."""
         mock_connection = AsyncMock()
@@ -478,6 +509,7 @@ class TestTransactionManagement:
 class TestHealthCheck:
     """Test health check functionality."""
 
+    @pytest.mark.asyncio
     async def test_health_check_success(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test successful health check."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -490,6 +522,7 @@ class TestHealthCheck:
         assert result is True
         mock_cursor.execute.assert_called_once_with("SELECT 1")
 
+    @pytest.mark.asyncio
     async def test_health_check_failure(self, adapter, mock_pool):
         """Test health check failure."""
         mock_pool.connection.side_effect = Exception("Database unavailable")
@@ -503,6 +536,7 @@ class TestHealthCheck:
 class TestConnectionInfo:
     """Test connection info retrieval."""
 
+    @pytest.mark.asyncio
     async def test_get_connection_info_active(self, adapter, mock_pool):
         """Test getting connection info when pool is active."""
         mock_pool.closed = False
@@ -513,6 +547,7 @@ class TestConnectionInfo:
         assert info["min_size"] == 2
         assert info["pool_status"] == "active"
 
+    @pytest.mark.asyncio
     async def test_get_connection_info_closed(self, adapter, mock_pool):
         """Test getting connection info when pool is closed."""
         mock_pool.closed = True
@@ -526,6 +561,7 @@ class TestConnectionInfo:
 class TestEdgeCases:
     """Test edge cases and special scenarios."""
 
+    @pytest.mark.asyncio
     async def test_multiple_parameters_in_query(
         self, adapter, mock_pool, mock_connection, mock_cursor
     ):
@@ -542,6 +578,7 @@ class TestEdgeCases:
             "INSERT INTO table (a, b, c, d) VALUES (%s, %s, %s, %s)", (1, "test", 3.14, True)
         )
 
+    @pytest.mark.asyncio
     async def test_query_with_no_parameters(self, adapter, mock_pool, mock_connection, mock_cursor):
         """Test query with no parameters."""
         mock_pool.connection.return_value.__aenter__ = AsyncMock(return_value=mock_connection)
@@ -552,6 +589,7 @@ class TestEdgeCases:
 
         mock_cursor.execute.assert_called_once_with("TRUNCATE TABLE test_table", ())
 
+    @pytest.mark.asyncio
     async def test_long_query_truncation_in_logs(
         self, adapter, mock_pool, mock_connection, mock_cursor
     ):

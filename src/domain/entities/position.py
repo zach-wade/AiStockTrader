@@ -10,6 +10,9 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
+# Internal imports
+from src.domain.value_objects.converter import ValueObjectConverter
+
 from ..value_objects import Money, Price, Quantity
 
 
@@ -29,13 +32,16 @@ class Position:
     All financial values use Decimal for precision.
     """
 
+    # Required fields (must come first for dataclass)
+    average_entry_price: Price  # No default - must be set explicitly
+
     # Identity
     id: UUID = field(default_factory=uuid4)
     symbol: str = ""
 
     # Position details
     quantity: Quantity = Quantity(Decimal("0"))  # Positive for long, negative for short
-    average_entry_price: Price = Price(Decimal("0"))
+    original_quantity: Quantity | None = None  # Store original quantity for closed positions
 
     # Market data
     current_price: Price | None = None
@@ -67,10 +73,15 @@ class Position:
         if not self.symbol:
             raise ValueError("Position symbol cannot be empty")
 
-        if self.average_entry_price.value < 0:
+        # Handle both Price objects and raw Decimal values
+        entry_price_value = ValueObjectConverter.extract_value(self.average_entry_price)
+        if entry_price_value < 0:
             raise ValueError("Average entry price cannot be negative")
 
-        if self.quantity.value == 0 and self.closed_at is None:
+        # Handle both Quantity objects and raw Decimal values
+        quantity_value = ValueObjectConverter.extract_value(self.quantity)
+        # Allow zero quantity only if position is marked as closed
+        if quantity_value == 0 and self.closed_at is None:
             raise ValueError("Open position cannot have zero quantity")
 
     @classmethod
@@ -94,6 +105,7 @@ class Position:
         return cls(
             symbol=symbol,
             quantity=quantity,
+            original_quantity=quantity,  # Store original quantity
             average_entry_price=entry_price,
             commission_paid=commission,
             strategy=strategy,
@@ -147,6 +159,10 @@ class Position:
             pnl = Money(abs(quantity.value) * (self.average_entry_price.value - exit_price.value))
 
         pnl = pnl - commission
+
+        # Store original quantity if not already stored
+        if self.original_quantity is None:
+            self.original_quantity = self.quantity
 
         # Update position
         reduction_quantity = quantity.value if self.is_long() else -quantity.value
@@ -212,15 +228,21 @@ class Position:
 
     def is_long(self) -> bool:
         """Check if this is a long position"""
-        return self.quantity.value > 0
+        # Handle both Quantity objects and raw Decimal values
+        quantity_value = ValueObjectConverter.extract_value(self.quantity)
+        return quantity_value > 0
 
     def is_short(self) -> bool:
         """Check if this is a short position"""
-        return self.quantity.value < 0
+        # Handle both Quantity objects and raw Decimal values
+        quantity_value = ValueObjectConverter.extract_value(self.quantity)
+        return quantity_value < 0
 
     def is_closed(self) -> bool:
         """Check if position is closed"""
-        return self.quantity.value == 0 or self.closed_at is not None
+        # Handle both Quantity objects and raw Decimal values
+        quantity_value = ValueObjectConverter.extract_value(self.quantity)
+        return quantity_value == 0 or self.closed_at is not None
 
     def get_unrealized_pnl(self) -> Money | None:
         """Calculate unrealized P&L based on current price"""
@@ -250,7 +272,10 @@ class Position:
         if self.current_price is None:
             return None
 
-        return Money(abs(self.quantity.value) * self.current_price.value)
+        # Handle both value objects and raw Decimal values
+        quantity_value = ValueObjectConverter.extract_value(self.quantity)
+        price_value = ValueObjectConverter.extract_value(self.current_price)
+        return Money(abs(quantity_value) * price_value)
 
     def get_return_percentage(self) -> Decimal | None:
         """Calculate return percentage"""
@@ -261,7 +286,11 @@ class Position:
         if total_pnl is None:
             return None
 
-        initial_value = abs(self.quantity.value) * self.average_entry_price.value
+        # Use original quantity for closed positions, current quantity for open
+        quantity_for_calc = (
+            self.original_quantity if self.is_closed() and self.original_quantity else self.quantity
+        )
+        initial_value = abs(quantity_for_calc.value) * self.average_entry_price.value
         if initial_value == 0:
             return None
 
@@ -298,6 +327,10 @@ class Position:
         if self.is_closed():
             raise ValueError("Position is already closed")
 
+        # Store original quantity if not already stored
+        if self.original_quantity is None:
+            self.original_quantity = self.quantity
+
         # Calculate final P&L
         if self.is_long():
             final_pnl = Money(
@@ -317,7 +350,12 @@ class Position:
 
     def __str__(self) -> str:
         """String representation"""
-        direction = "LONG" if self.is_long() else "SHORT"
+        # Use original quantity to determine direction for closed positions
+        if self.is_closed() and self.original_quantity:
+            direction = "LONG" if self.original_quantity.value > 0 else "SHORT"
+        else:
+            direction = "LONG" if self.is_long() else "SHORT"
+
         status = "CLOSED" if self.is_closed() else "OPEN"
 
         pnl_str = ""
@@ -328,7 +366,14 @@ class Position:
         else:
             pnl_str = f", Realized P&L: {self.realized_pnl}"
 
+        # Display original quantity for closed positions, current quantity for open
+        display_quantity = (
+            abs(self.original_quantity.value)
+            if self.is_closed() and self.original_quantity
+            else abs(self.quantity.value)
+        )
+
         return (
-            f"Position({self.symbol}: {direction} {abs(self.quantity.value)} @ {self.average_entry_price}"
+            f"Position({self.symbol}: {direction} {display_quantity} @ {self.average_entry_price}"
             f" - {status}{pnl_str})"
         )

@@ -26,6 +26,8 @@ from src.domain.entities.order import OrderSide, OrderType
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 class TestRequestPostInit:
@@ -98,7 +100,12 @@ class TestRequestPostInit:
 @pytest.fixture
 def sample_position_with_none_values():
     """Create position with None values for edge case testing."""
-    position = Position(symbol="TEST", quantity=Decimal("10"), average_entry_price=Decimal("100"))
+    from src.domain.value_objects.price import Price
+    from src.domain.value_objects.quantity import Quantity
+
+    position = Position(
+        symbol="TEST", quantity=Quantity(Decimal("10")), average_entry_price=Price(Decimal("100"))
+    )
     position.current_price = None  # Test None current price
     position.realized_pnl = None  # Test None realized_pnl
     return position
@@ -141,15 +148,22 @@ class TestGetPortfolioUseCase:
         portfolio.total_realized_pnl = Money(Decimal("5000"))
 
         # Add some positions
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.quantity import Quantity
+
         position1 = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
         )
-        position1.current_price = Decimal("155.00")
+        position1.current_price = Price(Decimal("155.00"))
 
         position2 = Position(
-            symbol="GOOGL", quantity=Decimal("50"), average_entry_price=Decimal("2500.00")
+            symbol="GOOGL",
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("2500.00")),
         )
-        position2.current_price = Decimal("2550.00")
+        position2.current_price = Price(Decimal("2550.00"))
 
         portfolio.positions = {position1.id: position1, position2.id: position2}
 
@@ -709,30 +723,38 @@ class TestGetPositionsUseCase:
     @pytest.fixture
     def sample_portfolio_with_positions(self):
         """Create sample portfolio with mixed positions."""
+        from src.domain.value_objects.money import Money
+
         portfolio = Portfolio(name="Test Portfolio", initial_capital=Money(Decimal("100000")))
         portfolio.id = uuid4()
 
         # Open position
         position1 = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
         )
-        position1.current_price = Decimal("155.00")
+        position1.current_price = Price(Decimal("155.00"))
         position1.is_closed = lambda: False
 
         # Another open position
         position2 = Position(
-            symbol="GOOGL", quantity=Decimal("50"), average_entry_price=Decimal("2500.00")
+            symbol="GOOGL",
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("2500.00")),
         )
-        position2.current_price = Decimal("2550.00")
+        position2.current_price = Price(Decimal("2550.00"))
         position2.is_closed = lambda: False
 
         # Closed position
         position3 = Position(
-            symbol="MSFT", quantity=Decimal("75"), average_entry_price=Decimal("300.00")
+            symbol="MSFT",
+            quantity=Quantity(Decimal("75")),
+            average_entry_price=Price(Decimal("300.00")),
         )
-        position3.exit_price = Decimal("320.00")
+        position3.exit_price = Price(Decimal("320.00"))
         position3.is_closed = lambda: True
-        position3.realized_pnl = Decimal("1500.00")
+        position3.realized_pnl = Money(Decimal("1500.00"))
 
         portfolio.positions = {
             position1.id: position1,
@@ -906,7 +928,9 @@ class TestGetPositionsUseCase:
 
         # Position with None values
         position = Position(
-            symbol="TEST", quantity=Decimal("10"), average_entry_price=Decimal("100")
+            symbol="TEST",
+            quantity=Quantity(Decimal("10")),
+            average_entry_price=Price(Decimal("100")),
         )
         position.current_price = None
         position.realized_pnl = None
@@ -962,13 +986,15 @@ class TestGetPositionsUseCase:
 
         # Position with value
         position1 = Position(
-            symbol="AAPL", quantity=Decimal("10"), average_entry_price=Decimal("100")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("10")),
+            average_entry_price=Price(Decimal("100")),
         )
-        position1.current_price = Decimal("110")
+        position1.current_price = Price(Decimal("110"))
 
         # Position with None position value
         position2 = Position(
-            symbol="TEST", quantity=Decimal("5"), average_entry_price=Decimal("50")
+            symbol="TEST", quantity=Quantity(Decimal("5")), average_entry_price=Price(Decimal("50"))
         )
         position2.current_price = None  # Will make get_position_value() return None
 
@@ -976,10 +1002,12 @@ class TestGetPositionsUseCase:
 
         position3 = Position(
             symbol="CLOSED",
-            quantity=Decimal("0"),
-            average_entry_price=Decimal("200", closed_at=datetime.now(UTC)),
-            closed_at=datetime.now(UTC),
+            quantity=Quantity(Decimal("1")),  # Can't be 0, will be marked as closed
+            average_entry_price=Price(Decimal("200")),
         )
+        position3.closed_at = datetime.now(UTC)
+        position3.exit_price = Price(Decimal("200"))  # Exit at same price
+        position3.is_closed = lambda: True
 
         portfolio.positions = {
             position1.id: position1,
@@ -1014,10 +1042,10 @@ class TestGetPositionsUseCase:
         # Short position
         position = Position(
             symbol="SHORT",
-            quantity=Decimal("-100"),  # Negative for short
-            average_entry_price=Decimal("50"),
+            quantity=Quantity(Decimal("-100")),  # Negative for short
+            average_entry_price=Price(Decimal("50")),
         )
-        position.current_price = Decimal("45")  # Price went down, profit for short
+        position.current_price = Price(Decimal("45"))  # Price went down, profit for short
 
         portfolio.positions = {position.id: position}
 
@@ -1041,7 +1069,9 @@ class TestGetPositionsUseCase:
         portfolio.id = uuid4()
 
         position = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150")),
         )
 
         portfolio.positions = {position.id: position}
@@ -1182,9 +1212,11 @@ class TestClosePositionUseCase:
     def sample_open_position(self):
         """Create sample open position."""
         position = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
         )
-        position.current_price = Decimal("160.00")
+        position.current_price = Price(Decimal("160.00"))
         position.is_closed = lambda: False
         return position
 
@@ -1232,7 +1264,7 @@ class TestClosePositionUseCase:
         # Assert
         assert response.success is True
         assert response.closed is True
-        assert response.realized_pnl == Money(Decimal("1500.00"))
+        assert response.realized_pnl == Decimal("1500.00")
         assert response.total_return is not None
 
         mock_position_manager.close_position.assert_called_once()
@@ -1279,7 +1311,7 @@ class TestClosePositionUseCase:
 
         # Assert
         assert response.success is True
-        assert response.realized_pnl == Money(Decimal("-500.00"))
+        assert response.realized_pnl == Decimal("-500.00")
         # Portfolio update is not implemented in the actual code
         # assert sample_portfolio.cash_balance == Money(Decimal("49500.00"))  # 50000 - 500
 
@@ -1444,10 +1476,10 @@ class TestClosePositionUseCase:
         # Setup
         short_position = Position(
             symbol="SHORT",
-            quantity=Decimal("-100"),  # Negative for short
-            average_entry_price=Decimal("50.00"),
+            quantity=Quantity(Decimal("-100")),  # Negative for short
+            average_entry_price=Price(Decimal("50.00")),
         )
-        short_position.current_price = Decimal("45.00")
+        short_position.current_price = Price(Decimal("45.00"))
 
         request = ClosePositionRequest(
             position_id=short_position.id,
@@ -1482,7 +1514,9 @@ class TestClosePositionUseCase:
         """Test closing position when get_return_percentage returns None."""
         # Setup
         position = Position(
-            symbol="TEST", quantity=Decimal("100"), average_entry_price=Decimal("100.00")
+            symbol="TEST",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("100.00")),
         )
         position.get_return_percentage = Mock(return_value=None)
 
@@ -1511,7 +1545,9 @@ class TestClosePositionUseCase:
         """Test that closing position creates correct order."""
         # Setup
         position = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
         )
 
         request = ClosePositionRequest(position_id=position.id, exit_price=Decimal("160.00"))
@@ -1524,7 +1560,7 @@ class TestClosePositionUseCase:
         def close_position_side_effect(position, order, exit_price):
             nonlocal captured_order
             captured_order = order
-            position.realized_pnl = Decimal("1000.00")
+            position.realized_pnl = Money(Decimal("1000.00"))
 
         mock_position_manager.close_position.side_effect = close_position_side_effect
 
@@ -1537,8 +1573,8 @@ class TestClosePositionUseCase:
         assert captured_order.symbol == "AAPL"
         assert captured_order.side == OrderSide.SELL  # Sell to close long
         assert captured_order.order_type == OrderType.MARKET
-        assert captured_order.quantity == 100
-        assert captured_order.average_fill_price == Decimal("160.00")
+        assert captured_order.quantity == Quantity(Decimal("100"))
+        assert captured_order.average_fill_price == Price(Decimal("160.00"))
 
     @pytest.mark.asyncio
     async def test_process_position_not_found(
@@ -1603,7 +1639,7 @@ class TestClosePositionUseCase:
 
         # Mock the close_position to set realized_pnl
         def close_side_effect(position, order, exit_price):
-            position.realized_pnl = Decimal("1500.00")
+            position.realized_pnl = Money(Decimal("1500.00"))
 
         mock_position_manager.close_position.side_effect = close_side_effect
 
@@ -1634,8 +1670,8 @@ class TestClosePositionUseCase:
         assert order.symbol == "AAPL"
         assert order.side == OrderSide.SELL
         assert order.order_type == OrderType.MARKET
-        assert order.quantity == 100
-        assert order.average_fill_price == Decimal("165.00")
+        assert order.quantity == Quantity(Decimal("100"))
+        assert order.average_fill_price == Price(Decimal("165.00"))
 
         # Verify position was updated
         mock_unit_of_work.positions.update_position.assert_called_once_with(position)
@@ -1983,7 +2019,9 @@ class TestEdgeCasesAndErrorHandling:
         )
 
         position = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
         )
 
         request = ClosePositionRequest(position_id=position.id, exit_price=Decimal("160.00"))

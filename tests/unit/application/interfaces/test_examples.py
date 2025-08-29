@@ -78,6 +78,7 @@ class TestTradingService:
             cash_balance=Decimal("100000"),
         )
 
+    @pytest.mark.asyncio
     async def test_place_market_order_success(self, trading_service, mock_uow):
         """Test successful market order placement."""
         # Setup
@@ -102,6 +103,7 @@ class TestTradingService:
         assert call_args.quantity.value == Decimal("100")
         assert call_args.side == OrderSide.BUY
 
+    @pytest.mark.asyncio
     async def test_place_market_order_without_reason(self, trading_service, mock_uow):
         """Test market order placement without reason."""
         # Setup
@@ -120,6 +122,7 @@ class TestTradingService:
         assert call_args.quantity.value == Decimal("50")
         assert call_args.side == OrderSide.SELL
 
+    @pytest.mark.asyncio
     async def test_execute_trade_with_new_position(
         self, trading_service, mock_tx_manager, sample_order
     ):
@@ -154,6 +157,7 @@ class TestTradingService:
         assert result_position == updated_position
         mock_tx_manager.execute_in_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_execute_trade_with_existing_buy_position(
         self, trading_service, mock_tx_manager, sample_order, sample_position
     ):
@@ -186,12 +190,17 @@ class TestTradingService:
         assert result_order == updated_order
         assert result_position == updated_position
 
+    @pytest.mark.asyncio
     async def test_execute_trade_with_existing_sell_position(
         self, trading_service, mock_tx_manager, sample_position
     ):
         """Test trade execution with existing position for sell order."""
         # Setup
-        sell_request = OrderRequest(symbol="AAPL", quantity=Decimal("50"), side=OrderSide.SELL)
+        from src.domain.value_objects.quantity import Quantity
+
+        sell_request = OrderRequest(
+            symbol="AAPL", quantity=Quantity(Decimal("50")), side=OrderSide.SELL
+        )
         sell_order = Order.create_market_order(sell_request)
         sell_order.submit("test_broker_id")
         order_id = sell_order.id
@@ -221,6 +230,7 @@ class TestTradingService:
         assert result_order == updated_order
         assert result_position == updated_position
 
+    @pytest.mark.asyncio
     async def test_execute_trade_order_not_found(self, trading_service, mock_tx_manager):
         """Test trade execution when order is not found."""
         # Setup
@@ -237,6 +247,7 @@ class TestTradingService:
         with pytest.raises(OrderNotFoundError):
             await trading_service.execute_trade(order_id, Decimal("150.00"), Decimal("100"))
 
+    @pytest.mark.asyncio
     async def test_close_position_completely_long_position(
         self, trading_service, mock_tx_manager, sample_position
     ):
@@ -268,11 +279,15 @@ class TestTradingService:
         assert result_order == saved_order
         mock_tx_manager.execute_in_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_close_position_completely_short_position(self, trading_service, mock_tx_manager):
         """Test closing a short position completely."""
         # Setup
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.quantity import Quantity
+
         short_position = Position.open_position(
-            symbol="AAPL", quantity=Decimal("-100"), entry_price=Decimal("150.00")
+            symbol="AAPL", quantity=Quantity(Decimal("-100")), entry_price=Price(Decimal("150.00"))
         )
         exit_price = Decimal("140.00")
         symbol = "AAPL"
@@ -299,6 +314,7 @@ class TestTradingService:
         assert result_position == updated_position
         assert result_order == saved_order
 
+    @pytest.mark.asyncio
     async def test_close_position_not_found(self, trading_service, mock_tx_manager):
         """Test closing position when position is not found."""
         # Setup
@@ -316,13 +332,17 @@ class TestTradingService:
         with pytest.raises(PositionNotFoundError):
             await trading_service.close_position_completely(symbol, exit_price)
 
+    @pytest.mark.asyncio
     async def test_close_position_already_closed(self, trading_service, mock_tx_manager):
         """Test closing position when position is already closed."""
         # Setup
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.quantity import Quantity
+
         closed_position = Position.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00")
+            symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150.00"))
         )
-        closed_position.close_position(Decimal("160.00"))
+        closed_position.close_position(Price(Decimal("160.00")))
 
         symbol = "AAPL"
         exit_price = Decimal("160.00")
@@ -339,6 +359,7 @@ class TestTradingService:
             await trading_service.close_position_completely(symbol, exit_price)
 
     @pytest.mark.skip(reason="implementation needs update")
+    @pytest.mark.asyncio
     async def test_get_portfolio_summary_success(
         self, trading_service, mock_uow, sample_portfolio, sample_position, sample_order
     ):
@@ -382,6 +403,7 @@ class TestTradingService:
         assert "total_value" in summary
         assert "cash_balance" in summary
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_summary_portfolio_not_found(self, trading_service, mock_uow):
         """Test getting portfolio summary when portfolio is not found."""
         # Setup
@@ -392,6 +414,7 @@ class TestTradingService:
         with pytest.raises(PositionNotFoundError):
             await trading_service.get_portfolio_summary(portfolio_id)
 
+    @pytest.mark.asyncio
     async def test_bulk_update_positions_success(
         self, trading_service, mock_tx_manager, sample_position
     ):
@@ -425,6 +448,7 @@ class TestTradingService:
         assert result[0] == sample_position
         mock_tx_manager.execute_in_transaction.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_bulk_update_positions_empty_updates(self, trading_service, mock_tx_manager):
         """Test bulk position updates with empty price updates."""
         # Setup
@@ -442,18 +466,23 @@ class TestTradingService:
         # Verify
         assert result == []
 
+    @pytest.mark.asyncio
     async def test_get_trading_metrics_success(
         self, trading_service, mock_uow, sample_order, sample_position
     ):
         """Test getting trading metrics for a symbol."""
         # Setup
+        from src.domain.value_objects.quantity import Quantity
+
         symbol = "AAPL"
 
         # Create different order statuses
         filled_order = sample_order
         filled_order.status = OrderStatus.FILLED
 
-        cancelled_request = OrderRequest(symbol="AAPL", quantity=Decimal("50"), side=OrderSide.SELL)
+        cancelled_request = OrderRequest(
+            symbol="AAPL", quantity=Quantity(Decimal("50")), side=OrderSide.SELL
+        )
         cancelled_order = Order.create_market_order(cancelled_request)
         cancelled_order.submit("test_broker_id")
         cancelled_order.cancel("Test cancellation")
@@ -461,11 +490,15 @@ class TestTradingService:
         all_orders = [filled_order, cancelled_order]
 
         # Create closed position with profit
+        from src.domain.value_objects.price import Price
+
         closed_position = Position.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("100.00")
+            symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("100.00"))
         )
-        closed_position.close_position(Decimal("120.00"))
-        closed_position._realized_pnl = Decimal("2000.00")  # Mock positive PnL
+        closed_position.close_position(Price(Decimal("120.00")))
+        from src.domain.value_objects.money import Money
+
+        closed_position._realized_pnl = Money(Decimal("2000.00"))  # Mock positive PnL
 
         all_positions = [sample_position, closed_position]
 
@@ -501,6 +534,7 @@ class TestTradingService:
         assert pnl_stats["average_win"] == 2000.0
         assert pnl_stats["average_loss"] == 0.0
 
+    @pytest.mark.asyncio
     async def test_get_trading_metrics_no_data(self, trading_service, mock_uow):
         """Test getting trading metrics when no data exists."""
         # Setup
@@ -518,23 +552,28 @@ class TestTradingService:
         assert result["position_stats"]["total_positions"] == 0
         assert result["position_stats"]["win_rate"] == 0
 
+    @pytest.mark.asyncio
     async def test_get_trading_metrics_with_losses(self, trading_service, mock_uow):
         """Test trading metrics calculation with losing positions."""
         # Setup
+        from src.domain.value_objects.money import Money
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.quantity import Quantity
+
         symbol = "AAPL"
 
         # Create positions with losses
         losing_position = Position.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("150.00")
+            symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150.00"))
         )
-        losing_position.close_position(Decimal("120.00"))
-        losing_position._realized_pnl = Decimal("-3000.00")  # Mock negative PnL
+        losing_position.close_position(Price(Decimal("120.00")))
+        losing_position._realized_pnl = Money(Decimal("-3000.00"))  # Mock negative PnL
 
         winning_position = Position.open_position(
-            symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("100.00")
+            symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("100.00"))
         )
-        winning_position.close_position(Decimal("130.00"))
-        winning_position._realized_pnl = Decimal("3000.00")  # Mock positive PnL
+        winning_position.close_position(Price(Decimal("130.00")))
+        winning_position._realized_pnl = Money(Decimal("3000.00"))  # Mock positive PnL
 
         all_positions = [losing_position, winning_position]
 
@@ -559,6 +598,7 @@ class TestTradingService:
 class TestExampleUsagePatterns:
     """Test the example usage patterns function."""
 
+    @pytest.mark.asyncio
     async def test_example_usage_patterns_runs_without_error(self):
         """Test that the example usage patterns function runs without error."""
         # This is a documentation function that should not raise exceptions

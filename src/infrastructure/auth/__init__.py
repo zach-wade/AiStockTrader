@@ -12,6 +12,16 @@ from .jwt_service import (
     TokenReuseException,
     TokenRevokedException,
 )
+from .mfa_enforcement import (
+    MFAEnforcementService,
+    MFARequiredOperation,
+    MFASession,
+    MFAVerificationMethod,
+    require_mfa_for_account_changes,
+    require_mfa_for_operation,
+    require_mfa_for_risk_management,
+    require_mfa_for_trading,
+)
 from .middleware import (
     APIKeyAuth,
     AuditLoggingMiddleware,
@@ -62,6 +72,15 @@ __all__ = [
     # RBAC Service
     "RBACService",
     "APIKeyInfo",
+    # MFA Enforcement
+    "MFAEnforcementService",
+    "MFARequiredOperation",
+    "MFASession",
+    "MFAVerificationMethod",
+    "require_mfa_for_operation",
+    "require_mfa_for_trading",
+    "require_mfa_for_risk_management",
+    "require_mfa_for_account_changes",
     # Middleware
     "JWTBearer",
     "APIKeyAuth",

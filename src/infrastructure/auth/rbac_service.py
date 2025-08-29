@@ -118,7 +118,7 @@ class RBACService:
             raise ValueError("Cannot modify system role")
 
         if description is not None:
-            role.description = description
+            role.description = description  # type: ignore[assignment]
 
         if permissions is not None:
             # Clear existing permissions
@@ -251,7 +251,14 @@ class RBACService:
 
     async def get_user_roles(self, user_id: str) -> list[str]:
         """Get all roles for a user."""
-        user = self.db.query(User).filter_by(id=user_id).first()
+        from uuid import UUID
+
+        try:
+            user_id_uuid = UUID(user_id)
+        except ValueError:
+            return []
+
+        user = self.db.query(User).filter(User.id == user_id_uuid).first()
         if not user:
             return []
         return [role.name for role in user.roles]
@@ -308,7 +315,14 @@ class RBACService:
 
     async def get_user_permissions(self, user_id: str) -> list[str]:
         """Get all permissions for a user."""
-        user = self.db.query(User).filter_by(id=user_id).first()
+        from uuid import UUID
+
+        try:
+            user_id_uuid = UUID(user_id)
+        except ValueError:
+            return []
+
+        user = self.db.query(User).filter(User.id == user_id_uuid).first()
         if not user:
             return []
         return user.get_permissions()
@@ -589,6 +603,7 @@ class RBACService:
             if not existing:
                 permission = Permission(resource=resource, action=action, description=description)
                 self.db.add(permission)
+                self.db.flush()  # Ensure it's committed immediately to avoid duplicates
 
         # Default roles
         default_roles = [

@@ -22,6 +22,7 @@ from src.application.use_cases.trading import (
     CancelOrderUseCase,
 )
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType, TimeInForce
+from src.domain.value_objects import Price, Quantity
 
 
 # Test Fixtures
@@ -68,10 +69,10 @@ def sample_active_order():
     order = Order(
         id=uuid4(),
         symbol="AAPL",
-        quantity=Decimal("100"),
+        quantity=Quantity(Decimal("100")),
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
-        limit_price=Decimal("150.00"),
+        limit_price=Price(Decimal("150.00")),
         status=OrderStatus.SUBMITTED,
         time_in_force=TimeInForce.DAY,
     )
@@ -85,12 +86,12 @@ def sample_filled_order():
     order = Order(
         id=uuid4(),
         symbol="AAPL",
-        quantity=Decimal("100"),
+        quantity=Quantity(Decimal("100")),
         side=OrderSide.BUY,
         order_type=OrderType.MARKET,
         status=OrderStatus.FILLED,
-        filled_quantity=Decimal("100"),
-        average_fill_price=Decimal("149.50"),
+        filled_quantity=Quantity(Decimal("100")),
+        average_fill_price=Price(Decimal("149.50")),
     )
     order.broker_order_id = "BROKER-456"
     return order
@@ -102,10 +103,10 @@ def sample_cancelled_order():
     order = Order(
         id=uuid4(),
         symbol="AAPL",
-        quantity=Decimal("100"),
+        quantity=Quantity(Decimal("100")),
         side=OrderSide.SELL,
         order_type=OrderType.LIMIT,
-        limit_price=Decimal("155.00"),
+        limit_price=Price(Decimal("155.00")),
         status=OrderStatus.CANCELLED,
     )
     order.broker_order_id = "BROKER-789"
@@ -204,12 +205,12 @@ class TestCancelOrderSuccess:
         order = Order(
             id=uuid4(),
             symbol="TSLA",
-            quantity=Decimal("200"),
+            quantity=Quantity(Decimal("200")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("250.00"),
+            limit_price=Price(Decimal("250.00")),
             status=OrderStatus.PARTIALLY_FILLED,
-            filled_quantity=Decimal("75"),
+            filled_quantity=Quantity(Decimal("75")),
         )
 
         # Setup
@@ -235,10 +236,10 @@ class TestCancelOrderSuccess:
         order = Order(
             id=uuid4(),
             symbol="GOOGL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.SELL,
             order_type=OrderType.STOP,
-            stop_price=Decimal("2800.00"),
+            stop_price=Price(Decimal("2800.00")),
             status=OrderStatus.PENDING,
         )
 
@@ -344,10 +345,10 @@ class TestCancelOrderFailures:
         order = Order(
             id=uuid4(),
             symbol="NVDA",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("500.00"),
+            limit_price=Price(Decimal("500.00")),
             status=OrderStatus.REJECTED,
         )
 
@@ -373,10 +374,10 @@ class TestCancelOrderFailures:
         order = Order(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.SELL,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("350.00"),
+            limit_price=Price(Decimal("350.00")),
             status=OrderStatus.EXPIRED,
         )
 
@@ -693,10 +694,10 @@ class TestConcurrentOperations:
             order = Order(
                 id=uuid4(),
                 symbol=f"STOCK{i}",
-                quantity=Decimal("100"),
+                quantity=Quantity(Decimal("100")),
                 side=OrderSide.BUY,
                 order_type=OrderType.LIMIT,
-                limit_price=Decimal(f"{100 + i}.00"),
+                limit_price=Price(Decimal(f"{100 + i}.00")),
                 status=OrderStatus.SUBMITTED,
             )
             orders.append(order)
@@ -735,10 +736,10 @@ class TestConcurrentOperations:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
             status=OrderStatus.SUBMITTED,
         )
 
@@ -801,7 +802,7 @@ class TestOrderEntityIntegration:
             order = Order(
                 id=uuid4(),
                 symbol="TEST",
-                quantity=Decimal("100"),
+                quantity=Quantity(Decimal("100")),
                 side=OrderSide.BUY,
                 order_type=OrderType.MARKET,
                 status=status,

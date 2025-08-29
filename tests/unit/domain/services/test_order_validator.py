@@ -10,13 +10,12 @@ from unittest.mock import MagicMock, create_autospec
 import pytest
 
 # Local imports
-from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
+from src.domain.entities.order import OrderSide, OrderStatus, OrderType
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.domain.services.commission_calculator import ICommissionCalculator
 from src.domain.services.order_validator import OrderConstraints, OrderValidator, ValidationResult
-from src.domain.value_objects.money import Money
-from src.domain.value_objects.price import Price
+from tests.helpers.fixtures import create_test_order, create_test_portfolio, money, price, quantity
 
 
 class TestValidationResult:
@@ -25,13 +24,13 @@ class TestValidationResult:
     def test_success_result(self):
         """Test creating successful validation result"""
         result = ValidationResult.success(
-            required_capital=Money(Decimal("1000")), estimated_commission=Money(Decimal("10"))
+            required_capital=money("100"), estimated_commission=money("1")
         )
 
         assert result.is_valid is True
         assert result.error_message is None
-        assert result.required_capital == Decimal("1000")
-        assert result.estimated_commission == Decimal("10")
+        assert result.required_capital == Decimal("100")
+        assert result.estimated_commission == Decimal("1")
 
     def test_success_result_without_capital(self):
         """Test successful result without capital details"""
@@ -69,17 +68,17 @@ class TestOrderConstraints:
     def test_custom_constraints(self):
         """Test custom constraint values"""
         constraints = OrderConstraints(
-            max_position_size=Decimal("10000"),
-            max_order_value=Money(Decimal("100000")),
-            min_order_value=Money(Decimal("100")),
+            max_position_size=Decimal("1000"),
+            max_order_value=money("10000"),
+            min_order_value=money("10"),
             max_portfolio_concentration=Decimal("0.10"),
             require_margin_for_shorts=False,
             short_margin_requirement=Decimal("2.0"),
         )
 
-        assert constraints.max_position_size == Decimal("10000")
-        assert constraints.max_order_value == Decimal("100000")
-        assert constraints.min_order_value == Decimal("100")
+        assert constraints.max_position_size == Decimal("1000")
+        assert constraints.max_order_value == Decimal("10000")
+        assert constraints.min_order_value == Decimal("10")
         assert constraints.max_portfolio_concentration == Decimal("0.10")
         assert constraints.require_margin_for_shorts is False
         assert constraints.short_margin_requirement == Decimal("2.0")
@@ -117,7 +116,7 @@ class TestOrderValidator:
     def mock_commission_calculator(self):
         """Create mock commission calculator"""
         calculator = create_autospec(ICommissionCalculator)
-        calculator.calculate.return_value = Money(Decimal("10"))
+        calculator.calculate.return_value = money("1")
         return calculator
 
     @pytest.fixture
@@ -128,9 +127,9 @@ class TestOrderValidator:
     @pytest.fixture
     def sample_order(self):
         """Create sample order for testing"""
-        return Order(
+        return create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),  # Smaller quantity to avoid concentration limits
+            qty=10,  # Smaller quantity to avoid concentration limits
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
@@ -140,13 +139,14 @@ class TestOrderValidator:
     @pytest.fixture
     def sample_portfolio(self):
         """Create sample portfolio for testing"""
-        portfolio = Portfolio(name="test_account")
-        portfolio.cash_balance = Decimal("20000")  # Enough for most test orders
-        return portfolio
+        return create_test_portfolio(
+            name="test_account",
+            cash_balance=20000,  # Enough for most test orders
+        )
 
     def test_validate_valid_buy_order(self, validator, sample_order, sample_portfolio):
         """Test validation of valid buy order"""
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(sample_order, sample_portfolio, current_price)
 
@@ -158,16 +158,16 @@ class TestOrderValidator:
     def test_validate_order_insufficient_funds(self, validator, sample_portfolio):
         """Test validation fails with insufficient funds"""
         # Create a large order that exceeds available funds
-        large_order = Order(
+        large_order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("1000"),
+            qty="1000",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        sample_portfolio.cash_balance = Decimal("100")
-        current_price = Price(Decimal("150"))
+        sample_portfolio.cash_balance = money("10")
+        current_price = price("15")
 
         result = validator.validate_order(large_order, sample_portfolio, current_price)
 
@@ -176,15 +176,15 @@ class TestOrderValidator:
 
     def test_validate_order_wrong_status(self, validator, sample_portfolio):
         """Test validation fails for non-pending order"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -196,9 +196,9 @@ class TestOrderValidator:
         # Order entity validates quantity in constructor, so negative quantity
         # will raise ValueError before reaching the validator
         with pytest.raises(ValueError, match="Order quantity must be positive"):
-            Order(
+            create_test_order(
                 symbol="AAPL",
-                quantity=Decimal("-100"),
+                qty="-100",
                 side=OrderSide.BUY,
                 order_type=OrderType.MARKET,
                 status=OrderStatus.PENDING,
@@ -209,9 +209,9 @@ class TestOrderValidator:
         """Test that limit order without price raises error at order creation"""
         # Order entity validates limit price in constructor
         with pytest.raises(ValueError, match="Limit order requires limit price"):
-            Order(
+            create_test_order(
                 symbol="AAPL",
-                quantity=Decimal("100"),
+                qty="100",
                 side=OrderSide.BUY,
                 order_type=OrderType.LIMIT,
                 status=OrderStatus.PENDING,
@@ -222,9 +222,9 @@ class TestOrderValidator:
         """Test that stop order without stop price raises error at order creation"""
         # Order entity validates stop price in constructor
         with pytest.raises(ValueError, match="Stop order requires stop price"):
-            Order(
+            create_test_order(
                 symbol="AAPL",
-                quantity=Decimal("100"),
+                qty="100",
                 side=OrderSide.BUY,
                 order_type=OrderType.STOP,
                 status=OrderStatus.PENDING,
@@ -233,18 +233,18 @@ class TestOrderValidator:
 
     def test_validate_order_below_minimum_value(self, validator, sample_portfolio):
         """Test validation fails for order below minimum value"""
-        constraints = OrderConstraints(min_order_value=Money(Decimal("1000")))
+        constraints = OrderConstraints(min_order_value=money("100"))
         validator.constraints = constraints
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("1"),
+            qty="1",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -253,21 +253,21 @@ class TestOrderValidator:
 
     def test_validate_order_above_maximum_value(self, validator, sample_portfolio):
         """Test validation fails for order above maximum value"""
-        constraints = OrderConstraints(max_order_value=Money(Decimal("10000")))
+        constraints = OrderConstraints(max_order_value=money("1000"))
         validator.constraints = constraints
 
         # Give portfolio enough funds so we hit max order value constraint, not insufficient funds
-        sample_portfolio.cash_balance = Decimal("200000")
+        sample_portfolio.cash_balance = money("20000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("1000"),
+            qty="1000",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -276,30 +276,30 @@ class TestOrderValidator:
 
     def test_validate_position_size_limit(self, validator, sample_portfolio):
         """Test validation fails when exceeding position size limit"""
-        constraints = OrderConstraints(max_position_size=Decimal("500"))
+        constraints = OrderConstraints(max_position_size=Decimal("50"))
         validator.constraints = constraints
 
         # Give portfolio enough funds to pass the funds check
-        sample_portfolio.cash_balance = Decimal("50000")
+        sample_portfolio.cash_balance = money("5000")
 
         # Add existing position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("400"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("40"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         sample_portfolio.positions[position.id] = position
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("200"),
+            qty="200",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -312,17 +312,17 @@ class TestOrderValidator:
         validator.constraints = constraints
 
         # Set up portfolio with appropriate total value
-        sample_portfolio.cash_balance = Decimal("10000")
+        sample_portfolio.cash_balance = money("1000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))  # 10 * 150 = 1500, > 10% of 10000
+        current_price = price("15")  # 10 * 150 = 1500, > 10% of 10000
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -340,19 +340,19 @@ class TestOrderValidator:
         )
         validator.constraints = constraints
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test short",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         # Short value: 100 * 150 = 15000
         # Margin required: 15000 * 1.5 = 22500
-        sample_portfolio.cash_balance = Decimal("20000")  # Not enough
+        sample_portfolio.cash_balance = money("2000")  # Not enough
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -364,17 +364,17 @@ class TestOrderValidator:
         # Disable concentration limits for this test
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test short",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
-        sample_portfolio.cash_balance = Decimal("25000")  # Enough for margin
+        sample_portfolio.cash_balance = money("2500")  # Enough for margin
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -388,21 +388,21 @@ class TestOrderValidator:
         # Add existing long position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("200"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("20"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         sample_portfolio.positions[position.id] = position
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test sell",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -413,44 +413,45 @@ class TestOrderValidator:
         # Disable concentration limits for this test
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
             limit_price=Decimal("145"),
             status=OrderStatus.PENDING,
             reason="Test limit",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
         assert result.is_valid is True
         # Should use limit price (145) not current price (150)
-        assert result.required_capital < Decimal("15000")
+        assert result.required_capital < Decimal("1500")
 
     def test_validate_closed_position_not_counted(self, validator, sample_portfolio):
         """Test that closed positions are not counted"""
         # Add closed position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("0"),  # Closed
-            average_entry_price=Decimal("140", closed_at=datetime.now(UTC)),
-            current_price=Decimal("150"),
+            quantity=quantity("0"),  # Closed
+            average_entry_price=Decimal("140"),
+            closed_at=datetime.now(UTC),
+            current_price=Decimal("15"),
         )
         position.status = "closed"
         sample_portfolio.positions[position.id] = position
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,  # Try to sell without position
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test sell",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, sample_portfolio, current_price)
 
@@ -465,7 +466,7 @@ class TestOrderModificationValidation:
     def mock_commission_calculator(self):
         """Create mock commission calculator"""
         calculator = create_autospec(ICommissionCalculator)
-        calculator.calculate.return_value = Money(Decimal("10"))
+        calculator.calculate.return_value = money("1")
         return calculator
 
     @pytest.fixture
@@ -475,60 +476,58 @@ class TestOrderModificationValidation:
 
     def test_validate_modification_pending_order(self, validator):
         """Test modification of pending order"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
 
-        result = validator.validate_modification(
-            order, new_quantity=Decimal("200"), new_limit_price=Price(Decimal("155"))
-        )
+        result = validator.validate_modification(order, new_qty="200", new_limit_price=price("155"))
 
         assert result.is_valid is True
 
     def test_validate_modification_partially_filled(self, validator):
         """Test modification of partially filled order"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PARTIALLY_FILLED,
             reason="Test",
         )
-        order.filled_quantity = Decimal("30")
+        order.filled_quantity = quantity("3")
 
-        result = validator.validate_modification(order, new_quantity=Decimal("80"))
+        result = validator.validate_modification(order, new_quantity=quantity("8"))
 
         assert result.is_valid is True
 
     def test_validate_modification_filled_order(self, validator):
         """Test cannot modify filled order"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
             reason="Test",
         )
 
-        result = validator.validate_modification(order, new_quantity=Decimal("200"))
+        result = validator.validate_modification(order, new_quantity=quantity("20"))
 
         assert result.is_valid is False
         assert "Cannot modify order with status" in result.error_message
 
     def test_validate_modification_cancelled_order(self, validator):
         """Test cannot modify cancelled order"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.CANCELLED,
@@ -542,18 +541,18 @@ class TestOrderModificationValidation:
 
     def test_validate_modification_negative_quantity(self, validator):
         """Test modification with negative quantity fails"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
 
         # Create a Quantity and modify its internal value to be negative
-        qty = Decimal("1")
+        qty = quantity("1")
         # Use object.__setattr__ to bypass frozen dataclass
         object.__setattr__(qty, "_value", Decimal("-50"))
 
@@ -563,48 +562,48 @@ class TestOrderModificationValidation:
 
     def test_validate_modification_below_filled_quantity(self, validator):
         """Test cannot reduce quantity below filled amount"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PARTIALLY_FILLED,
             reason="Test",
         )
-        order.filled_quantity = Decimal("60")
+        order.filled_quantity = quantity("6")
 
-        result = validator.validate_modification(order, new_quantity=Decimal("50"))
+        result = validator.validate_modification(order, new_quantity=quantity("5"))
 
         assert result.is_valid is False
         assert "Cannot reduce quantity below filled amount" in result.error_message
 
     def test_validate_modification_negative_limit_price(self, validator):
         """Test modification with negative limit price fails"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
 
         # Create a Price and modify its internal value to be negative
-        price = Price(Decimal("1"))
+        test_price = price("1")
         # Use object.__setattr__ to bypass frozen dataclass
-        object.__setattr__(price, "_value", Decimal("-150"))
+        object.__setattr__(test_price, "_value", Decimal("-150"))
 
-        result = validator.validate_modification(order, new_limit_price=price)
+        result = validator.validate_modification(order, new_limit_price=test_price)
         assert result.is_valid is False
         assert "Modified limit price must be positive" in result.error_message
 
     def test_validate_modification_negative_stop_price(self, validator):
         """Test modification with negative stop price fails"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.STOP,
             stop_price=Decimal("145"),
@@ -613,19 +612,19 @@ class TestOrderModificationValidation:
         )
 
         # Create a Price and modify its internal value to be negative
-        price = Price(Decimal("1"))
+        test_price = price("1")
         # Use object.__setattr__ to bypass frozen dataclass
-        object.__setattr__(price, "_value", Decimal("-145"))
+        object.__setattr__(test_price, "_value", Decimal("-145"))
 
-        result = validator.validate_modification(order, new_stop_price=price)
+        result = validator.validate_modification(order, new_stop_price=test_price)
         assert result.is_valid is False
         assert "Modified stop price must be positive" in result.error_message
 
     def test_validate_modification_no_changes(self, validator):
         """Test modification with no changes succeeds"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
@@ -644,7 +643,7 @@ class TestComplexScenarios:
     def mock_commission_calculator(self):
         """Create mock commission calculator"""
         calculator = create_autospec(ICommissionCalculator)
-        calculator.calculate.return_value = Money(Decimal("10"))
+        calculator.calculate.return_value = money("1")
         return calculator
 
     @pytest.fixture
@@ -655,27 +654,27 @@ class TestComplexScenarios:
     def test_partial_short_sale(self, validator):
         """Test partial short sale (selling more than owned)"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("50000")
+        portfolio.cash_balance = money("5000")
 
         # Own 50 shares
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("5"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
         # Try to sell 100 (50 owned + 50 short)
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -685,24 +684,24 @@ class TestComplexScenarios:
     def test_multiple_constraint_violations(self, validator):
         """Test order failing multiple constraints"""
         constraints = OrderConstraints(
-            max_position_size=Decimal("50"),
-            max_order_value=Money(Decimal("5000")),
-            min_order_value=Money(Decimal("1000")),
+            max_position_size=Decimal("5"),
+            max_order_value=money("500"),
+            min_order_value=money("100"),
         )
         validator.constraints = constraints
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("100")  # Very low balance
+        portfolio.cash_balance = money("10")  # Very low balance
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),  # Exceeds max position size
+            qty="100",  # Exceeds max position size
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))  # Order value = 15000, exceeds max
+        current_price = price("15")  # Order value = 15000, exceeds max
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -712,17 +711,17 @@ class TestComplexScenarios:
     def test_zero_portfolio_value(self, validator):
         """Test handling zero portfolio value"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("0")
+        portfolio.cash_balance = money("0")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,  # Short sale
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -735,19 +734,19 @@ class TestComplexScenarios:
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("20000")
+        portfolio.cash_balance = money("2000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.STOP_LIMIT,
             stop_price=Decimal("155"),
-            limit_price=Decimal("160"),
+            limit_price=Decimal("16"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -755,21 +754,21 @@ class TestComplexScenarios:
 
     def test_commission_affects_buying_power(self, mock_commission_calculator):
         """Test that commission is properly included in capital requirements"""
-        mock_commission_calculator.calculate.return_value = Money(Decimal("100"))
+        mock_commission_calculator.calculate.return_value = money("10")
         validator = OrderValidator(mock_commission_calculator)
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("15050")  # Just enough for order + commission
+        portfolio.cash_balance = money("1505")  # Just enough for order + commission
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -786,17 +785,17 @@ class TestComplexScenarios:
         validator.constraints = constraints
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")  # Enough to avoid concentration issues
+        portfolio.cash_balance = money("1000")  # Enough to avoid concentration issues
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),  # Small short
+            qty="10",  # Small short
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -812,17 +811,17 @@ class TestComplexScenarios:
         validator.constraints = constraints
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("40000")
+        portfolio.cash_balance = money("4000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         # Short value: 15000, margin required: 45000
         result = validator.validate_order(order, portfolio, current_price)
@@ -838,7 +837,7 @@ class TestOrderValidatorEdgeCases:
     def calculator(self):
         """Create mock commission calculator"""
         calc = MagicMock(spec=ICommissionCalculator)
-        calc.calculate.return_value = Money(Decimal("1.00"))
+        calc.calculate.return_value = money("1.00")
         return calc
 
     @pytest.fixture
@@ -849,16 +848,16 @@ class TestOrderValidatorEdgeCases:
     @pytest.fixture
     def portfolio(self):
         """Create test portfolio"""
-        return Portfolio(cash_balance=Decimal("10000"))
+        return Portfolio(cash_balance=money("1000"))
 
     def test_validate_order_with_zero_quantity(self, validator, portfolio):
         """Test validation with zero quantity order"""
         # Order entity validates quantity in constructor, so zero quantity
         # will raise ValueError before reaching the validator
         with pytest.raises(ValueError, match="Order quantity must be positive"):
-            Order(
+            create_test_order(
                 symbol="AAPL",
-                quantity=Decimal("0"),
+                qty="0",
                 side=OrderSide.BUY,
                 order_type=OrderType.MARKET,
             )
@@ -868,23 +867,23 @@ class TestOrderValidatorEdgeCases:
         # Order entity validates quantity in constructor, so negative quantity
         # will raise ValueError before reaching the validator
         with pytest.raises(ValueError, match="Order quantity must be positive"):
-            Order(
+            create_test_order(
                 symbol="AAPL",
-                quantity=Decimal("-100"),
+                qty="-100",
                 side=OrderSide.BUY,
                 order_type=OrderType.MARKET,
             )
 
     def test_validate_limit_order_with_zero_price(self, validator, portfolio):
         """Test validation of limit order with zero price"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
             limit_price=Decimal("0"),
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -893,14 +892,14 @@ class TestOrderValidatorEdgeCases:
 
     def test_validate_stop_order_with_negative_price(self, validator, portfolio):
         """Test validation of stop order with negative price"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.STOP,
             stop_price=Decimal("-10"),
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -913,15 +912,15 @@ class TestOrderValidatorEdgeCases:
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
 
         # Portfolio has exactly $10,000
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("66"),  # 66 * 150 = 9900
+            qty="66",  # 66 * 150 = 9900
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         # 9900 + 1 commission = 9901, just under 10000
         result = validator.validate_order(order, portfolio, current_price)
@@ -934,22 +933,22 @@ class TestOrderValidatorEdgeCases:
         # Add existing position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("5"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
         # Order that would bring concentration to exactly 20%
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("13"),  # Will make position ~20% of portfolio
+            qty="13",  # Will make position ~20% of portfolio
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -962,37 +961,37 @@ class TestOrderValidatorEdgeCases:
 
     def test_validate_modification_reduce_below_filled(self, validator):
         """Test modification that reduces quantity below filled amount"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
         )
         order.status = OrderStatus.PARTIALLY_FILLED
-        order.filled_quantity = Decimal("60")
+        order.filled_quantity = quantity("6")
 
         # Try to reduce quantity to 50 (below filled 60)
-        result = validator.validate_modification(order, new_quantity=Decimal("50"))
+        result = validator.validate_modification(order, new_quantity=quantity("5"))
 
         assert result.is_valid is False
         assert "below filled amount" in result.error_message
 
     def test_validate_modification_exact_filled_quantity(self, validator):
         """Test modification to exact filled quantity"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PARTIALLY_FILLED,
             reason="Test order",
         )
-        order.filled_quantity = Decimal("60")
+        order.filled_quantity = quantity("6")
 
         # Modify to exactly filled quantity
-        result = validator.validate_modification(order, new_quantity=Decimal("60"))
+        result = validator.validate_modification(order, new_quantity=quantity("6"))
 
         assert result.is_valid is True
 
@@ -1004,22 +1003,22 @@ class TestOrderValidatorEdgeCases:
         # Add existing long position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("5"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
         # Sell 100 shares (50 from position, 50 short)
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1031,27 +1030,27 @@ class TestOrderValidatorEdgeCases:
     def test_custom_constraints_validation(self):
         """Test validator with custom constraints"""
         calc = MagicMock(spec=ICommissionCalculator)
-        calc.calculate.return_value = Money(Decimal("1.00"))
+        calc.calculate.return_value = money("1.00")
 
         constraints = OrderConstraints(
-            max_position_size=Decimal("10"),
-            max_order_value=Money(Decimal("1000")),
-            min_order_value=Money(Decimal("100")),
+            max_position_size=Decimal("1"),
+            max_order_value=money("100"),
+            min_order_value=money("10"),
             max_portfolio_concentration=Decimal("0.10"),
             short_margin_requirement=Decimal("2.0"),
         )
 
         validator = OrderValidator(calc, constraints)
-        portfolio = Portfolio(cash_balance=Decimal("10000"))
+        portfolio = Portfolio(cash_balance=money("1000"))
 
         # Test max position size
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("20"),  # Exceeds max of 10
+            qty="20",  # Exceeds max of 10
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
-        result = validator.validate_order(order, portfolio, Price(Decimal("50")))
+        result = validator.validate_order(order, portfolio, price("5"))
 
         assert result.is_valid is False
         assert "exceeds maximum" in result.error_message
@@ -1059,24 +1058,24 @@ class TestOrderValidatorEdgeCases:
     def test_commission_calculation_in_validation(self):
         """Test that commission is properly calculated in validation"""
         calc = MagicMock(spec=ICommissionCalculator)
-        calc.calculate.return_value = Money(Decimal("25.00"))  # High commission
+        calc.calculate.return_value = money("25.00")  # High commission
 
         # Disable concentration limits for this test
         constraints = OrderConstraints(max_portfolio_concentration=Decimal("1.0"))
         validator = OrderValidator(calc, constraints)
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("1000")
+        portfolio.cash_balance = money("100")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("6"),
+            qty="6",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test order",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1087,12 +1086,12 @@ class TestOrderValidatorEdgeCases:
 
     def test_zero_cash_balance_portfolio(self, validator):
         """Test validation with zero cash balance"""
-        portfolio = Portfolio(cash_balance=Decimal("0"))
+        portfolio = Portfolio(cash_balance=money("0"))
 
-        order = Order(
-            symbol="AAPL", quantity=Decimal("1"), side=OrderSide.BUY, order_type=OrderType.MARKET
+        order = create_test_order(
+            symbol="AAPL", qty="1", side=OrderSide.BUY, order_type=OrderType.MARKET
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1107,7 +1106,7 @@ class TestOrderValidatorFullCoverage:
     def mock_commission_calculator(self):
         """Create mock commission calculator"""
         calculator = create_autospec(ICommissionCalculator)
-        calculator.calculate.return_value = Money(Decimal("10"))
+        calculator.calculate.return_value = money("1")
         return calculator
 
     @pytest.fixture
@@ -1120,21 +1119,21 @@ class TestOrderValidatorFullCoverage:
         # Create an order that somehow gets zero quantity
         # (normally prevented by Order entity validation)
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
         # We'll create a valid order first, then manually set quantity to 0
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
         # Directly modify the quantity attribute to bypass validation
-        order.quantity = Decimal("0")
+        order.quantity = quantity("0")
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1143,12 +1142,12 @@ class TestOrderValidatorFullCoverage:
 
     def test_validate_modification_zero_quantity(self, validator):
         """Test modification with zero quantity"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
@@ -1164,18 +1163,18 @@ class TestOrderValidatorFullCoverage:
 
     def test_validate_modification_zero_limit_price(self, validator):
         """Test modification with zero limit price"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
 
         # Create a Price object and then modify its internal value
-        new_price = Price(Decimal("1"))
+        new_price = price("1")
         new_price._value = Decimal("0")
 
         result = validator.validate_modification(order, new_limit_price=new_price)
@@ -1185,9 +1184,9 @@ class TestOrderValidatorFullCoverage:
 
     def test_validate_modification_zero_stop_price(self, validator):
         """Test modification with zero stop price"""
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.STOP,
             stop_price=Decimal("145"),
@@ -1196,7 +1195,7 @@ class TestOrderValidatorFullCoverage:
         )
 
         # Create a Price object and then modify its internal value
-        new_price = Price(Decimal("1"))
+        new_price = price("1")
         new_price._value = Decimal("0")
 
         result = validator.validate_modification(order, new_stop_price=new_price)
@@ -1207,54 +1206,54 @@ class TestOrderValidatorFullCoverage:
     def test_sell_order_only_commission_required(self, validator):
         """Test that sell orders only require commission as capital"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("20")  # Just enough for commission
+        portfolio.cash_balance = money("2")  # Just enough for commission
 
         # Add position to sell
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("10"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
         # Disable concentration limits
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("50"),
+            qty="50",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is True
         # For sell orders, required capital should be just the commission
-        assert result.required_capital == Decimal("10")  # Just commission
+        assert result.required_capital == Decimal("1")  # Just commission
 
     def test_position_with_negative_quantity_sell(self, validator):
         """Test selling when position quantity becomes negative (short)"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("50000")
+        portfolio.cash_balance = money("5000")
 
         # Disable concentration limits
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
 
         # No existing position - pure short sale
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1264,22 +1263,22 @@ class TestOrderValidatorFullCoverage:
     def test_max_position_size_exact_limit(self, validator):
         """Test position at exactly max size limit"""
         constraints = OrderConstraints(
-            max_position_size=Decimal("100"), max_portfolio_concentration=Decimal("1.0")
+            max_position_size=Decimal("10"), max_portfolio_concentration=Decimal("1.0")
         )
         validator.constraints = constraints
 
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("20000")
+        portfolio.cash_balance = money("2000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),  # Exactly at limit
+            qty="100",  # Exactly at limit
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1290,17 +1289,17 @@ class TestOrderValidatorFullCoverage:
         portfolio = Portfolio(name="test")
         # Mock get_total_value to return 0
         portfolio.get_total_value = MagicMock(return_value=Decimal("0"))
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1311,7 +1310,7 @@ class TestOrderValidatorFullCoverage:
     def test_short_sale_with_partial_position_exact_coverage(self, validator):
         """Test short sale when position exactly covers order"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("1000")
+        portfolio.cash_balance = money("100")
 
         # Disable concentration limits
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
@@ -1319,21 +1318,21 @@ class TestOrderValidatorFullCoverage:
         # Position exactly matches order quantity
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("10"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),  # Exactly matches position
+            qty="100",  # Exactly matches position
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1343,22 +1342,22 @@ class TestOrderValidatorFullCoverage:
     def test_limit_order_with_none_limit_price(self, validator):
         """Test that limit order validation catches None limit price"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
         # Create a limit order and force limit_price to None
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
         # Force limit_price to None
         order.limit_price = None
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1368,12 +1367,12 @@ class TestOrderValidatorFullCoverage:
     def test_stop_order_with_none_stop_price(self, validator):
         """Test that stop order validation catches None stop price"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
         # Create a stop order and force stop_price to None
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.STOP,
             stop_price=Decimal("145"),
@@ -1383,7 +1382,7 @@ class TestOrderValidatorFullCoverage:
         # Force stop_price to None
         order.stop_price = None
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1393,7 +1392,7 @@ class TestOrderValidatorFullCoverage:
     def test_position_calculation_for_sell_order_reducing_long(self, validator):
         """Test position calculation when sell order reduces existing long"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
         # Disable concentration limits
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
@@ -1401,34 +1400,34 @@ class TestOrderValidatorFullCoverage:
         # Existing long position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("150"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("15"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
         # Sell part of position
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("50"),
+            qty="50",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
         # Should succeed - just reducing position
         assert result.is_valid is True
         # Capital required is just commission for sell
-        assert result.required_capital == Decimal("10")
+        assert result.required_capital == Decimal("1")
 
     def test_short_margin_check_when_shares_to_short_zero(self, validator):
         """Test margin check when calculated shares to short is exactly zero"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("100")
+        portfolio.cash_balance = money("10")
 
         # Disable concentration limits
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
@@ -1436,21 +1435,21 @@ class TestOrderValidatorFullCoverage:
         # Position exactly covers sell order
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("10"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1460,21 +1459,21 @@ class TestOrderValidatorFullCoverage:
     def test_validate_order_negative_quantity_edge_case(self, validator):
         """Test handling of negative quantity (line 327 coverage)"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
         # Create order and force negative quantity
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            qty="100",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
         # Force negative quantity to trigger line 327
-        order.quantity = Decimal("-10")
+        order.quantity = quantity("-10")
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1484,21 +1483,21 @@ class TestOrderValidatorFullCoverage:
     def test_limit_order_zero_limit_price(self, validator):
         """Test limit order with zero limit price"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
         # Force limit price to zero
-        order.limit_price = Decimal("0")
+        order.limit_price = price("0")
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1508,11 +1507,11 @@ class TestOrderValidatorFullCoverage:
     def test_stop_order_zero_stop_price(self, validator):
         """Test stop order with zero stop price"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.STOP,
             stop_price=Decimal("145"),
@@ -1520,9 +1519,9 @@ class TestOrderValidatorFullCoverage:
             reason="Test",
         )
         # Force stop price to zero
-        order.stop_price = Decimal("0")
+        order.stop_price = price("0")
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1532,22 +1531,22 @@ class TestOrderValidatorFullCoverage:
     def test_stop_limit_order_with_zero_stop_price(self, validator):
         """Test stop limit order with zero stop price"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("10000")
+        portfolio.cash_balance = money("1000")
 
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("10"),
+            qty="10",
             side=OrderSide.BUY,
             order_type=OrderType.STOP_LIMIT,
             stop_price=Decimal("145"),
-            limit_price=Decimal("150"),
+            limit_price=Decimal("15"),
             status=OrderStatus.PENDING,
             reason="Test",
         )
         # Force stop price to zero
-        order.stop_price = Decimal("0")
+        order.stop_price = price("0")
 
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 
@@ -1557,7 +1556,7 @@ class TestOrderValidatorFullCoverage:
     def test_short_sale_with_margin_disabled_by_position(self, validator):
         """Test short sale edge case with position partially covering"""
         portfolio = Portfolio(name="test")
-        portfolio.cash_balance = Decimal("1000")
+        portfolio.cash_balance = money("100")
 
         # Disable concentration limits
         validator.constraints.max_portfolio_concentration = Decimal("1.0")
@@ -1565,22 +1564,22 @@ class TestOrderValidatorFullCoverage:
         # Position that partially covers
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("140"),
-            current_price=Decimal("150"),
+            quantity=quantity("5"),
+            average_entry_price=Decimal("14"),
+            current_price=Decimal("15"),
         )
         portfolio.positions[position.id] = position
 
         # Sell more than position
-        order = Order(
+        order = create_test_order(
             symbol="AAPL",
-            quantity=Decimal("51"),  # 1 share short
+            qty="51",  # 1 share short
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
             reason="Test",
         )
-        current_price = Price(Decimal("150"))
+        current_price = price("15")
 
         result = validator.validate_order(order, portfolio, current_price)
 

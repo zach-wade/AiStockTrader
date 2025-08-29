@@ -9,10 +9,10 @@ import asyncio
 import logging
 import random
 import threading
-from collections.abc import AsyncGenerator, Callable, Generator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from src.domain.exceptions import (
@@ -220,7 +220,7 @@ class ConcurrencyService:
         Raises:
             OptimisticLockException: If operation fails after max retries
         """
-        last_exception = None
+        last_exception: StaleDataException | DeadlockException | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -275,7 +275,7 @@ class ConcurrencyService:
 
     async def async_retry_on_version_conflict(
         self,
-        operation: Callable[[], T],
+        operation: Callable[[], T | Awaitable[T]],
         entity_type: str,
         entity_id: UUID | str,
     ) -> T:
@@ -293,7 +293,7 @@ class ConcurrencyService:
         Raises:
             OptimisticLockException: If operation fails after max retries
         """
-        last_exception = None
+        last_exception: StaleDataException | DeadlockException | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -310,7 +310,7 @@ class ConcurrencyService:
                         f"{entity_type} {entity_id}"
                     )
 
-                return result
+                return cast(T, result)
 
             except StaleDataException as e:
                 last_exception = e

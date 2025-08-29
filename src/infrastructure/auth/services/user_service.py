@@ -11,7 +11,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..jwt_service import JWTService
-from .authentication import AuthenticationResult, AuthenticationService
+from ..types import AuthenticationResult
+from .authentication import AuthenticationService
 from .mfa_service import MFAService
 from .password_service import PasswordService
 from .registration import RegistrationResult, RegistrationService
@@ -118,16 +119,27 @@ class UserService:
         Verify MFA code and complete authentication with rate limiting.
         """
         # Get user ID from session token
-        user_id = self.jwt_service.redis.get(f"mfa:session:{mfa_session_token}")
-        if not user_id:
+        user_id_bytes = self.jwt_service.redis.get(f"mfa:session:{mfa_session_token}")
+        if not user_id_bytes:
             raise ValueError("Invalid or expired MFA session")
+
+        user_id = (
+            user_id_bytes.decode("utf-8")
+            if isinstance(user_id_bytes, bytes)
+            else str(user_id_bytes)
+        )
 
         # Check MFA attempt rate limit (5 attempts per 5 minutes per user)
         rate_limit_key = f"mfa:attempts:{user_id}"
-        attempts = self.jwt_service.redis.get(rate_limit_key)
+        attempts_bytes = self.jwt_service.redis.get(rate_limit_key)
 
-        if attempts:
-            attempts = int(attempts)
+        if attempts_bytes:
+            attempts_str = (
+                attempts_bytes.decode("utf-8")
+                if isinstance(attempts_bytes, bytes)
+                else str(attempts_bytes)
+            )
+            attempts = int(attempts_str)
             if attempts >= 5:
                 raise ValueError("Too many MFA attempts. Please try again later.")
         else:
@@ -171,7 +183,7 @@ class UserService:
         return await self.auth_service.change_password(user_id, current_password, new_password)
 
     # Session operations
-    async def logout(self, user_id: str, session_id: str, everywhere: bool = False):
+    async def logout(self, user_id: str, session_id: str, everywhere: bool = False) -> None:
         """Logout user from current session or all sessions."""
         await self.session_manager.logout(user_id, session_id, everywhere)
 

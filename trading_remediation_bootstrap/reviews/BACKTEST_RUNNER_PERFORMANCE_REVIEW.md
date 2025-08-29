@@ -1,6 +1,7 @@
 # Comprehensive Performance & Architecture Review: run_backtest.py
 
 ## Executive Summary
+
 Critical performance and architecture issues identified in the backtest runner implementation that severely impact scalability, memory efficiency, and execution speed. The module exhibits significant anti-patterns in data handling, lacks proper resource management, and misses critical optimization opportunities.
 
 ---
@@ -19,11 +20,13 @@ Critical performance and architecture issues identified in the backtest runner i
 2. **Synchronous Initialization in Async Context** (Lines 35-49)
    - **Issue**: Heavy initialization in `__init__` blocks event loop
    - **Lines**: 43-45
+
    ```python
    self.model_loader = ModelLoader()
    self.feature_store = FeatureStore(config=self.config)
    self.backtest_factory = BacktestEngineFactory()
    ```
+
    - **Impact**: Blocks async execution, poor startup performance
    - **Severity**: HIGH
    - **Fix**: Use async factory pattern or lazy initialization
@@ -48,12 +51,14 @@ Critical performance and architecture issues identified in the backtest runner i
 
 2. **Inefficient Date Range Handling** (Lines 72-78)
    - **Issue**: No validation or optimization of date ranges
+
    ```python
    if end_date is None:
        end_date = datetime.now()
    if start_date is None:
        start_date = end_date - timedelta(days=self.default_lookback_days)
    ```
+
    - **Impact**: May query excessive historical data unnecessarily
    - **Severity**: HIGH
    - **Fix**: Add date range validation and data availability checks
@@ -72,20 +77,24 @@ Critical performance and architecture issues identified in the backtest runner i
 
 1. **DataFrame Copies in Results Processing** (Lines 189-207)
    - **Issue**: Multiple DataFrame operations creating copies
+
    ```python
    winning_trades = trades_df[trades_df['pnl'] > 0]  # Copy
    losing_trades = trades_df[trades_df['pnl'] < 0]   # Another copy
    ```
+
    - **Impact**: 2-3x memory usage for trade analysis
    - **Severity**: HIGH
    - **Fix**: Use views or boolean indexing without copies
 
 2. **Full Equity Curve Storage** (Lines 243-254)
    - **Issue**: Entire equity and drawdown curves converted to lists
+
    ```python
    'dates': result.equity_curve.index.tolist(),
    'values': result.equity_curve.values.tolist()
    ```
+
    - **Impact**: Memory spike for long backtests (365 days = 365*2*8 bytes minimum)
    - **Severity**: HIGH
    - **Fix**: Implement sampling or compression for large datasets
@@ -98,9 +107,11 @@ Critical performance and architecture issues identified in the backtest runner i
 
 4. **Dictionary Accumulation** (Lines 156-171)
    - **Issue**: Results dictionary grows unbounded
+
    ```python
    results[model_path] = result  # Accumulates all results
    ```
+
    - **Impact**: O(n) memory growth with number of models
    - **Severity**: HIGH
 
@@ -112,10 +123,12 @@ Critical performance and architecture issues identified in the backtest runner i
 
 1. **Sequential Model Backtesting** (Lines 158-171)
    - **Issue**: Models tested one at a time in loop
+
    ```python
    for model_path in model_paths:
        result = await self.run_model_backtest(...)
    ```
+
    - **Impact**: Linear time complexity O(n) instead of O(1) with parallelization
    - **Severity**: CRITICAL
    - **Performance Loss**: 5-10x slower for multiple models
@@ -164,9 +177,11 @@ Critical performance and architecture issues identified in the backtest runner i
 
 1. **No Model Caching** (Lines 87-91)
    - **Issue**: Model loaded from disk every time
+
    ```python
    strategy = MLModelStrategy(model_path=model_path, ...)
    ```
+
    - **Impact**: Disk I/O for every backtest
    - **Severity**: HIGH
    - **Fix**: Implement LRU cache for loaded models
@@ -191,10 +206,12 @@ Critical performance and architecture issues identified in the backtest runner i
 
 1. **Generic Exception Handling** (Lines 127-133)
    - **Issue**: Catches all exceptions without discrimination
+
    ```python
    except Exception as e:
        logger.error(f"Backtest failed: {e}", exc_info=True)
    ```
+
    - **Impact**: Hides specific errors, difficult debugging
    - **Severity**: HIGH
    - **Fix**: Specific exception handling with retry logic
@@ -217,9 +234,11 @@ Critical performance and architecture issues identified in the backtest runner i
 
 1. **Blocking Operations in Async Context** (Lines 94-95)
    - **Issue**: Synchronous model info retrieval
+
    ```python
    model_info = strategy.get_model_info()  # Blocking call
    ```
+
    - **Impact**: Thread blocking in async function
    - **Severity**: HIGH
    - **Fix**: Make get_model_info async
@@ -248,11 +267,13 @@ Critical performance and architecture issues identified in the backtest runner i
 
 2. **Inefficient DataFrame Operations** (Lines 298-312)
    - **Issue**: Multiple passes over DataFrame
+
    ```python
    for metric, optimization in metrics_to_compare:
        if optimization == 'max':
            best_idx = summary_df[metric].idxmax()
    ```
+
    - **Impact**: O(m*n) where m=metrics, n=rows
    - **Severity**: MEDIUM
    - **Fix**: Single-pass algorithm
@@ -301,9 +322,11 @@ Critical performance and architecture issues identified in the backtest runner i
 
 2. **Insufficient Execution Timing** (Line 238)
    - **Issue**: Only total execution time tracked
+
    ```python
    'execution_time': result.execution_time
    ```
+
    - **Impact**: No breakdown of where time is spent
    - **Severity**: MEDIUM
    - **Fix**: Add stage-wise timing
@@ -352,6 +375,7 @@ Critical performance and architecture issues identified in the backtest runner i
 ### Priority 1: Critical Fixes (Do Immediately)
 
 1. **Implement Parallel Model Backtesting**
+
    ```python
    # Line 158-171 replacement
    tasks = [
@@ -362,6 +386,7 @@ Critical performance and architecture issues identified in the backtest runner i
    ```
 
 2. **Add Data Streaming**
+
    ```python
    # Add chunked data processing
    async def stream_data(self, symbols, start_date, end_date, chunk_size=1000):
@@ -372,9 +397,10 @@ Critical performance and architecture issues identified in the backtest runner i
    ```
 
 3. **Implement Model Caching**
+
    ```python
    from functools import lru_cache
-   
+
    @lru_cache(maxsize=10)
    def load_model_cached(model_path):
        return MLModelStrategy(model_path)

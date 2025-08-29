@@ -8,10 +8,10 @@ keeping the brokers as simple technical adapters.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from src.application.interfaces.broker import IBroker
 from src.application.interfaces.unit_of_work import IUnitOfWork
@@ -148,7 +148,7 @@ class BrokerCoordinator:
 
         request = PlaceOrderRequest(
             request_id=(
-                UUID(order_request.get("request_id")) if "request_id" in order_request else None
+                UUID(order_request.get("request_id")) if "request_id" in order_request else uuid4()
             ),
             portfolio_id=UUID(order_request["portfolio_id"]),
             symbol=order_request["symbol"],
@@ -195,7 +195,7 @@ class BrokerCoordinator:
         from src.application.use_cases.trading import CancelOrderRequest
 
         request = CancelOrderRequest(
-            request_id=None,
+            request_id=uuid4(),
             order_id=order_id,
             reason=reason,
         )
@@ -235,10 +235,10 @@ class BrokerCoordinator:
         from src.application.use_cases.market_simulation import UpdateMarketPriceRequest
 
         request = UpdateMarketPriceRequest(
-            request_id=None,
+            request_id=uuid4(),
             symbol=symbol,
             price=price,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(UTC),
         )
 
         response = await use_case.execute(request)
@@ -274,7 +274,7 @@ class BrokerCoordinator:
         from src.application.use_cases.order_execution import ProcessOrderFillRequest
 
         request = ProcessOrderFillRequest(
-            request_id=None,
+            request_id=uuid4(),
             order_id=order_id,
             fill_price=fill_price,
             fill_quantity=fill_quantity,
@@ -312,7 +312,7 @@ class BrokerCoordinator:
         from src.application.use_cases.trading import GetOrderStatusRequest
 
         request = GetOrderStatusRequest(
-            request_id=None,
+            request_id=uuid4(),
             order_id=order_id,
         )
 
@@ -340,7 +340,7 @@ class BrokerCoordinator:
         from src.application.use_cases.market_simulation import ProcessPendingOrdersRequest
 
         request = ProcessPendingOrdersRequest(
-            request_id=None,
+            request_id=uuid4(),
             current_prices=self.market_prices,
         )
 

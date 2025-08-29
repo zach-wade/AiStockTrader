@@ -225,8 +225,8 @@ class PrometheusExporter(ObservabilityExporter):
 
         try:
             # Track event metrics
-            event_counts: dict[tuple, int] = {}
-            error_counts: dict[tuple, int] = {}
+            event_counts: dict[tuple[str, str], int] = {}
+            error_counts: dict[tuple[str, str], int] = {}
 
             for event in events:
                 # Count events

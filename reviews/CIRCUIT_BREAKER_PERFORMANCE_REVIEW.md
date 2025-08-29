@@ -1,9 +1,11 @@
 # Circuit Breaker System - Performance and Architecture Review
 
 ## Executive Summary
+
 Comprehensive performance analysis of the circuit breaker system revealed **25 critical issues** affecting event system performance, memory management, async patterns, and scalability. Major concerns include unbounded memory growth, inefficient event handling, poor concurrency control, and missing resource cleanup mechanisms.
 
 **Critical Impact Areas:**
+
 - **Memory Leaks**: 8 unbounded collections causing memory growth
 - **Performance Bottlenecks**: 7 O(n) or worse complexity operations
 - **Concurrency Issues**: 5 thread safety violations
@@ -14,6 +16,7 @@ Comprehensive performance analysis of the circuit breaker system revealed **25 c
 ## 1. MEMORY MANAGEMENT ISSUES
 
 ### ISSUE-2800: Unbounded Event Callbacks List (facade.py)
+
 **Location**: Lines 65, 291, 300-307
 **Severity**: CRITICAL
 **Impact**: Memory leak, growing callback list
@@ -28,12 +31,14 @@ def add_event_callback(self, callback: Callable):
 ```
 
 **Problem**: Event callbacks accumulate without bounds, never garbage collected
-**Performance Impact**: 
+**Performance Impact**:
+
 - Memory growth: ~100 bytes per callback
 - Iteration cost: O(n) for each event emission
 - After 10,000 events with unique callbacks: ~1MB wasted memory
 
 **Fix Required**:
+
 ```python
 from collections import deque
 self._event_callbacks = deque(maxlen=1000)  # Bounded collection
@@ -43,6 +48,7 @@ self._event_callbacks = WeakSet()
 ```
 
 ### ISSUE-2801: Unbounded Tripped Breakers Set (facade.py)
+
 **Location**: Lines 70, 335
 **Severity**: HIGH
 **Impact**: Memory growth in long-running systems
@@ -53,11 +59,13 @@ self._tripped_breakers: Set[str] = set()
 ```
 
 **Problem**: Tripped breakers accumulate without cleanup after reset
-**Performance Impact**: 
+**Performance Impact**:
+
 - Set operations degrade from O(1) to O(log n) with growth
 - Memory: ~50 bytes per breaker name
 
 ### ISSUE-2802: Cooldown Timer Task Leak (facade.py)
+
 **Location**: Lines 71, 232-233, 388
 **Severity**: CRITICAL
 **Impact**: Task object accumulation
@@ -69,11 +77,13 @@ self._cooldown_timers[breaker_name] = asyncio.create_task(cooldown_task())
 
 **Problem**: Cancelled tasks remain in dictionary
 **Performance Impact**:
+
 - Memory: ~2KB per task object
 - Dictionary lookup degradation
 - Potential for 100+ zombie tasks
 
 ### ISSUE-2803: Event Metadata Dictionary Growth (events.py)
+
 **Location**: Lines 69-79, 95-100, 118-125
 **Severity**: HIGH
 **Impact**: Unbounded metadata accumulation
@@ -89,6 +99,7 @@ self.metadata.update({
 
 **Problem**: Event objects retain all metadata indefinitely
 **Performance Impact**:
+
 - Each event: ~500-1000 bytes
 - 1000 events/hour = ~1MB/hour memory growth
 
@@ -97,6 +108,7 @@ self.metadata.update({
 ## 2. EVENT SYSTEM PERFORMANCE
 
 ### ISSUE-2804: Synchronous Event Emission Blocking (facade.py)
+
 **Location**: Lines 298-307
 **Severity**: CRITICAL
 **Impact**: Thread blocking, cascade delays
@@ -113,11 +125,13 @@ async def _emit_event(self, event: CircuitBreakerEvent):
 
 **Problem**: Sequential callback execution blocks all subsequent callbacks
 **Performance Impact**:
+
 - 10 callbacks × 100ms each = 1 second total blocking
 - Critical events delayed by slow handlers
 - No timeout protection
 
 **Fix Required**:
+
 ```python
 async def _emit_event(self, event: CircuitBreakerEvent):
     tasks = []
@@ -129,6 +143,7 @@ async def _emit_event(self, event: CircuitBreakerEvent):
 ```
 
 ### ISSUE-2805: Event Builder Timestamp Generation (events.py)
+
 **Location**: Lines 200, 218, 236
 **Severity**: MEDIUM
 **Impact**: Redundant timestamp calculations
@@ -142,6 +157,7 @@ event_id = f"TRIP_{breaker_name}_{datetime.utcnow().timestamp():.0f}"
 **Performance Impact**: ~5μs per call × 3 = 15μs overhead per event
 
 ### ISSUE-2806: Event Dictionary Conversion Overhead (events.py)
+
 **Location**: Lines 40-50
 **Severity**: MEDIUM
 **Impact**: Repeated serialization cost
@@ -163,6 +179,7 @@ def to_dict(self) -> Dict[str, Any]:
 ## 3. REGISTRY LOCKING AND CONCURRENCY
 
 ### ISSUE-2807: Registry Lock Granularity (registry.py)
+
 **Location**: Lines 120, 129-136, 248-259
 **Severity**: HIGH
 **Impact**: Coarse-grained locking reduces concurrency
@@ -176,16 +193,19 @@ async with self._lock:
 
 **Problem**: Single lock for all operations prevents parallel access
 **Performance Impact**:
+
 - Initialization blocks all registry operations
 - Check operations can't run in parallel
 - 10 breakers × 50ms init = 500ms blocking
 
 **Fix Required**: Fine-grained locking per breaker type
+
 ```python
 self._breaker_locks = {bt: asyncio.Lock() for bt in BreakerType}
 ```
 
 ### ISSUE-2808: Missing Lock in Registry Reads (registry.py)
+
 **Location**: Lines 180-186, 196-204
 **Severity**: CRITICAL
 **Impact**: Race conditions, data corruption
@@ -200,6 +220,7 @@ def get_all_breakers(self) -> Dict[BreakerType, BaseBreaker]:
 **Performance Impact**: Unpredictable failures, debugging overhead
 
 ### ISSUE-2809: Registry Check Performance (registry.py)
+
 **Location**: Lines 138-178
 **Severity**: HIGH
 **Impact**: O(n) iteration without optimization
@@ -213,6 +234,7 @@ for breaker_type, breaker in self.breakers.items():
 
 **Problem**: Sequential breaker checks instead of parallel
 **Performance Impact**:
+
 - 15 breakers × 20ms = 300ms total
 - Could be 20ms with parallel execution
 
@@ -221,6 +243,7 @@ for breaker_type, breaker in self.breakers.items():
 ## 4. ASYNC PATTERN ISSUES
 
 ### ISSUE-2810: Monitoring Loop Resource Waste (facade.py)
+
 **Location**: Lines 317-328
 **Severity**: MEDIUM
 **Impact**: CPU cycles wasted
@@ -233,23 +256,27 @@ async def _monitoring_loop(self):
 ```
 
 **Problem**: Continuous loop even when idle
-**Performance Impact**: 
+**Performance Impact**:
+
 - Wake-up every second
 - Context switch overhead
 - Battery drain on mobile/embedded
 
 ### ISSUE-2811: Missing Async Context Manager (facade.py)
+
 **Location**: Entire class
 **Severity**: HIGH
 **Impact**: Resource cleanup failures
 
 **Problem**: No `__aenter__` / `__aexit__` implementation
-**Performance Impact**: 
+**Performance Impact**:
+
 - Leaked tasks on exceptions
 - Unclosed monitoring loops
 - Memory leaks in production
 
 ### ISSUE-2812: Task Cancellation Handling (facade.py)
+
 **Location**: Lines 104-109, 232-233
 **Severity**: MEDIUM
 **Impact**: Improper cleanup
@@ -268,6 +295,7 @@ except asyncio.CancelledError:
 ## 5. DATABASE/EXTERNAL API ISSUES
 
 ### ISSUE-2813: Missing Connection Pooling (config.py)
+
 **Location**: Lines 97-109
 **Severity**: HIGH
 **Impact**: Connection exhaustion
@@ -280,17 +308,20 @@ def nyse_api_endpoint(self) -> str:
 
 **Problem**: No connection pooling for external APIs
 **Performance Impact**:
+
 - New connection per request: ~100ms overhead
 - Connection limit exhaustion
 - No retry mechanism
 
 ### ISSUE-2814: No Caching for External Data (facade.py)
+
 **Location**: Check conditions implementation
 **Severity**: HIGH
 **Impact**: Redundant API calls
 
 **Problem**: Market conditions fetched repeatedly
 **Performance Impact**:
+
 - NYSE/NASDAQ status: 200ms per call
 - VIX data: 150ms per call
 - Called every second = 350ms/sec overhead
@@ -300,6 +331,7 @@ def nyse_api_endpoint(self) -> str:
 ## 6. ALGORITHMIC COMPLEXITY ISSUES
 
 ### ISSUE-2815: O(n²) Status Message Generation (facade.py)
+
 **Location**: Lines 390-399
 **Severity**: MEDIUM
 **Impact**: String concatenation in loop
@@ -310,11 +342,13 @@ return f"Trading halted - breakers tripped: {', '.join(tripped_breakers)}"
 ```
 
 **Problem**: Set to list conversion + join
-**Performance Impact**: 
+**Performance Impact**:
+
 - 100 breakers = 10ms overhead
 - Called frequently in status checks
 
 ### ISSUE-2816: Linear Search in Get Breaker (facade.py)
+
 **Location**: Line 194
 **Severity**: LOW
 **Impact**: O(n) lookup
@@ -327,6 +361,7 @@ breaker = self.registry.get_breaker(breaker_name)
 **Performance Impact**: ~1μs per lookup (negligible but accumulates)
 
 ### ISSUE-2817: Risk Score Calculation (facade.py)
+
 **Location**: Lines 161-166
 **Severity**: MEDIUM
 **Impact**: Inefficient max() on list
@@ -345,17 +380,20 @@ overall_risk = max(risk_scores) if risk_scores else 0.0
 ## 7. RESOURCE LIFECYCLE MANAGEMENT
 
 ### ISSUE-2818: No Facade Cleanup Method (facade.py)
+
 **Location**: Entire class
 **Severity**: CRITICAL
 **Impact**: Resource leaks on shutdown
 
 **Problem**: No cleanup for tasks, timers, callbacks
 **Performance Impact**:
+
 - Leaked asyncio tasks
 - Unclosed event loops
 - Memory not freed
 
 ### ISSUE-2819: Registry Shutdown Incomplete (registry.py)
+
 **Location**: Lines 246-259
 **Severity**: HIGH
 **Impact**: Partial cleanup
@@ -370,6 +408,7 @@ async def shutdown(self):
 **Performance Impact**: Memory leaks, thread leaks
 
 ### ISSUE-2820: Config Validation Performance (config.py)
+
 **Location**: Lines 31-36, 214-230
 **Severity**: LOW
 **Impact**: Repeated validation
@@ -388,6 +427,7 @@ def _validate_config(self):
 ## 8. SCALABILITY BOTTLENECKS
 
 ### ISSUE-2821: Single Monitoring Task (facade.py)
+
 **Location**: Lines 74, 98
 **Severity**: HIGH
 **Impact**: Can't scale monitoring
@@ -398,11 +438,13 @@ self._monitoring_task: Optional[asyncio.Task] = None  # Single task!
 
 **Problem**: One monitoring task for all breakers
 **Performance Impact**:
+
 - Can't parallelize monitoring
 - Single point of failure
 - Limited to single core
 
 ### ISSUE-2822: Global Statistics Collection (facade.py)
+
 **Location**: Lines 403-414
 **Severity**: MEDIUM
 **Impact**: O(n) statistics gathering
@@ -419,16 +461,19 @@ def get_statistics(self) -> Dict[str, Any]:
 **Performance Impact**: ~100μs per call
 
 ### ISSUE-2823: Event History Not Bounded (types.py)
+
 **Location**: BreakerEvent definition
 **Severity**: HIGH
 **Impact**: Unbounded event storage
 
 **Problem**: No mechanism to limit event history
 **Performance Impact**:
+
 - 1000 events/hour × 24 hours = 24,000 events
 - ~24MB memory for event history
 
 ### ISSUE-2824: Config Dictionary Operations (config.py)
+
 **Location**: Lines 183-187
 **Severity**: MEDIUM
 **Impact**: O(n) config generation
@@ -449,18 +494,21 @@ def get_all_breaker_configs(self) -> Dict[BreakerType, BreakerConfiguration]:
 ## 9. CRITICAL PERFORMANCE RECOMMENDATIONS
 
 ### Immediate Actions (Week 1)
+
 1. **Fix memory leaks** (ISSUE-2800, 2801, 2802)
 2. **Implement async event emission** (ISSUE-2804)
 3. **Add proper locking** (ISSUE-2808)
 4. **Add resource cleanup** (ISSUE-2818)
 
 ### Short-term Improvements (Week 2-3)
+
 1. **Implement connection pooling** (ISSUE-2813)
 2. **Add caching layer** (ISSUE-2814)
 3. **Parallelize breaker checks** (ISSUE-2809)
 4. **Implement bounded collections** (ISSUE-2823)
 
 ### Long-term Optimizations (Month 2)
+
 1. **Refactor monitoring architecture** (ISSUE-2821)
 2. **Implement event batching**
 3. **Add metrics aggregation**
@@ -471,6 +519,7 @@ def get_all_breaker_configs(self) -> Dict[BreakerType, BreakerConfiguration]:
 ## 10. PERFORMANCE IMPACT SUMMARY
 
 ### Current State Performance Profile
+
 - **Memory Growth Rate**: ~2-5 MB/hour
 - **Event Latency**: 100-1000ms (depends on callbacks)
 - **Check Latency**: 300-500ms (sequential)
@@ -478,6 +527,7 @@ def get_all_breaker_configs(self) -> Dict[BreakerType, BreakerConfiguration]:
 - **CPU Utilization**: 5-10% idle usage
 
 ### Expected After Fixes
+
 - **Memory Growth Rate**: <100 KB/hour
 - **Event Latency**: <10ms (parallel)
 - **Check Latency**: 20-50ms (parallel)
@@ -485,6 +535,7 @@ def get_all_breaker_configs(self) -> Dict[BreakerType, BreakerConfiguration]:
 - **CPU Utilization**: <1% idle usage
 
 ### Business Impact
+
 - **Current**: System degrades after 24-48 hours, requires restart
 - **After Fix**: Stable for weeks/months of continuous operation
 - **Cost Savings**: 80% reduction in infrastructure costs
@@ -495,6 +546,7 @@ def get_all_breaker_configs(self) -> Dict[BreakerType, BreakerConfiguration]:
 ## APPENDIX: Quick Fix Templates
 
 ### Memory Leak Fix Template
+
 ```python
 from weakref import WeakSet, WeakValueDictionary
 from collections import deque
@@ -507,6 +559,7 @@ class ImprovedFacade:
 ```
 
 ### Async Pattern Fix Template
+
 ```python
 async def parallel_check(self):
     tasks = []
@@ -517,15 +570,16 @@ async def parallel_check(self):
 ```
 
 ### Resource Management Template
+
 ```python
 class ManagedFacade:
     async def __aenter__(self):
         await self.initialize()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.cleanup()
-        
+
     async def cleanup(self):
         # Cancel all tasks
         for task in self._tasks:

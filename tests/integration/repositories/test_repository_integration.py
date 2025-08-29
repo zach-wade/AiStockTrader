@@ -112,6 +112,7 @@ def unit_of_work(clean_database):
 class TestOrderRepositoryIntegration:
     """Integration tests for Order Repository."""
 
+    @pytest.mark.asyncio
     async def test_order_crud_operations(self, order_repository):
         """Test complete order CRUD operations against real database."""
         # Create order
@@ -156,6 +157,7 @@ class TestOrderRepositoryIntegration:
         deleted_order = await order_repository.get_order_by_id(order.id)
         assert deleted_order is None
 
+    @pytest.mark.asyncio
     async def test_order_query_operations(self, order_repository):
         """Test order query operations against real database."""
         # Create multiple test orders
@@ -212,6 +214,7 @@ class TestOrderRepositoryIntegration:
         assert len(broker_orders) == 1
         assert broker_orders[0].id == orders[0].id
 
+    @pytest.mark.asyncio
     async def test_order_date_range_queries(self, order_repository):
         """Test order date range queries."""
         # Create order
@@ -243,6 +246,7 @@ class TestOrderRepositoryIntegration:
 class TestPositionRepositoryIntegration:
     """Integration tests for Position Repository."""
 
+    @pytest.mark.asyncio
     async def test_position_crud_operations(self, position_repository):
         """Test complete position CRUD operations against real database."""
         # Create position
@@ -290,6 +294,7 @@ class TestPositionRepositoryIntegration:
         closed_positions = await position_repository.get_closed_positions()
         assert any(p.id == position.id for p in closed_positions)
 
+    @pytest.mark.asyncio
     async def test_position_queries(self, position_repository):
         """Test position query operations."""
         # Create multiple positions
@@ -342,6 +347,7 @@ class TestPositionRepositoryIntegration:
 class TestPortfolioRepositoryIntegration:
     """Integration tests for Portfolio Repository."""
 
+    @pytest.mark.asyncio
     async def test_portfolio_crud_operations(self, portfolio_repository):
         """Test complete portfolio CRUD operations against real database."""
         # Create portfolio
@@ -393,6 +399,7 @@ class TestPortfolioRepositoryIntegration:
 class TestUnitOfWorkIntegration:
     """Integration tests for Unit of Work."""
 
+    @pytest.mark.asyncio
     async def test_transaction_commit_success(self, unit_of_work):
         """Test successful transaction commit across multiple repositories."""
         request = OrderRequest(
@@ -441,6 +448,7 @@ class TestUnitOfWorkIntegration:
         assert retrieved_position is not None
         assert retrieved_portfolio is not None
 
+    @pytest.mark.asyncio
     async def test_transaction_rollback_on_error(self, unit_of_work):
         """Test transaction rollback when error occurs."""
         request = OrderRequest(
@@ -466,6 +474,7 @@ class TestUnitOfWorkIntegration:
         retrieved_order = await unit_of_work.orders.get_order_by_id(order.id)
         assert retrieved_order is None
 
+    @pytest.mark.asyncio
     async def test_manual_transaction_management(self, unit_of_work):
         """Test manual transaction management."""
         request = OrderRequest(
@@ -498,6 +507,7 @@ class TestUnitOfWorkIntegration:
         retrieved_order = await unit_of_work.orders.get_order_by_id(order.id)
         assert retrieved_order is not None
 
+    @pytest.mark.asyncio
     async def test_nested_transactions(self, unit_of_work):
         """Test nested transaction behavior."""
         request1 = OrderRequest(
@@ -538,6 +548,7 @@ class TestUnitOfWorkIntegration:
 class TestConcurrentOperations:
     """Integration tests for concurrent operations."""
 
+    @pytest.mark.asyncio
     async def test_concurrent_order_creation(self, database_connection):
         """Test concurrent order creation doesn't cause conflicts."""
 
@@ -564,6 +575,7 @@ class TestConcurrentOperations:
         ids = [order.id for order in results]
         assert len(set(ids)) == 5
 
+    @pytest.mark.asyncio
     async def test_concurrent_position_updates(self, database_connection):
         """Test concurrent position updates."""
         repo = PostgreSQLPositionRepository(database_connection)
@@ -602,6 +614,7 @@ class TestConcurrentOperations:
 class TestPerformanceCharacteristics:
     """Integration tests for performance characteristics."""
 
+    @pytest.mark.asyncio
     async def test_bulk_order_operations(self, order_repository):
         """Test performance of bulk order operations."""
         # Standard library imports
@@ -646,6 +659,7 @@ class TestPerformanceCharacteristics:
         assert save_time < 5.0  # 10 saves in under 5 seconds
         assert retrieve_time < 2.0  # 10 retrievals in under 2 seconds
 
+    @pytest.mark.asyncio
     async def test_connection_pool_usage(self, database_connection):
         """Test connection pool handles concurrent operations efficiently."""
 
@@ -675,6 +689,7 @@ class TestPerformanceCharacteristics:
 class TestErrorHandlingIntegration:
     """Integration tests for error handling scenarios."""
 
+    @pytest.mark.asyncio
     async def test_database_constraint_violations(self, order_repository):
         """Test handling of database constraint violations."""
         request = OrderRequest(
@@ -702,6 +717,7 @@ class TestErrorHandlingIntegration:
         with suppress(RepositoryError):
             await order_repository.save_order(duplicate_order)
 
+    @pytest.mark.asyncio
     async def test_connection_failure_recovery(self, database_config):
         """Test recovery from connection failures."""
         # This test would require more sophisticated setup to simulate

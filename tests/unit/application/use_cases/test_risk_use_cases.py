@@ -24,6 +24,7 @@ from src.application.use_cases.risk import (
 from src.domain.entities.order import Order, OrderSide, OrderType
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
+from src.domain.value_objects import Quantity
 from src.domain.value_objects.money import Money
 
 
@@ -435,7 +436,10 @@ class TestValidateOrderRiskUseCase:
     def sample_order(self):
         """Create a sample order for testing."""
         order = Order(
-            symbol="AAPL", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=Decimal("100")
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
         )
         order.id = uuid4()
         order.portfolio_id = uuid4()
@@ -448,7 +452,7 @@ class TestValidateOrderRiskUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
-            quantity=Decimal("10000"),
+            quantity=Quantity(Decimal("10000")),
         )
         order.id = uuid4()
         order.portfolio_id = uuid4()
@@ -654,7 +658,10 @@ class TestValidateOrderRiskUseCase:
         portfolio.get_total_value_sync = Mock(return_value=Decimal("1000"))
 
         order = Order(
-            symbol="TSLA", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=Decimal("1000")
+            symbol="TSLA",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("1000")),
         )
         order.portfolio_id = portfolio.id
 
@@ -696,7 +703,10 @@ class TestValidateOrderRiskUseCase:
         )  # Small non-zero to avoid division by zero
 
         order = Order(
-            symbol="AAPL", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=Decimal("10")
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("10")),
         )
         order.portfolio_id = portfolio.id
 

@@ -887,14 +887,14 @@ class TestGetRiskMetricsUseCase:
         # Setup
         empty_portfolio = Mock()
         empty_portfolio.id = uuid4()
-        empty_portfolio.cash_balance = Decimal("100000")
-        empty_portfolio.total_realized_pnl = Decimal("0")
-        empty_portfolio.get_total_value = Mock(return_value=Decimal("100000"))
-        portfolio.get_total_value_sync = Mock(return_value=Decimal("100000"))
-        empty_portfolio.get_positions_value = Mock(return_value=Decimal("0"))
+        empty_portfolio.cash_balance = Money(Decimal("100000"))
+        empty_portfolio.total_realized_pnl = Money(Decimal("0"))
+        empty_portfolio.get_total_value = Mock(return_value=Money(Decimal("100000")))
+        empty_portfolio.get_total_value_sync = Mock(return_value=Money(Decimal("100000")))
+        empty_portfolio.get_positions_value = Mock(return_value=Money(Decimal("0")))
         empty_portfolio.get_open_positions = Mock(return_value=[])
-        empty_portfolio.get_unrealized_pnl = Mock(return_value=Decimal("0"))
-        empty_portfolio.get_total_return = Mock(return_value=Decimal("0"))
+        empty_portfolio.get_unrealized_pnl = Mock(return_value=Money(Decimal("0")))
+        empty_portfolio.get_total_return = Mock(return_value=Money(Decimal("0")))
 
         request = GetRiskMetricsRequest(portfolio_id=empty_portfolio.id)
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = empty_portfolio
@@ -917,14 +917,14 @@ class TestGetRiskMetricsUseCase:
         # Setup
         leveraged_portfolio = Mock()
         leveraged_portfolio.id = uuid4()
-        leveraged_portfolio.cash_balance = Decimal("10000")  # Low cash
-        leveraged_portfolio.total_realized_pnl = Decimal("0")
-        leveraged_portfolio.get_total_value = Mock(return_value=Decimal("860000"))
-        portfolio.get_total_value_sync = Mock(return_value=Decimal("860000"))
-        leveraged_portfolio.get_positions_value = Mock(return_value=Decimal("850000"))
+        leveraged_portfolio.cash_balance = Money(Decimal("10000"))  # Low cash
+        leveraged_portfolio.total_realized_pnl = Money(Decimal("0"))
+        leveraged_portfolio.get_total_value = Mock(return_value=Money(Decimal("860000")))
+        leveraged_portfolio.get_total_value_sync = Mock(return_value=Money(Decimal("860000")))
+        leveraged_portfolio.get_positions_value = Mock(return_value=Money(Decimal("850000")))
         leveraged_portfolio.get_open_positions = Mock(return_value=[Mock()])
-        leveraged_portfolio.get_unrealized_pnl = Mock(return_value=Decimal("50000"))
-        leveraged_portfolio.get_total_return = Mock(return_value=Decimal("7.6"))
+        leveraged_portfolio.get_unrealized_pnl = Mock(return_value=Money(Decimal("50000")))
+        leveraged_portfolio.get_total_return = Mock(return_value=Money(Decimal("7.6")))
 
         request = GetRiskMetricsRequest(portfolio_id=leveraged_portfolio.id)
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = leveraged_portfolio

@@ -19,6 +19,7 @@ from src.domain.services.market_microstructure import (
     SquareRootImpactModel,
 )
 from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 class TestSlippageConfig:
@@ -112,7 +113,7 @@ class TestLinearImpactModel:
     def test_market_order_buy_execution_price(self, model):
         """Test execution price calculation for market buy order."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -124,13 +125,13 @@ class TestLinearImpactModel:
         # Buy orders pay more (base + bid-ask + impact)
         # Bid-ask: 100 * 5/10000 = 0.05
         # Impact: 0.1 * 1000/1000 * 1.0 = 0.1 bps -> 100 * 0.1/10000 = 0.001
-        expected = Decimal("100.051")
+        expected = Price(Decimal("100.051"))
         assert execution_price == expected
 
     def test_market_order_sell_execution_price(self, model):
         """Test execution price calculation for market sell order."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -140,19 +141,19 @@ class TestLinearImpactModel:
         )
 
         # Sell orders receive less (base - bid-ask - impact)
-        expected = Decimal("99.949")
+        expected = Price(Decimal("99.949"))
         assert execution_price == expected
 
     def test_limit_order_no_slippage(self, model):
         """Test that limit orders have no slippage."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         # Test buy limit order
         execution_price = model.calculate_execution_price(
             base_price=base_price, side=OrderSide.BUY, quantity=quantity, order_type=OrderType.LIMIT
         )
-        assert execution_price == Decimal("100.00")
+        assert execution_price == Price(Decimal("100.00"))
 
         # Test sell limit order
         execution_price = model.calculate_execution_price(
@@ -161,22 +162,22 @@ class TestLinearImpactModel:
             quantity=quantity,
             order_type=OrderType.LIMIT,
         )
-        assert execution_price == Decimal("100.00")
+        assert execution_price == Price(Decimal("100.00"))
 
     def test_stop_order_no_slippage(self, model):
         """Test that stop orders have no slippage (treated as limit when filled)."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price, side=OrderSide.BUY, quantity=quantity, order_type=OrderType.STOP
         )
-        assert execution_price == Decimal("100.00")
+        assert execution_price == Price(Decimal("100.00"))
 
     def test_stop_limit_order_no_slippage(self, model):
         """Test that stop limit orders have no slippage."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -184,12 +185,12 @@ class TestLinearImpactModel:
             quantity=quantity,
             order_type=OrderType.STOP_LIMIT,
         )
-        assert execution_price == Decimal("100.00")
+        assert execution_price == Price(Decimal("100.00"))
 
     def test_calculate_market_impact(self, model):
         """Test market impact calculation."""
         price = Price(Decimal("100.00"))
-        quantity = Decimal("5000")
+        quantity = Quantity(Decimal("5000"))
 
         impact = model.calculate_market_impact(price, quantity)
 
@@ -199,7 +200,7 @@ class TestLinearImpactModel:
     def test_market_impact_with_average_volume(self, model):
         """Test market impact calculation with average volume (not used in linear model)."""
         price = Price(Decimal("100.00"))
-        quantity = Decimal("5000")
+        quantity = Quantity(Decimal("5000"))
         avg_volume = Decimal("1000000")
 
         # Linear model doesn't use average volume
@@ -209,8 +210,8 @@ class TestLinearImpactModel:
     def test_market_impact_uses_absolute_quantity(self, model):
         """Test that market impact uses absolute value of quantity."""
         price = Price(Decimal("100.00"))
-        positive_qty = Decimal("5000")
-        negative_qty = Decimal("-5000")
+        positive_qty = Quantity(Decimal("5000"))
+        negative_qty = Quantity(Decimal("-5000"))
 
         positive_impact = model.calculate_market_impact(price, positive_qty)
         negative_impact = model.calculate_market_impact(price, negative_qty)
@@ -228,7 +229,7 @@ class TestLinearImpactModel:
         model = LinearImpactModel(config)
 
         price = Price(Decimal("100.00"))
-        quantity = Decimal("5000")
+        quantity = Quantity(Decimal("5000"))
 
         impact = model.calculate_market_impact(price, quantity)
         # Impact = 0.1 * 5000/1000 * 2.0 = 1.0 basis points
@@ -239,7 +240,7 @@ class TestLinearImpactModel:
         model = LinearImpactModel(config_with_randomness)
 
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         # Mock the random number generator
         with patch.object(model._rng, "random", return_value=0.5):
@@ -252,7 +253,7 @@ class TestLinearImpactModel:
 
             # Random factor = 0.9 + (1.1 - 0.9) * 0.5 = 1.0
             # So same as without randomness
-            expected = Decimal("100.051")
+            expected = Price(Decimal("100.051"))
             assert execution_price == expected
 
     def test_random_factor_range(self, config_with_randomness):
@@ -284,7 +285,7 @@ class TestLinearImpactModel:
         model = LinearImpactModel(config)
 
         base_price = Price(Decimal("0.10"))
-        quantity = Decimal("10000")
+        quantity = Quantity(Decimal("10000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -294,12 +295,12 @@ class TestLinearImpactModel:
         )
 
         # Should not go below $0.01
-        assert execution_price == Decimal("0.01")
+        assert execution_price == Price(Decimal("0.01"))
 
     def test_zero_quantity_handling(self, model):
         """Test handling of zero quantity orders."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("0")
+        quantity = Quantity(Decimal("0"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -311,13 +312,13 @@ class TestLinearImpactModel:
         # Zero quantity should still have bid-ask spread but no impact
         # Bid-ask: 100 * 5/10000 = 0.05
         # Impact: 0.1 * 0/1000 = 0
-        expected = Decimal("100.05")
+        expected = Price(Decimal("100.05"))
         assert execution_price == expected
 
     def test_very_large_quantity(self, model):
         """Test handling of very large quantities."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000000")  # 1 million shares
+        quantity = Quantity(Decimal("1000000"))  # 1 million shares
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -328,13 +329,13 @@ class TestLinearImpactModel:
 
         # Bid-ask: 100 * 5/10000 = 0.05
         # Impact: 0.1 * 1000000/1000 = 100 bps -> 100 * 100/10000 = 1.00
-        expected = Decimal("101.05")
+        expected = Price(Decimal("101.05"))
         assert execution_price == expected
 
     def test_fractional_quantities(self, model):
         """Test handling of fractional share quantities."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("0.5")
+        quantity = Quantity(Decimal("0.5"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -371,10 +372,10 @@ class TestSquareRootImpactModel:
         price = Price(Decimal("100.00"))
 
         # Test with different quantities to verify square root relationship
-        qty1 = Decimal("100")
+        qty1 = Quantity(Decimal("100"))
         impact1 = model.calculate_market_impact(price, qty1)
 
-        qty2 = Decimal("400")  # 4x the quantity
+        qty2 = Quantity(Decimal("400"))  # 4x the quantity
         impact2 = model.calculate_market_impact(price, qty2)
 
         # Impact should scale with square root, so 2x not 4x
@@ -384,7 +385,7 @@ class TestSquareRootImpactModel:
     def test_market_order_execution_with_sqrt_impact(self, model):
         """Test execution price with square root impact model."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("10000")  # Large order
+        quantity = Quantity(Decimal("10000"))  # Large order
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -402,7 +403,7 @@ class TestSquareRootImpactModel:
     def test_sqrt_model_with_average_volume(self, model):
         """Test square root model with average volume consideration."""
         price = Price(Decimal("100.00"))
-        quantity = Decimal("50000")
+        quantity = Quantity(Decimal("50000"))
         avg_volume = Decimal("1000000")
 
         # With average volume, impact should be scaled by volume ratio
@@ -423,7 +424,7 @@ class TestSquareRootImpactModel:
         model = SquareRootImpactModel(config)
 
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         with patch.object(model._rng, "random", return_value=0.5):
             execution_price = model.calculate_execution_price(
@@ -439,13 +440,13 @@ class TestSquareRootImpactModel:
     def test_sqrt_model_limit_orders(self, model):
         """Test that square root model also doesn't affect limit orders."""
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("10000")
+        quantity = Quantity(Decimal("10000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price, side=OrderSide.BUY, quantity=quantity, order_type=OrderType.LIMIT
         )
 
-        assert execution_price == Decimal("100.00")
+        assert execution_price == Price(Decimal("100.00"))
 
     def test_sqrt_model_minimum_price(self):
         """Test square root model respects minimum price."""
@@ -457,7 +458,7 @@ class TestSquareRootImpactModel:
         model = SquareRootImpactModel(config)
 
         base_price = Price(Decimal("1.00"))
-        quantity = Decimal("100000")
+        quantity = Quantity(Decimal("100000"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -545,7 +546,7 @@ class TestEdgeCasesAndIntegration:
         model = LinearImpactModel(config)
 
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         # With zero config, market orders should have no slippage
         execution_price = model.calculate_execution_price(
@@ -555,7 +556,7 @@ class TestEdgeCasesAndIntegration:
             order_type=OrderType.MARKET,
         )
 
-        assert execution_price == Decimal("100.00")
+        assert execution_price == Price(Decimal("100.00"))
 
     def test_extreme_market_conditions(self):
         """Test models under extreme market conditions."""
@@ -570,7 +571,7 @@ class TestEdgeCasesAndIntegration:
         sqrt_model = SquareRootImpactModel(config)
 
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("10000")
+        quantity = Quantity(Decimal("10000"))
 
         linear_exec = linear_model.calculate_execution_price(
             base_price=base_price,
@@ -601,7 +602,7 @@ class TestEdgeCasesAndIntegration:
         model = LinearImpactModel(config)
 
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         # Market order has slippage
         market_price = model.calculate_execution_price(
@@ -635,7 +636,7 @@ class TestEdgeCasesAndIntegration:
         model = LinearImpactModel(config)
 
         base_price = Price(Decimal("123.456"))
-        quantity = Decimal("789.012")
+        quantity = Quantity(Decimal("789.012"))
 
         execution_price = model.calculate_execution_price(
             base_price=base_price,
@@ -645,7 +646,7 @@ class TestEdgeCasesAndIntegration:
         )
 
         # Should handle precise decimals without rounding errors
-        assert isinstance(execution_price, Decimal)
+        assert isinstance(execution_price, Price)
         assert execution_price < base_price  # Sell gets less
 
     def test_concurrent_model_usage(self):
@@ -658,7 +659,7 @@ class TestEdgeCasesAndIntegration:
         models = [LinearImpactModel(config) for _ in range(5)]
 
         base_price = Price(Decimal("100.00"))
-        quantity = Decimal("1000")
+        quantity = Quantity(Decimal("1000"))
 
         # Execute on all models
         results = []

@@ -24,6 +24,7 @@ from src.application.use_cases.trading import (
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType, TimeInForce
 from src.domain.entities.portfolio import Portfolio
 from src.domain.services.order_validator import ValidationResult
+from src.domain.value_objects import Price, Quantity
 from src.domain.value_objects.money import Money
 
 
@@ -182,7 +183,7 @@ class TestPlaceOrderUseCase:
     def mock_order_validator(self):
         """Create mock order validator."""
         validator = Mock()
-        validator.validate_order = Mock()
+        validator.validate_order = AsyncMock()
         return validator
 
     @pytest.fixture
@@ -305,8 +306,8 @@ class TestPlaceOrderUseCase:
         assert order.symbol == "GOOGL"
         assert order.side == OrderSide.SELL
         assert order.order_type == OrderType.LIMIT
-        assert order.quantity == Decimal("50")
-        assert order.limit_price == Decimal("150.50")
+        assert order.quantity == Quantity(Decimal("50"))
+        assert order.limit_price == Price(Decimal("150.50"))
         assert order.time_in_force == TimeInForce.GTC
 
     @pytest.mark.asyncio
@@ -348,7 +349,7 @@ class TestPlaceOrderUseCase:
         # Verify order was created with correct stop price
         call_args = mock_broker.submit_order.call_args[0]
         order = call_args[0]
-        assert order.stop_price == Decimal("195.00")
+        assert order.stop_price == Price(Decimal("195.00"))
         assert order.order_type == OrderType.STOP
 
     @pytest.mark.asyncio
@@ -392,8 +393,8 @@ class TestPlaceOrderUseCase:
         # Verify order was created with both stop and limit prices
         call_args = mock_broker.submit_order.call_args[0]
         order = call_args[0]
-        assert order.limit_price == Decimal("200.00")
-        assert order.stop_price == Decimal("195.00")
+        assert order.limit_price == Price(Decimal("200.00"))
+        assert order.stop_price == Price(Decimal("195.00"))
         assert order.order_type == OrderType.STOP_LIMIT
 
     @pytest.mark.asyncio
@@ -747,8 +748,8 @@ class TestCancelOrderUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            quantity=Decimal("100"),
-            limit_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("150.00")),
         )
         order.submit("BROKER-123")
         return order
@@ -814,7 +815,7 @@ class TestCancelOrderUseCase:
     async def test_cancel_order_already_filled(self, use_case, mock_unit_of_work, sample_order):
         """Test cancellation of already filled order."""
         # Setup
-        sample_order.fill(Decimal("100"), Decimal("150.00"))
+        sample_order.fill(Quantity(Decimal("100")), Price(Decimal("150.00")))
         request = CancelOrderRequest(order_id=sample_order.id)
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
 
@@ -848,8 +849,8 @@ class TestCancelOrderUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            quantity=Decimal("100"),
-            limit_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("150.00")),
         )
         # Order starts in PENDING status by default
         order.reject("Insufficient funds")
@@ -966,8 +967,8 @@ class TestModifyOrderUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            quantity=Decimal("100"),
-            limit_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("150.00")),
         )
         order.submit("BROKER-123")
         return order
@@ -1026,8 +1027,8 @@ class TestModifyOrderUseCase:
             symbol="AAPL",
             side=OrderSide.SELL,
             order_type=OrderType.STOP,
-            quantity=Decimal("100"),
-            stop_price=Decimal("145.00"),
+            quantity=Quantity(Decimal("100")),
+            stop_price=Price(Decimal("145.00")),
         )
         order.submit("BROKER-123")
 
@@ -1043,7 +1044,7 @@ class TestModifyOrderUseCase:
         # Assert
         assert response.success is True
         assert response.new_values == {"stop_price": 140.00}
-        assert order.stop_price == Decimal("140.00")
+        assert order.stop_price == Decimal("140.00") or order.stop_price == Price(Decimal("140.00"))
 
     @pytest.mark.asyncio
     async def test_modify_multiple_fields_success(
@@ -1078,9 +1079,9 @@ class TestModifyOrderUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.STOP_LIMIT,
-            quantity=Decimal("100"),
-            limit_price=Decimal("150.00"),
-            stop_price=Decimal("145.00"),
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("150.00")),
+            stop_price=Price(Decimal("145.00")),
         )
         order.submit("BROKER-123")
 
@@ -1098,9 +1099,11 @@ class TestModifyOrderUseCase:
         # Assert
         assert response.success is True
         assert response.new_values == {"quantity": 200, "limit_price": 155.00, "stop_price": 150.00}
-        assert order.quantity == Decimal("200")
-        assert order.limit_price == Decimal("155.00")
-        assert order.stop_price == Decimal("150.00")
+        assert order.quantity == Decimal("200") or order.quantity == Quantity(Decimal("200"))
+        assert order.limit_price == Decimal("155.00") or order.limit_price == Price(
+            Decimal("155.00")
+        )
+        assert order.stop_price == Decimal("150.00") or order.stop_price == Price(Decimal("150.00"))
 
     @pytest.mark.asyncio
     async def test_modify_order_not_found(self, use_case, mock_unit_of_work):
@@ -1288,11 +1291,14 @@ class TestGetOrderStatusUseCase:
     def sample_order(self):
         """Create sample order."""
         order = Order(
-            symbol="AAPL", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=Decimal("100")
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
         )
         order.submit("BROKER-123")
-        order.filled_quantity = Decimal("50")
-        order.average_fill_price = Decimal("149.75")
+        order.filled_quantity = Quantity(Decimal("50"))
+        order.average_fill_price = Price(Decimal("149.75"))
         return order
 
     @pytest.mark.asyncio
@@ -1322,8 +1328,8 @@ class TestGetOrderStatusUseCase:
             symbol="AAPL",
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            quantity=Decimal("100"),
-            limit_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("150.00")),
         )
         order.submit("BROKER-123")
 
@@ -1394,7 +1400,7 @@ class TestGetOrderStatusUseCase:
 
         # Assert
         assert response.success is True
-        assert response.status == sample_order.status
+        assert response.status == sample_order.status.value
         mock_unit_of_work.orders.update_order.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1427,7 +1433,7 @@ class TestGetOrderStatusUseCase:
 
         # Assert
         assert response.success is True  # Returns cached data
-        assert response.status == sample_order.status
+        assert response.status == sample_order.status.value
         assert response.filled_quantity == 50
         assert response.average_fill_price == 149.75
 
@@ -1475,6 +1481,8 @@ class TestEdgeCases:
         validator = Mock()
         calculator = Mock()
 
+        validator.validate_order = AsyncMock()
+
         use_case = PlaceOrderUseCase(uow, broker, validator, calculator)
 
         portfolio = Portfolio(name="Test", initial_capital=Money(Decimal("100000")))
@@ -1518,6 +1526,7 @@ class TestEdgeCases:
 
         broker = Mock()
         validator = Mock()
+        validator.validate_order = AsyncMock()
         calculator = Mock()
 
         use_case = PlaceOrderUseCase(uow, broker, validator, calculator)

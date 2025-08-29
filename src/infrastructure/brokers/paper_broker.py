@@ -18,7 +18,11 @@ from src.application.interfaces.broker import (
 )
 from src.domain.entities.order import Order, OrderStatus, OrderType
 from src.domain.entities.position import Position
+from src.domain.interfaces.time_service import TimeService
 from src.domain.services.trading_calendar import Exchange, TradingCalendar
+from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.infrastructure.time.timezone_service import PythonTimeService as ConcreteTimeService
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +62,9 @@ class PaperBroker(IBroker):
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self.state = PaperBrokerState(initial_capital=initial_capital, cash_balance=initial_capital)
         self._connected = False
-        self.trading_calendar = TradingCalendar(exchange)
+        # Create time service for trading calendar
+        time_service: TimeService = ConcreteTimeService()
+        self.trading_calendar = TradingCalendar(time_service, exchange)
         logger.info(f"Initialized thread-safe paper broker with ${initial_capital} capital")
 
     def connect(self) -> None:
@@ -93,7 +99,7 @@ class PaperBroker(IBroker):
             if order.order_type == OrderType.MARKET and self.state.market_prices:
                 market_price = self.state.market_prices.get(order.symbol)
                 if market_price:
-                    order.fill(filled_quantity=order.quantity, fill_price=market_price)
+                    order.fill(filled_quantity=order.quantity, fill_price=Price(market_price))
                     logger.info(f"Auto-filled market order: {order.id} at {market_price}")
 
             logger.info(f"Stored paper order: {order.id}")
@@ -165,11 +171,9 @@ class PaperBroker(IBroker):
         with self._lock:
             assert self.state.positions is not None  # Always initialized in __post_init__
             positions_value = (
-                Decimal(
-                    sum(
-                        p.get_position_value() or Decimal("0")
-                        for p in self.state.positions.values()
-                    )
+                sum(
+                    (p.get_position_value() or Money(Decimal("0"))).amount
+                    for p in self.state.positions.values()
                 )
                 if self.state.positions
                 else Decimal("0")
@@ -184,7 +188,7 @@ class PaperBroker(IBroker):
             equity=equity,
             cash=cash_balance,
             buying_power=cash_balance,
-            positions_value=positions_value,
+            positions_value=Decimal(str(positions_value)),
             unrealized_pnl=Decimal("0"),  # Calculated by use cases
             realized_pnl=Decimal("0"),  # Calculated by use cases
             margin_used=Decimal("0"),

@@ -7,8 +7,9 @@ operations it needs, and infrastructure provides the implementation.
 """
 
 from abc import ABC, abstractmethod
-from datetime import date, datetime, time, timedelta, tzinfo
-from typing import Any, Protocol, runtime_checkable
+from datetime import date, datetime, time, timedelta
+from datetime import tzinfo as timezone_info
+from typing import Protocol, Union, overload, runtime_checkable
 
 
 @runtime_checkable
@@ -35,8 +36,56 @@ class TimezoneInfo(Protocol):
 
 @runtime_checkable
 class LocalizedDatetime(Protocol):
-    """Protocol for timezone-aware datetime objects compatible with datetime."""
+    """Protocol for timezone-aware datetime objects compatible with datetime.
 
+    This protocol defines the interface that timezone-aware datetime objects
+    must implement to be compatible with the domain's time operations.
+    It includes all essential datetime properties and methods while maintaining
+    compatibility with Python's standard datetime interface.
+    """
+
+    # Essential datetime properties
+    @property
+    def year(self) -> int:
+        """Get the year."""
+        ...
+
+    @property
+    def month(self) -> int:
+        """Get the month."""
+        ...
+
+    @property
+    def day(self) -> int:
+        """Get the day."""
+        ...
+
+    @property
+    def hour(self) -> int:
+        """Get the hour."""
+        ...
+
+    @property
+    def minute(self) -> int:
+        """Get the minute."""
+        ...
+
+    @property
+    def second(self) -> int:
+        """Get the second."""
+        ...
+
+    @property
+    def microsecond(self) -> int:
+        """Get the microsecond."""
+        ...
+
+    @property
+    def tzinfo(self) -> timezone_info | None:
+        """Get timezone info."""
+        ...
+
+    # Essential datetime methods
     def date(self) -> date:
         """Get the date component."""
         ...
@@ -49,35 +98,62 @@ class LocalizedDatetime(Protocol):
         """Get the weekday (0=Monday, 6=Sunday)."""
         ...
 
+    def isoweekday(self) -> int:
+        """Get the ISO weekday (1=Monday, 7=Sunday)."""
+        ...
+
     def strftime(self, format_string: str) -> str:
         """Format datetime as string."""
         ...
 
-    def replace(self, **kwargs: Any) -> datetime:
+    def replace(
+        self,
+        year: int | None = None,
+        month: int | None = None,
+        day: int | None = None,
+        hour: int | None = None,
+        minute: int | None = None,
+        second: int | None = None,
+        microsecond: int | None = None,
+        tzinfo: timezone_info | None = ...,
+        fold: int = 0,
+    ) -> "LocalizedDatetime":
         """Return datetime with specified components replaced."""
         ...
 
-    def __add__(self, other: timedelta) -> datetime:
+    def __add__(self, other: timedelta) -> "LocalizedDatetime":
         """Add timedelta to datetime."""
         ...
 
-    def __sub__(self, other: datetime | timedelta) -> timedelta | datetime:
+    @overload
+    def __sub__(self, other: "LocalizedDatetime") -> timedelta:
+        """Subtract datetime to get timedelta."""
+        ...
+
+    @overload
+    def __sub__(self, other: timedelta) -> "LocalizedDatetime":
+        """Subtract timedelta from datetime."""
+        ...
+
+    def __sub__(
+        self, other: Union["LocalizedDatetime", timedelta]
+    ) -> Union[timedelta, "LocalizedDatetime"]:
         """Subtract datetime or timedelta."""
         ...
 
-    def __lt__(self, other: datetime) -> bool:
+    def __lt__(self, other: "LocalizedDatetime") -> bool:
         """Less than comparison."""
         ...
 
-    def __le__(self, other: datetime) -> bool:
+    def __le__(self, other: "LocalizedDatetime") -> bool:
         """Less than or equal comparison."""
         ...
 
-    def __gt__(self, other: datetime) -> bool:
+    def __gt__(self, other: "LocalizedDatetime") -> bool:
         """Greater than comparison."""
         ...
 
-    def __ge__(self, other: datetime) -> bool:
+    def __ge__(self, other: "LocalizedDatetime") -> bool:
         """Greater than or equal comparison."""
         ...
 
@@ -85,13 +161,20 @@ class LocalizedDatetime(Protocol):
         """Equality comparison."""
         ...
 
-    def as_datetime(self) -> datetime:
-        """Convert to standard datetime object."""
+    def __ne__(self, other: object) -> bool:
+        """Not equal comparison."""
         ...
 
-    @property
-    def tzinfo(self) -> tzinfo | None:
-        """Get timezone info."""
+    def timestamp(self) -> float:
+        """Return POSIX timestamp as float."""
+        ...
+
+    def as_datetime(self) -> datetime:
+        """Convert to standard datetime object.
+
+        This method provides a way to get the underlying datetime
+        for compatibility with code that requires standard datetime objects.
+        """
         ...
 
 

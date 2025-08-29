@@ -31,10 +31,10 @@ class TestEnvironment:
 
     def test_environment_values(self):
         """Test environment enum values."""
-        assert Environment.DEVELOPMENT == "development"
-        assert Environment.TESTING == "testing"
-        assert Environment.STAGING == "staging"
-        assert Environment.PRODUCTION == "production"
+        assert Environment.DEVELOPMENT.value == "development"
+        assert Environment.TESTING.value == "testing"
+        assert Environment.STAGING.value == "staging"
+        assert Environment.PRODUCTION.value == "production"
 
     def test_environment_from_string(self):
         """Test creating environment from string."""

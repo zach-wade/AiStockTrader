@@ -89,6 +89,7 @@ def unit_of_work(clean_database):
 class TestTransactionACIDProperties:
     """Test ACID properties of transactions."""
 
+    @pytest.mark.asyncio
     async def test_atomicity_all_or_nothing(self, unit_of_work):
         """Test atomicity - all operations succeed or all fail."""
         request1 = OrderRequest(
@@ -139,6 +140,7 @@ class TestTransactionACIDProperties:
         retrieved_order3 = await unit_of_work.orders.get_order_by_id(order3.id)
         assert retrieved_order3 is None
 
+    @pytest.mark.asyncio
     async def test_consistency_data_integrity(self, unit_of_work):
         """Test consistency - data integrity constraints are maintained."""
         portfolio = Portfolio(
@@ -173,6 +175,7 @@ class TestTransactionACIDProperties:
         assert retrieved_position is not None
         assert retrieved_portfolio.strategy == retrieved_position.strategy
 
+    @pytest.mark.asyncio
     async def test_isolation_concurrent_transactions(self, database_connection):
         """Test isolation - concurrent transactions don't interfere."""
         symbol = "TX_ISOLATION"
@@ -228,6 +231,7 @@ class TestTransactionACIDProperties:
         final_position = await uow1.positions.get_position_by_id(initial_position.id)
         assert final_position.current_price in [Decimal("160.00"), Decimal("155.00")]
 
+    @pytest.mark.asyncio
     async def test_durability_data_persists(self, unit_of_work):
         """Test durability - committed data persists across connections."""
         request = OrderRequest(
@@ -260,6 +264,7 @@ class TestTransactionACIDProperties:
 class TestComplexTransactionScenarios:
     """Test complex transaction scenarios."""
 
+    @pytest.mark.asyncio
     async def test_multi_repository_transaction_success(self, unit_of_work):
         """Test successful transaction across multiple repositories."""
         # Create related entities
@@ -322,6 +327,7 @@ class TestComplexTransactionScenarios:
         assert retrieved_position is not None
         assert retrieved_position.symbol == "TX_MULTI_SUCCESS"
 
+    @pytest.mark.asyncio
     async def test_multi_repository_transaction_rollback(self, unit_of_work):
         """Test rollback across multiple repositories."""
         portfolio = Portfolio(
@@ -360,6 +366,7 @@ class TestComplexTransactionScenarios:
         assert retrieved_portfolio is None
         assert retrieved_order is None
 
+    @pytest.mark.asyncio
     async def test_savepoint_like_behavior(self, unit_of_work):
         """Test savepoint-like behavior with nested operations."""
         # This test demonstrates how nested operations behave
@@ -410,6 +417,7 @@ class TestComplexTransactionScenarios:
 class TestTransactionPerformance:
     """Test transaction performance characteristics."""
 
+    @pytest.mark.asyncio
     async def test_transaction_overhead(self, unit_of_work):
         """Test overhead of transaction management."""
         # Standard library imports
@@ -457,6 +465,7 @@ class TestTransactionPerformance:
             retrieved = await unit_of_work.orders.get_order_by_id(order.id)
             assert retrieved is not None
 
+    @pytest.mark.asyncio
     async def test_long_running_transaction(self, unit_of_work):
         """Test behavior of long-running transactions."""
         request = OrderRequest(
@@ -507,6 +516,7 @@ class TestTransactionPerformance:
 class TestTransactionErrorScenarios:
     """Test various transaction error scenarios."""
 
+    @pytest.mark.asyncio
     async def test_connection_failure_during_transaction(self, unit_of_work):
         """Test behavior when connection fails during transaction."""
         # This test is conceptual - actual connection failure simulation
@@ -529,6 +539,7 @@ class TestTransactionErrorScenarios:
         retrieved_order = await unit_of_work.orders.get_order_by_id(order.id)
         assert retrieved_order is not None
 
+    @pytest.mark.asyncio
     async def test_deadlock_handling(self, database_connection):
         """Test deadlock detection and handling."""
         # Create two UoW instances for potential deadlock scenario
@@ -608,6 +619,7 @@ class TestTransactionErrorScenarios:
         assert final_order1.broker_order_id in ["BROKER_A", "BROKER_B"]
         assert final_order2.broker_order_id in ["BROKER_A", "BROKER_B"]
 
+    @pytest.mark.asyncio
     async def test_transaction_timeout_behavior(self, unit_of_work):
         """Test behavior when transaction exceeds reasonable time limits."""
         # This test would require configuration of transaction timeouts

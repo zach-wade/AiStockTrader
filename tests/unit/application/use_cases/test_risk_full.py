@@ -31,6 +31,8 @@ from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.domain.services.risk_calculator import RiskCalculator
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 # Fixtures
@@ -75,17 +77,17 @@ def sample_portfolio():
     # Add some positions
     position1 = Position(
         symbol="AAPL",
-        quantity=Decimal("100"),
-        average_entry_price=Decimal("150.00"),
+        quantity=Quantity(Decimal("100")),
+        average_entry_price=Price(Decimal("150.00")),
     )
-    position1.current_price = Decimal("155.00")
+    position1.current_price = Price(Decimal("155.00"))
 
     position2 = Position(
         symbol="GOOGL",
-        quantity=Decimal("50"),
-        average_entry_price=Decimal("2800.00"),
+        quantity=Quantity(Decimal("50")),
+        average_entry_price=Price(Decimal("2800.00")),
     )
-    position2.current_price = Decimal("2850.00")
+    position2.current_price = Price(Decimal("2850.00"))
 
     portfolio.positions = {
         position1.id: position1,
@@ -102,8 +104,8 @@ def sample_order():
         symbol="AAPL",
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
-        quantity=Decimal("100"),
-        limit_price=Decimal("150.00"),
+        quantity=Quantity(Decimal("100")),
+        limit_price=Price(Decimal("150.00")),
     )
     order.id = uuid4()
     return order
@@ -500,11 +502,15 @@ class TestValidateOrderRiskUseCase:
         assert response.success is True
 
         # Check metrics calculations
-        position_value = sample_order.quantity * request.current_price
-        portfolio_value = sample_portfolio.get_total_value_sync()
+        from src.domain.value_objects.converter import ValueObjectConverter
+
+        quantity_val = ValueObjectConverter.extract_value(sample_order.quantity)
+        position_value = quantity_val * request.current_price
+        portfolio_value = ValueObjectConverter.extract_amount(sample_portfolio.get_total_value())
+        cash_balance = ValueObjectConverter.extract_amount(sample_portfolio.cash_balance)
 
         expected_position_size_pct = float(position_value / portfolio_value * 100)
-        expected_leverage = float(portfolio_value / sample_portfolio.cash_balance)
+        expected_leverage = float(portfolio_value / cash_balance)
         expected_concentration = float(position_value / portfolio_value)
         expected_max_loss = float(position_value * Decimal("0.1"))
 
@@ -631,16 +637,24 @@ class TestGetRiskMetricsUseCase:
         assert response.success is True
 
         # Verify metric calculations
-        portfolio_value = sample_portfolio.get_total_value()
-        positions_value = sample_portfolio.get_positions_value()
-        cash_balance = sample_portfolio.cash_balance
+        from src.domain.value_objects.converter import ValueObjectConverter
+
+        portfolio_value = ValueObjectConverter.extract_amount(sample_portfolio.get_total_value())
+        positions_value = ValueObjectConverter.extract_amount(
+            sample_portfolio.get_positions_value()
+        )
+        cash_balance = ValueObjectConverter.extract_amount(sample_portfolio.cash_balance)
 
         assert response.metrics["portfolio_value"] == float(portfolio_value)
         assert response.metrics["positions_value"] == float(positions_value)
         assert response.metrics["cash_balance"] == float(cash_balance)
         assert response.metrics["position_count"] == len(sample_portfolio.get_open_positions())
-        assert response.metrics["unrealized_pnl"] == float(sample_portfolio.get_unrealized_pnl())
-        assert response.metrics["realized_pnl"] == float(sample_portfolio.total_realized_pnl)
+        assert response.metrics["unrealized_pnl"] == float(
+            ValueObjectConverter.extract_amount(sample_portfolio.get_unrealized_pnl())
+        )
+        assert response.metrics["realized_pnl"] == float(
+            ValueObjectConverter.extract_amount(sample_portfolio.total_realized_pnl)
+        )
         assert response.metrics["total_return_pct"] == float(
             sample_portfolio.get_total_return() * 100
         )
@@ -673,13 +687,13 @@ class TestGetRiskMetricsUseCase:
         """Test metrics calculation with zero portfolio value."""
         use_case = GetRiskMetricsUseCase(mock_unit_of_work, mock_risk_calculator)
 
-        # Create portfolio with zero value
+        # Create portfolio with minimal value (zero would violate validation)
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Money(Decimal("0")),
+            initial_capital=Money(Decimal("0.01")),
         )
         portfolio.id = uuid4()
-        portfolio.cash_balance = Money(Decimal("0"))
+        portfolio.cash_balance = Money(Decimal("0.01"))
 
         # Setup mocks
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = portfolio

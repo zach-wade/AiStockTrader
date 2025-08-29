@@ -37,6 +37,8 @@ from src.domain.entities.position import Position
 from src.domain.services.position_manager import PositionManager
 from src.domain.services.risk_calculator import RiskCalculator
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 # Fixtures
@@ -87,39 +89,40 @@ def sample_portfolio():
     portfolio.max_leverage = Decimal("2.0")
     portfolio.max_portfolio_risk = Decimal("0.2")
 
-    # Mock async method
-    portfolio.get_total_value = AsyncMock(return_value=Decimal("15500.00"))
+    # Mock method - get_total_value is NOT async, returns Money
+    portfolio.get_total_value = Mock(return_value=Money(Decimal("15500.00")))
 
     # Add open positions
     position1 = Position(
         symbol="AAPL",
-        quantity=Decimal("100"),
-        average_entry_price=Decimal("150.00"),
+        quantity=Quantity(Decimal("100")),
+        average_entry_price=Price(Decimal("150.00")),
     )
     position1.id = uuid4()
-    position1.current_price = Decimal("155.00")
+    position1.current_price = Price(Decimal("155.00"))
     position1.opened_at = datetime.now(UTC)
 
     position2 = Position(
         symbol="GOOGL",
-        quantity=Decimal("50"),
-        average_entry_price=Decimal("2800.00"),
+        quantity=Quantity(Decimal("50")),
+        average_entry_price=Price(Decimal("2800.00")),
     )
     position2.id = uuid4()
-    position2.current_price = Decimal("2850.00")
+    position2.current_price = Price(Decimal("2850.00"))
     position2.opened_at = datetime.now(UTC)
 
-    # Add closed position
+    # Add closed position - create with quantity first, then set to zero after closing
     position3 = Position(
         symbol="MSFT",
-        quantity=Decimal("0"),  # Closed
-        average_entry_price=Decimal("300.00"),
+        quantity=Quantity(Decimal("50")),  # Will be closed
+        average_entry_price=Price(Decimal("300.00")),
     )
     position3.id = uuid4()
-    position3.current_price = Decimal("310.00")
+    position3.current_price = Price(Decimal("310.00"))
     position3.opened_at = datetime.now(UTC)
     position3.closed_at = datetime.now(UTC)
-    position3.realized_pnl = Decimal("1000.00")
+    position3.quantity = Quantity(Decimal("0"))  # Set to zero after marking as closed
+    position3.realized_pnl = Money(Decimal("1000.00"))
 
     portfolio.positions = {
         position1.id: position1,
@@ -135,11 +138,11 @@ def sample_position():
     """Create a sample open position for testing."""
     position = Position(
         symbol="TSLA",
-        quantity=Decimal("50"),
-        average_entry_price=Decimal("700.00"),
+        quantity=Quantity(Decimal("50")),
+        average_entry_price=Price(Decimal("700.00")),
     )
     position.id = uuid4()
-    position.current_price = Decimal("750.00")
+    position.current_price = Price(Decimal("750.00"))
     position.opened_at = datetime.now(UTC)
     return position
 
@@ -314,7 +317,7 @@ class TestGetPortfolioUseCase:
         portfolio.id = uuid4()
         portfolio.cash_balance = Money(Decimal("5000.00"))
         portfolio.total_realized_pnl = Money(Decimal("100.00"))
-        portfolio.get_total_value = AsyncMock(return_value=Decimal("10000.00"))
+        portfolio.get_total_value = Mock(return_value=Money(Decimal("10000.00")))
         portfolio.positions = {}
 
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = portfolio
@@ -746,7 +749,11 @@ class TestGetPositionsUseCase:
             for pos in open_positions
         )
 
-        assert response.total_value == expected_total
+        assert (
+            response.total_value.value == expected_total
+            if hasattr(response.total_value, "value")
+            else response.total_value == expected_total
+        )
 
     @pytest.mark.asyncio
     async def test_process_with_metadata(self, mock_unit_of_work, sample_portfolio):
@@ -828,7 +835,7 @@ class TestClosePositionUseCase:
         use_case = ClosePositionUseCase(mock_unit_of_work, mock_position_manager)
 
         # Setup position with P&L
-        sample_position.realized_pnl = Decimal("2500.00")  # $50 profit per share
+        sample_position.realized_pnl = Money(Decimal("2500.00"))  # $50 profit per share
 
         # Setup mocks
         mock_unit_of_work.positions.get_position_by_id.return_value = sample_position
@@ -875,14 +882,15 @@ class TestClosePositionUseCase:
         """Test closing an already closed position."""
         use_case = ClosePositionUseCase(mock_unit_of_work, mock_position_manager)
 
-        # Create closed position
+        # Create closed position - create with quantity first, then set to zero after closing
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("0"),  # Closed
-            average_entry_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),  # Will be closed
+            average_entry_price=Price(Decimal("150.00")),
         )
         position.id = uuid4()
         position.closed_at = datetime.now(UTC)
+        position.quantity = Quantity(Decimal("0"))  # Set to zero after marking as closed
 
         # Setup mocks
         mock_unit_of_work.positions.get_position_by_id.return_value = position
@@ -924,8 +932,8 @@ class TestClosePositionUseCase:
         assert closing_order.symbol == sample_position.symbol
         assert closing_order.side == OrderSide.SELL  # Long position closes with sell
         assert closing_order.order_type == OrderType.MARKET
-        assert closing_order.quantity == abs(sample_position.quantity)
-        assert closing_order.average_fill_price == Decimal("750.00")
+        assert closing_order.quantity == Quantity(abs(sample_position.quantity.value))
+        assert closing_order.average_fill_price == Price(Decimal("750.00"))
 
     @pytest.mark.asyncio
     async def test_process_short_position_close(self, mock_unit_of_work, mock_position_manager):
@@ -935,11 +943,11 @@ class TestClosePositionUseCase:
         # Create short position
         position = Position(
             symbol="TSLA",
-            quantity=Decimal("-50"),  # Short position
-            average_entry_price=Decimal("800.00"),
+            quantity=Quantity(Decimal("-50")),  # Short position
+            average_entry_price=Price(Decimal("800.00")),
         )
         position.id = uuid4()
-        position.realized_pnl = Decimal("2500.00")  # Profit from short
+        position.realized_pnl = Money(Decimal("2500.00"))  # Profit from short
 
         # Setup mocks
         mock_unit_of_work.positions.get_position_by_id.return_value = position
@@ -968,7 +976,7 @@ class TestClosePositionUseCase:
 
         # Setup mocks
         mock_unit_of_work.positions.get_position_by_id.return_value = sample_position
-        sample_position.realized_pnl = Decimal("1000.00")
+        sample_position.realized_pnl = Money(Decimal("1000.00"))
 
         request = ClosePositionRequest(
             position_id=sample_position.id,

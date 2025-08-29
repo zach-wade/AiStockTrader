@@ -2,12 +2,12 @@
 
 ## Executive Summary
 
-**Module**: `ai_trader/src/main/backtesting/engine`  
-**Files Reviewed**: 6 files, 2,387 lines  
-**Overall Architecture Rating**: **MEDIUM-HIGH Risk**  
-**Critical Issues Found**: 8  
-**High Priority Issues**: 12  
-**Medium Priority Issues**: 15  
+**Module**: `ai_trader/src/main/backtesting/engine`
+**Files Reviewed**: 6 files, 2,387 lines
+**Overall Architecture Rating**: **MEDIUM-HIGH Risk**
+**Critical Issues Found**: 8
+**High Priority Issues**: 12
+**Medium Priority Issues**: 15
 
 The backtesting engine module exhibits a well-structured event-driven architecture but contains significant SOLID principle violations, particularly in Single Responsibility and Dependency Inversion. The module would benefit from interface extraction, better separation of concerns, and reduced coupling between components.
 
@@ -18,6 +18,7 @@ The backtesting engine module exhibits a well-structured event-driven architectu
 **Rating: HIGH**
 
 ### Justification
+
 - Core architectural patterns are established (event-driven, observer pattern)
 - Significant violations of SOLID principles compromise maintainability
 - Tight coupling between components limits extensibility
@@ -52,11 +53,13 @@ The backtesting engine module exhibits a well-structured event-driven architectu
 ## Critical Violations Found
 
 ### 1. **CRITICAL: BacktestEngine God Class (SRP Violation)**
-**File**: `backtest_engine.py`  
-**Lines**: 108-543  
+
+**File**: `backtest_engine.py`
+**Lines**: 108-543
 **Impact**: Maintainability, Testing, Extensibility
 
 The `BacktestEngine` class violates SRP with 15+ distinct responsibilities:
+
 - Event management (lines 150-204)
 - Data loading (lines 266-291)
 - Market event creation (lines 293-330)
@@ -69,6 +72,7 @@ The `BacktestEngine` class violates SRP with 15+ distinct responsibilities:
 - Result generation (lines 426-467)
 
 **Recommended Refactoring**:
+
 ```python
 # Extract separate classes for each responsibility
 class EventCoordinator:
@@ -76,7 +80,7 @@ class EventCoordinator:
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus
         self.event_queue = []
-    
+
     async def process_events(self, handlers: Dict[EventType, EventHandler]):
         while self.event_queue:
             event = heapq.heappop(self.event_queue)
@@ -86,14 +90,14 @@ class DataLoader:
     """Handles market data loading and transformation"""
     def __init__(self, data_source: DataSource):
         self.data_source = data_source
-    
+
     async def load_market_data(self, config: BacktestConfig) -> pd.DataFrame:
         # Data loading logic
         pass
 
 class PerformanceCalculator:
     """Calculates backtest metrics and statistics"""
-    def calculate_metrics(self, portfolio_history: pd.DataFrame, 
+    def calculate_metrics(self, portfolio_history: pd.DataFrame,
                          trades: pd.DataFrame) -> Dict[str, float]:
         # Metric calculation logic
         pass
@@ -108,15 +112,18 @@ class BacktestEngine:
 ```
 
 ### 2. **CRITICAL: Missing Abstraction Interfaces (DIP Violation)**
-**Files**: All files  
+
+**Files**: All files
 **Impact**: Testability, Flexibility, Coupling
 
 No interface definitions exist. All dependencies are on concrete classes:
+
 - `BacktestEngine` directly depends on `Portfolio`, `MarketSimulator`, `BarAggregator`
 - `MarketSimulator` directly depends on `CostModel`
 - `Portfolio` has no abstraction layer
 
 **Recommended Refactoring**:
+
 ```python
 # Create interfaces module
 from abc import ABC, abstractmethod
@@ -125,7 +132,7 @@ class IPortfolio(ABC):
     @abstractmethod
     def process_fill(self, fill_event: FillEvent, costs: CostComponents) -> bool:
         pass
-    
+
     @abstractmethod
     def get_position(self, symbol: str) -> Optional[PortfolioPosition]:
         pass
@@ -134,14 +141,14 @@ class IMarketSimulator(ABC):
     @abstractmethod
     def submit_order(self, order: Order, timestamp: datetime) -> OrderEvent:
         pass
-    
+
     @abstractmethod
     def process_orders(self, timestamp: datetime) -> List[FillEvent]:
         pass
 
 class ICostModel(ABC):
     @abstractmethod
-    def calculate_trade_cost(self, quantity: int, price: float, 
+    def calculate_trade_cost(self, quantity: int, price: float,
                             order_side: OrderSide) -> CostComponents:
         pass
 
@@ -153,11 +160,13 @@ class BacktestEngine:
 ```
 
 ### 3. **HIGH: MarketSimulator Complexity (SRP Violation)**
-**File**: `market_simulator.py`  
-**Lines**: 98-538  
+
+**File**: `market_simulator.py`
+**Lines**: 98-538
 **Impact**: Maintainability, Testing
 
 The `MarketSimulator` class handles too many responsibilities:
+
 - Order book management (lines 136-159)
 - Order validation (lines 435-445)
 - Order queuing (lines 179-192)
@@ -166,6 +175,7 @@ The `MarketSimulator` class handles too many responsibilities:
 - Statistics tracking (lines 139-143)
 
 **Recommended Refactoring**:
+
 ```python
 class OrderBook:
     """Manages order book state"""
@@ -176,7 +186,7 @@ class OrderQueue:
     """Manages order priority and queuing"""
     def add_order(self, order: PendingOrder):
         pass
-    
+
     def get_next_order(self) -> Optional[PendingOrder]:
         pass
 
@@ -194,29 +204,32 @@ class MarketSimulator:
 ```
 
 ### 4. **HIGH: Portfolio State Management Issues**
-**File**: `portfolio.py`  
-**Lines**: 128-470  
+
+**File**: `portfolio.py`
+**Lines**: 128-470
 **Impact**: Data Integrity, Concurrency
 
 The `Portfolio` class mixes state management with business logic:
+
 - Direct state mutation throughout (lines 220, 268-313)
 - No transaction boundaries
 - No state validation before mutations
 - Mixed concerns between position tracking and P&L calculation
 
 **Recommended Refactoring**:
+
 ```python
 class PositionStore:
     """Manages position state with transaction support"""
     def __init__(self):
         self._positions: Dict[str, PortfolioPosition] = {}
         self._locks = defaultdict(threading.Lock)
-    
+
     @contextmanager
     def transaction(self, symbol: str):
         with self._locks[symbol]:
             yield
-    
+
     def update_position(self, symbol: str, update_fn: Callable):
         with self.transaction(symbol):
             position = self._positions.get(symbol)
@@ -226,7 +239,7 @@ class PnLCalculator:
     """Calculates P&L metrics"""
     def calculate_unrealized(self, positions: List[PortfolioPosition]) -> float:
         pass
-    
+
     def calculate_realized(self, trades: List[Trade]) -> float:
         pass
 
@@ -237,16 +250,19 @@ class Portfolio:
 ```
 
 ### 5. **HIGH: Event System Coupling**
-**File**: `backtest_engine.py`  
-**Lines**: 186-204, 332-397  
+
+**File**: `backtest_engine.py`
+**Lines**: 186-204, 332-397
 **Impact**: Flexibility, Testing
 
 Event handlers are tightly coupled to implementation:
+
 - Direct method references in subscriptions (lines 189-204)
 - No event handler interface
 - Hard-coded event processing logic
 
 **Recommended Refactoring**:
+
 ```python
 class IEventHandler(ABC):
     @abstractmethod
@@ -257,7 +273,7 @@ class MarketEventHandler(IEventHandler):
     def __init__(self, strategy: IStrategy, portfolio: IPortfolio):
         self.strategy = strategy
         self.portfolio = portfolio
-    
+
     async def handle(self, event: Event) -> Optional[List[Event]]:
         # Decoupled event handling
         pass
@@ -267,25 +283,28 @@ event_bus.register_handler(EventType.MARKET_DATA, MarketEventHandler(strategy, p
 ```
 
 ### 6. **MEDIUM: Cost Model Hierarchy Complexity**
-**File**: `cost_model.py`  
-**Lines**: 70-617  
+
+**File**: `cost_model.py`
+**Lines**: 70-617
 **Impact**: Maintainability, Extension
 
 While the cost model uses inheritance well (OCP compliant), it has issues:
+
 - Too many model variants (12+ different cost models)
 - Factory function with hardcoded broker mappings (lines 601-617)
 - Mixed abstraction levels (broker-specific vs generic models)
 
 **Recommended Refactoring**:
+
 ```python
 class CostModelFactory:
     """Factory with registration pattern"""
     def __init__(self):
         self._models = {}
-    
+
     def register(self, name: str, creator: Callable[[], CostModel]):
         self._models[name] = creator
-    
+
     def create(self, name: str) -> CostModel:
         if name not in self._models:
             return self._models['default']()
@@ -298,21 +317,24 @@ factory.register('default', create_default_cost_model)
 ```
 
 ### 7. **MEDIUM: BarAggregator Design Issues**
-**File**: `bar_aggregator.py`  
-**Lines**: 16-196  
+
+**File**: `bar_aggregator.py`
+**Lines**: 16-196
 **Impact**: Memory, Performance
 
 The `BarAggregator` has architectural issues:
+
 - Unbounded memory growth (incomplete_bars dict)
 - No cleanup mechanism for stale bars
 - Tight coupling to BacktestEngine via imports (line 11)
 - No interface definition
 
 **Recommended Refactoring**:
+
 ```python
 class IBarAggregator(ABC):
     @abstractmethod
-    def process_minute_bar(self, symbol: str, timestamp: datetime, 
+    def process_minute_bar(self, symbol: str, timestamp: datetime,
                           ohlcv: Dict) -> List[MarketEvent]:
         pass
 
@@ -321,7 +343,7 @@ class BarAggregator(IBarAggregator):
         self.incomplete_bars = LRUCache(max_incomplete_bars)
         self.cleanup_interval = timedelta(hours=1)
         self.last_cleanup = datetime.now()
-    
+
     def _cleanup_stale_bars(self, current_time: datetime):
         if current_time - self.last_cleanup > self.cleanup_interval:
             # Remove bars older than 24 hours
@@ -329,15 +351,18 @@ class BarAggregator(IBarAggregator):
 ```
 
 ### 8. **MEDIUM: Configuration Object Responsibilities**
-**File**: `backtest_engine.py`  
-**Lines**: 47-79  
+
+**File**: `backtest_engine.py`
+**Lines**: 47-79
 **Impact**: Separation of Concerns
 
 `BacktestConfig` mixes configuration with validation logic:
+
 - Validation in data class (lines 65-79)
 - Business rules embedded in configuration
 
 **Recommended Refactoring**:
+
 ```python
 @dataclass
 class BacktestConfig:
@@ -479,6 +504,7 @@ class BacktestConfigValidator:
 ### Immediate Actions (Do Now)
 
 1. **Create Interface Module**
+
 ```python
 # backtesting/engine/interfaces.py
 from abc import ABC, abstractmethod
@@ -488,7 +514,7 @@ class IBacktestComponent(ABC):
     @abstractmethod
     async def initialize(self):
         pass
-    
+
     @abstractmethod
     async def cleanup(self):
         pass
@@ -497,6 +523,7 @@ class IBacktestComponent(ABC):
 ```
 
 2. **Implement Dependency Injection**
+
 ```python
 # backtesting/engine/container.py
 class BacktestContainer:
@@ -504,10 +531,10 @@ class BacktestContainer:
     def __init__(self, config: BacktestConfig):
         self.config = config
         self._components = {}
-    
+
     def register(self, interface: Type, implementation: Any):
         self._components[interface] = implementation
-    
+
     def resolve(self, interface: Type) -> Any:
         return self._components.get(interface)
 ```

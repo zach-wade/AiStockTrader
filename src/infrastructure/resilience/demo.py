@@ -7,8 +7,15 @@ existing trading system components for production use.
 
 import asyncio
 import logging
+import random
+from collections.abc import AsyncIterator
 from typing import Any
+from uuid import UUID
 
+from src.application.interfaces.broker import AccountInfo, IBroker, MarketHours
+from src.application.interfaces.market_data import IMarketDataProvider
+from src.domain.entities.order import Order, OrderStatus
+from src.domain.entities.position import Position
 from src.infrastructure.database.connection import DatabaseConfig
 from src.infrastructure.resilience.config import ConfigManager
 from src.infrastructure.resilience.database import EnhancedDatabaseConfig
@@ -21,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class MockBroker:
+class MockBroker(IBroker):
     """Mock broker for demonstration."""
 
     def __init__(self, name: str, failure_rate: float = 0.0) -> None:
@@ -29,43 +36,73 @@ class MockBroker:
         self.failure_rate = failure_rate
         self.call_count = 0
 
-    async def place_order(self, order_data: dict[str, Any]) -> dict[str, Any]:
-        """Mock place order with optional failures."""
+    def submit_order(self, order: Order) -> Order:
+        """Mock submit order."""
         self.call_count += 1
-
         import random
 
         if random.random() < self.failure_rate:
             raise ConnectionError(f"Mock {self.name} broker connection error")
+        # Return order with broker ID set
+        return order
 
-        return {
-            "order_id": f"order_{self.call_count}",
-            "symbol": order_data.get("symbol", "UNKNOWN"),
-            "status": "submitted",
-            "broker": self.name,
-        }
+    def cancel_order(self, order_id: UUID) -> bool:
+        """Mock cancel order."""
+        return True
 
-    async def get_account_info(self) -> dict[str, Any]:
-        """Mock get account info."""
-        self.call_count += 1
+    def get_order_status(self, order_id: UUID) -> OrderStatus:
+        """Mock get order status."""
+        return OrderStatus.SUBMITTED
 
-        import random
-
-        if random.random() < self.failure_rate:
-            raise ConnectionError(f"Mock {self.name} broker connection error")
-
-        return {
-            "account_id": f"{self.name}_account",
-            "buying_power": 10000.0,
-            "calls": self.call_count,
-        }
-
-    async def get_positions(self) -> list:
+    def get_positions(self) -> list[Position]:
         """Mock get positions."""
         return []
 
+    def get_account_info(self) -> AccountInfo:
+        """Mock get account info."""
+        from decimal import Decimal
 
-class MockMarketData:
+        return AccountInfo(
+            account_id=f"{self.name}_account",
+            account_type="paper",
+            equity=Decimal("10000.0"),
+            cash=Decimal("10000.0"),
+            buying_power=Decimal("10000.0"),
+            positions_value=Decimal("0.0"),
+            unrealized_pnl=Decimal("0.0"),
+            realized_pnl=Decimal("0.0"),
+        )
+
+    def is_market_open(self) -> bool:
+        """Mock market open check."""
+        return True
+
+    def get_market_hours(self) -> MarketHours:
+        """Mock get market hours."""
+        return MarketHours(is_open=True)
+
+    def update_order(self, order: Order) -> Order:
+        """Mock update order."""
+        return order
+
+    def get_recent_orders(self, limit: int = 100) -> list[Order]:
+        """Mock get recent orders."""
+        return []
+
+    def connect(self) -> None:
+        """Mock connect."""
+        pass
+
+    def disconnect(self) -> None:
+        """Mock disconnect."""
+        pass
+
+    def is_connected(self) -> bool:
+        """Mock is connected."""
+        return True
+
+
+class MockMarketData(IMarketDataProvider):
     """Mock market data provider for demonstration."""
 
     def __init__(self, name: str, failure_rate: float = 0.0) -> None:
@@ -73,32 +110,85 @@ class MockMarketData:
         self.failure_rate = failure_rate
         self.call_count = 0
 
-    async def get_current_price(self, symbol: str) -> dict[str, Any]:
-        """Mock get current price with optional failures."""
+    async def get_current_price(self, symbol: str) -> Any:
+        """Mock get current price."""
+        from decimal import Decimal
+
+        from src.domain.value_objects.price import Price
+
         self.call_count += 1
-
-        import random
-
         if random.random() < self.failure_rate:
             raise ConnectionError(f"Mock {self.name} market data connection error")
 
-        return {
-            "symbol": symbol,
-            "price": round(100 + random.uniform(-10, 10), 2),
-            "timestamp": asyncio.get_event_loop().time(),
-            "provider": self.name,
-        }
+        price_value = Decimal(str(round(100 + random.uniform(-10, 10), 2)))
+        return Price(price_value)
 
-    async def get_historical_data(self, symbol: str, period: str) -> list:
-        """Mock get historical data."""
+    async def get_current_quote(self, symbol: str) -> Any:
+        """Mock get current quote."""
+        from datetime import datetime
+        from decimal import Decimal
+
+        from src.application.interfaces.market_data import Quote
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.symbol import Symbol
+
         self.call_count += 1
-
-        import random
-
         if random.random() < self.failure_rate:
             raise ConnectionError(f"Mock {self.name} market data connection error")
 
-        return [{"timestamp": asyncio.get_event_loop().time(), "price": 100.0}]
+        base_price = Decimal(str(round(100 + random.uniform(-10, 10), 2)))
+        bid_price = Price(base_price - Decimal("0.01"))
+        ask_price = Price(base_price + Decimal("0.01"))
+
+        return Quote(
+            symbol=Symbol(symbol),
+            timestamp=datetime.now(),
+            bid_price=bid_price,
+            bid_size=100,
+            ask_price=ask_price,
+            ask_size=100,
+        )
+
+    async def get_historical_bars(
+        self, symbol: str, start: Any, end: Any, timeframe: str = "1min"
+    ) -> list[Any]:
+        """Mock get historical bars."""
+        self.call_count += 1
+        if random.random() < self.failure_rate:
+            raise ConnectionError(f"Mock {self.name} market data connection error")
+        return []
+
+    async def stream_prices(self, symbols: list[str]) -> AsyncIterator[Any]:
+        """Mock stream prices."""
+
+        # This would be an async generator in a real implementation
+        # Return empty async iterator for demo
+        async def empty_stream() -> AsyncIterator[Any]:
+            # Empty generator - never yields anything
+            return
+            yield None  # pragma: no cover
+
+        return empty_stream()
+
+    async def stream_quotes(self, symbols: list[str]) -> AsyncIterator[Any]:
+        """Mock stream quotes."""
+
+        # This would be an async generator in a real implementation
+        # Return empty async iterator for demo
+        async def empty_stream() -> AsyncIterator[Any]:
+            # Empty generator - never yields anything
+            return
+            yield None  # pragma: no cover
+
+        return empty_stream()
+
+    async def is_market_open(self) -> bool:
+        """Mock market open check."""
+        return True
+
+    async def get_symbol_info(self, symbol: str) -> dict[str, str]:
+        """Mock get symbol info."""
+        return {"symbol": symbol, "name": f"Mock {symbol}", "type": "stock"}
 
 
 async def demonstrate_resilience_features() -> None:

@@ -8,7 +8,7 @@ status based on current time and market calendar rules.
 
 from datetime import date, datetime, time, timedelta
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from src.domain.interfaces.time_service import LocalizedDatetime, TimeService
 
@@ -113,12 +113,14 @@ class MarketHoursService:
             self.AFTER_MARKET_CLOSE_HOUR, self.AFTER_MARKET_CLOSE_MINUTE
         )
 
-    def get_current_market_status(self, current_time: datetime | None = None) -> MarketStatus:
+    def get_current_market_status(
+        self, current_time: LocalizedDatetime | datetime | None = None
+    ) -> MarketStatus:
         """
         Determine current market status based on business rules.
 
         Args:
-            current_time: Optional datetime to check (defaults to current time)
+            current_time: Optional datetime or LocalizedDatetime to check (defaults to current time)
 
         Returns:
             MarketStatus enum value
@@ -126,10 +128,16 @@ class MarketHoursService:
         # Use provided time or current time
         if current_time is None:
             now = self._time_service.get_current_time(self.timezone)
+        elif hasattr(current_time, "as_datetime"):
+            # Already a LocalizedDatetime, just convert timezone if needed
+            localized_current_time = cast(LocalizedDatetime, current_time)
+            now = self._time_service.convert_timezone(localized_current_time, self.timezone)
         elif not self._time_service.is_timezone_aware(current_time):
             now = self._time_service.localize_naive_datetime(current_time, self.timezone)
         else:
-            now = self._time_service.convert_timezone(current_time, self.timezone)
+            # Create adapter for timezone-aware datetime then convert timezone
+            adapted_dt = self._time_service.create_adapter(current_time)
+            now = self._time_service.convert_timezone(adapted_dt, self.timezone)
 
         # Business rule: Check if today is a holiday
         if self.is_holiday(now):
@@ -184,12 +192,12 @@ class MarketHoursService:
         # Business rule: Saturday = 5, Sunday = 6
         return dt.weekday() >= 5
 
-    def is_trading_day(self, dt: datetime | date) -> bool:
+    def is_trading_day(self, dt: LocalizedDatetime | datetime | date) -> bool:
         """
         Check if a given date is a trading day.
 
         Args:
-            dt: Date or datetime to check
+            dt: Date, datetime, or LocalizedDatetime to check
 
         Returns:
             True if markets are open on this date, False otherwise
@@ -198,22 +206,27 @@ class MarketHoursService:
         if isinstance(dt, date):
             # Convert date to datetime at noon
             check_dt = self._time_service.combine_date_time_timezone(dt, time(12, 0), self.timezone)
-        elif not self._time_service.is_timezone_aware(dt):
-            check_dt = self._time_service.localize_naive_datetime(dt, self.timezone)
-        elif hasattr(dt, "native_datetime"):
+        elif hasattr(dt, "as_datetime"):
+            # Already a LocalizedDatetime
             check_dt = dt
         else:
-            adapter = self._time_service.create_adapter(dt)
-            check_dt = self._time_service.convert_timezone(adapter, self.timezone)
+            # Must be a regular datetime
+            datetime_dt = cast(datetime, dt)
+            if not self._time_service.is_timezone_aware(datetime_dt):
+                check_dt = self._time_service.localize_naive_datetime(datetime_dt, self.timezone)
+            else:
+                # Create adapter for timezone-aware datetime
+                adapter = self._time_service.create_adapter(datetime_dt)
+                check_dt = self._time_service.convert_timezone(adapter, self.timezone)
 
         return not (self.is_weekend(check_dt) or self.is_holiday(check_dt))
 
-    def is_market_open(self, current_time: datetime | None = None) -> bool:
+    def is_market_open(self, current_time: LocalizedDatetime | datetime | None = None) -> bool:
         """
         Check if the market is currently open for regular trading.
 
         Args:
-            current_time: Optional datetime to check
+            current_time: Optional datetime or LocalizedDatetime to check
 
         Returns:
             True if market is open for regular trading, False otherwise
@@ -234,22 +247,30 @@ class MarketHoursService:
         status = self.get_current_market_status(current_time)
         return status in [MarketStatus.PRE_MARKET, MarketStatus.AFTER_MARKET]
 
-    def get_next_market_open(self, from_time: datetime | None = None) -> datetime | None:
+    def get_next_market_open(
+        self, from_time: LocalizedDatetime | datetime | None = None
+    ) -> LocalizedDatetime | None:
         """
         Get the next market open time from a given datetime.
 
         Args:
-            from_time: Starting datetime (defaults to current time)
+            from_time: Starting datetime or LocalizedDatetime (defaults to current time)
 
         Returns:
-            Next market open datetime, or None if unable to determine
+            Next market open datetime as LocalizedDatetime, or None if unable to determine
         """
         if from_time is None:
             current = self._time_service.get_current_time(self.timezone)
+        elif hasattr(from_time, "as_datetime"):
+            # Already a LocalizedDatetime, just convert timezone if needed
+            localized_from_time = cast(LocalizedDatetime, from_time)
+            current = self._time_service.convert_timezone(localized_from_time, self.timezone)
         elif not self._time_service.is_timezone_aware(from_time):
             current = self._time_service.localize_naive_datetime(from_time, self.timezone)
         else:
-            current = self._time_service.convert_timezone(from_time, self.timezone)
+            # Create adapter for timezone-aware datetime then convert timezone
+            adapted_dt = self._time_service.create_adapter(from_time)
+            current = self._time_service.convert_timezone(adapted_dt, self.timezone)
 
         # Start checking from current time
         check_date = current
@@ -276,22 +297,30 @@ class MarketHoursService:
 
         return None
 
-    def get_next_market_close(self, from_time: datetime | None = None) -> datetime | None:
+    def get_next_market_close(
+        self, from_time: LocalizedDatetime | datetime | None = None
+    ) -> LocalizedDatetime | None:
         """
         Get the next market close time from a given datetime.
 
         Args:
-            from_time: Starting datetime (defaults to current time)
+            from_time: Starting datetime or LocalizedDatetime (defaults to current time)
 
         Returns:
             Next market close datetime, or None if unable to determine
         """
         if from_time is None:
             current = self._time_service.get_current_time(self.timezone)
+        elif hasattr(from_time, "as_datetime"):
+            # Already a LocalizedDatetime, just convert timezone if needed
+            localized_from_time = cast(LocalizedDatetime, from_time)
+            current = self._time_service.convert_timezone(localized_from_time, self.timezone)
         elif not self._time_service.is_timezone_aware(from_time):
             current = self._time_service.localize_naive_datetime(from_time, self.timezone)
         else:
-            current = self._time_service.convert_timezone(from_time, self.timezone)
+            # Create adapter for timezone-aware datetime then convert timezone
+            adapted_dt = self._time_service.create_adapter(from_time)
+            current = self._time_service.convert_timezone(adapted_dt, self.timezone)
 
         # If market is currently open, return today's close
         if self.is_market_open(current):
@@ -358,8 +387,8 @@ class MarketHoursService:
         Returns:
             Dictionary with open and close times, or None if not a trading day
         """
-        # Convert date to datetime for checking
-        dt = datetime.combine(trading_day, time(12, 0))
+        # Convert date to localized datetime for checking
+        dt = self._time_service.combine_date_time_timezone(trading_day, time(12, 0), self.timezone)
 
         if not self.is_trading_day(dt):
             return None
@@ -464,7 +493,9 @@ class MarketHoursService:
 
         return prev_day
 
-    def time_until_market_open(self, from_time: datetime | None = None) -> timedelta | None:
+    def time_until_market_open(
+        self, from_time: LocalizedDatetime | datetime | None = None
+    ) -> timedelta | None:
         """
         Calculate time until next market open.
 
@@ -475,26 +506,39 @@ class MarketHoursService:
             Timedelta until market opens, or timedelta(0) if market is currently open
         """
         if from_time is None:
-            from_time = datetime.now(self.timezone)
+            localized_from_time = self._time_service.get_current_time(self.timezone)
+        elif hasattr(from_time, "as_datetime"):
+            # Already a LocalizedDatetime
+            localized_from_time = cast(LocalizedDatetime, from_time)
         elif not self._time_service.is_timezone_aware(from_time):
-            from_time = self._time_service.localize_naive_datetime(from_time, self.timezone)
+            localized_from_time = self._time_service.localize_naive_datetime(
+                from_time, self.timezone
+            )
+        else:
+            # Create adapter for timezone-aware datetime
+            adapted_dt = self._time_service.create_adapter(from_time)
+            localized_from_time = self._time_service.convert_timezone(adapted_dt, self.timezone)
 
         # If market is currently open, return 0
-        if self.is_market_open(from_time):
+        if self.is_market_open(localized_from_time):
             return timedelta(0)
 
         # Get next market open
-        next_open = self.get_next_market_open(from_time)
+        next_open = self.get_next_market_open(localized_from_time)
         if next_open:
-            return next_open - from_time
+            return next_open - localized_from_time
 
         return None
 
-    def get_time_until_market_open(self, from_time: datetime | None = None) -> timedelta | None:
+    def get_time_until_market_open(
+        self, from_time: LocalizedDatetime | datetime | None = None
+    ) -> timedelta | None:
         """Alias for time_until_market_open for backward compatibility."""
         return self.time_until_market_open(from_time)
 
-    def get_time_until_market_close(self, from_time: datetime | None = None) -> timedelta | None:
+    def get_time_until_market_close(
+        self, from_time: LocalizedDatetime | datetime | None = None
+    ) -> timedelta | None:
         """
         Calculate time until market close.
 
@@ -505,17 +549,50 @@ class MarketHoursService:
             Timedelta until market closes, or None if market is closed
         """
         if from_time is None:
-            from_time = datetime.now(self.timezone)
+            localized_from_time = self._time_service.get_current_time(self.timezone)
+        elif hasattr(from_time, "as_datetime"):
+            # Already a LocalizedDatetime
+            localized_from_time = cast(LocalizedDatetime, from_time)
         elif not self._time_service.is_timezone_aware(from_time):
-            from_time = self._time_service.localize_naive_datetime(from_time, self.timezone)
+            localized_from_time = self._time_service.localize_naive_datetime(
+                from_time, self.timezone
+            )
+        else:
+            # Create adapter for timezone-aware datetime
+            adapted_dt = self._time_service.create_adapter(from_time)
+            localized_from_time = self._time_service.convert_timezone(adapted_dt, self.timezone)
 
         # If market is closed, return None
-        if not self.is_market_open(from_time):
+        if not self.is_market_open(localized_from_time):
             return None
 
         # Get next market close
-        next_close = self.get_next_market_close(from_time)
+        next_close = self.get_next_market_close(localized_from_time)
         if next_close:
-            return next_close - from_time
+            return next_close - localized_from_time
 
         return None
+
+    def get_trading_days_between(self, start_date: date, end_date: date) -> list[date]:
+        """
+        Get all trading days between two dates (inclusive).
+
+        Args:
+            start_date: Start date
+            end_date: End date
+
+        Returns:
+            List of trading days between the dates
+        """
+        if start_date > end_date:
+            return []
+
+        trading_days = []
+        current_date = start_date
+
+        while current_date <= end_date:
+            if self.is_trading_day(current_date):
+                trading_days.append(current_date)
+            current_date += timedelta(days=1)
+
+        return trading_days

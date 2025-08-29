@@ -252,6 +252,7 @@ class TestServiceHealthCheck:
     async def test_service_health_check_async_success(self):
         """Test service health check with async function."""
 
+        @pytest.mark.asyncio
         async def test_service():
             await asyncio.sleep(0.01)
             return "service_result"

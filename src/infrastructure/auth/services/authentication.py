@@ -7,7 +7,6 @@ and security measures.
 
 import logging
 import secrets
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -15,23 +14,10 @@ from sqlalchemy.orm import Session
 
 from ..jwt_service import JWTService
 from ..models import AuthAuditLog, User
+from ..types import AuthenticationResult
 from .password_service import PasswordService
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class AuthenticationResult:
-    """Authentication result data."""
-
-    user_id: str
-    access_token: str
-    refresh_token: str
-    expires_in: int
-    roles: list[str]
-    permissions: list[str]
-    mfa_required: bool = False
-    mfa_session_token: str | None = None
 
 
 class AuthenticationService:
@@ -194,8 +180,15 @@ class AuthenticationService:
         success: bool = True,
     ) -> None:
         """Log audit event."""
+        from uuid import UUID
+
+        # Convert string UUID to UUID object if needed
+        uuid_user_id = None
+        if user_id:
+            uuid_user_id = UUID(user_id) if isinstance(user_id, str) else user_id
+
         audit_log = AuthAuditLog(
-            user_id=user_id,
+            user_id=uuid_user_id,
             event_type=event_type,
             event_data=event_data or {},
             ip_address=ip_address,
@@ -220,8 +213,8 @@ class AuthenticationService:
         if user:
             # Generate reset token
             reset_token = secrets.token_urlsafe(32)
-            user.password_reset_token = reset_token
-            user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+            user.password_reset_token = reset_token  # type: ignore[assignment]
+            user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)  # type: ignore[assignment]
             self.db.commit()
 
             self._log_audit_event(
@@ -268,9 +261,9 @@ class AuthenticationService:
             raise ValueError("Invalid or expired reset token")
 
         # Update password
-        user.password_hash = self.password_service.hash_password(new_password)
-        user.password_reset_token = None
-        user.password_reset_expires = None
+        user.password_hash = self.password_service.hash_password(new_password)  # type: ignore[assignment]
+        user.password_reset_token = None  # type: ignore[assignment]
+        user.password_reset_expires = None  # type: ignore[assignment]
 
         # Revoke all sessions
         for session in user.sessions:
@@ -280,7 +273,7 @@ class AuthenticationService:
         self.db.commit()
 
         # Revoke all tokens
-        self.jwt_service.revoke_all_user_tokens(str(user.id))
+        await self.jwt_service.revoke_all_user_tokens(str(user.id))
 
         self._log_audit_event(
             event_type="password_reset_success", user_id=str(user.id), success=True
@@ -321,7 +314,7 @@ class AuthenticationService:
             raise ValueError(f"Invalid password: {'; '.join(errors)}")
 
         # Update password
-        user.password_hash = self.password_service.hash_password(new_password)
+        user.password_hash = self.password_service.hash_password(new_password)  # type: ignore[assignment]
         self.db.commit()
 
         self._log_audit_event(event_type="password_changed", user_id=user_id, success=True)

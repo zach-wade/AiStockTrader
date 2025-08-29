@@ -7,7 +7,7 @@ complexity of timezone conversions, localization, and datetime manipulation.
 """
 
 import sys
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Any
 
 # Use zoneinfo for Python 3.9+ with pytz fallback for older versions
@@ -36,10 +36,9 @@ def to_datetime(localized_dt: LocalizedDatetime) -> datetime:
         return localized_dt.as_datetime()
     elif hasattr(localized_dt, "_dt"):
         return localized_dt._dt  # type: ignore
-    elif isinstance(localized_dt, datetime):
-        return localized_dt  # type: ignore
     else:
-        raise TypeError(f"Cannot convert {type(localized_dt)} to datetime")
+        # Assume it's a datetime or compatible type
+        return localized_dt  # type: ignore
 
 
 class TimezoneInfoAdapter:
@@ -57,15 +56,69 @@ class TimezoneInfoAdapter:
         """Get the underlying timezone object."""
         return self._tz
 
+    # TimezoneInfo protocol methods
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        """Return offset of local time from UTC."""
+        result = self._tz.utcoffset(dt)
+        return result if isinstance(result, (timedelta, type(None))) else None
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        """Return name of timezone."""
+        result = self._tz.tzname(dt)
+        return str(result) if result is not None else None
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        """Return DST offset."""
+        result = self._tz.dst(dt)
+        return result if isinstance(result, (timedelta, type(None))) else None
+
 
 class LocalizedDatetimeAdapter:
-    """Adapter for localized datetime from different libraries."""
+    """Adapter for localized datetime from different libraries.
+
+    This adapter implements the LocalizedDatetime protocol by wrapping
+    a standard datetime object and providing all required properties and methods.
+    """
 
     def __init__(self, dt: datetime):
         if dt.tzinfo is None:
             raise ValueError("Datetime must be timezone-aware")
         self._dt = dt
 
+    # Properties required by LocalizedDatetime protocol
+    @property
+    def year(self) -> int:
+        return self._dt.year
+
+    @property
+    def month(self) -> int:
+        return self._dt.month
+
+    @property
+    def day(self) -> int:
+        return self._dt.day
+
+    @property
+    def hour(self) -> int:
+        return self._dt.hour
+
+    @property
+    def minute(self) -> int:
+        return self._dt.minute
+
+    @property
+    def second(self) -> int:
+        return self._dt.second
+
+    @property
+    def microsecond(self) -> int:
+        return self._dt.microsecond
+
+    @property
+    def tzinfo(self) -> tzinfo | None:
+        return self._dt.tzinfo
+
+    # Methods required by LocalizedDatetime protocol
     def date(self) -> date:
         return self._dt.date()
 
@@ -75,78 +128,139 @@ class LocalizedDatetimeAdapter:
     def weekday(self) -> int:
         return self._dt.weekday()
 
+    def isoweekday(self) -> int:
+        return self._dt.isoweekday()
+
     def strftime(self, format_string: str) -> str:
         return self._dt.strftime(format_string)
 
-    def replace(self, **kwargs: Any) -> "LocalizedDatetime":
-        new_dt = self._dt.replace(**kwargs)
+    def timestamp(self) -> float:
+        return self._dt.timestamp()
+
+    def replace(
+        self,
+        year: int | None = None,
+        month: int | None = None,
+        day: int | None = None,
+        hour: int | None = None,
+        minute: int | None = None,
+        second: int | None = None,
+        microsecond: int | None = None,
+        tzinfo: "tzinfo | None" = ...,  # type: ignore
+        fold: int = 0,
+    ) -> "LocalizedDatetimeAdapter":
+        """Return datetime with specified components replaced."""
+        # Build kwargs dictionary, filtering out None values
+        replace_kwargs: dict[str, Any] = {}
+        if year is not None:
+            replace_kwargs["year"] = year
+        if month is not None:
+            replace_kwargs["month"] = month
+        if day is not None:
+            replace_kwargs["day"] = day
+        if hour is not None:
+            replace_kwargs["hour"] = hour
+        if minute is not None:
+            replace_kwargs["minute"] = minute
+        if second is not None:
+            replace_kwargs["second"] = second
+        if microsecond is not None:
+            replace_kwargs["microsecond"] = microsecond
+        if tzinfo is not ...:
+            replace_kwargs["tzinfo"] = tzinfo
+        if fold != 0:
+            replace_kwargs["fold"] = fold
+
+        new_dt = self._dt.replace(**replace_kwargs)
         return LocalizedDatetimeAdapter(new_dt)
 
-    def __add__(self, other: Any) -> "LocalizedDatetime":
+    def __add__(self, other: timedelta) -> "LocalizedDatetimeAdapter":
+        """Add timedelta to datetime."""
         return LocalizedDatetimeAdapter(self._dt + other)
 
-    def __sub__(self, other: Any) -> Any:
+    def __sub__(
+        self, other: "LocalizedDatetimeAdapter | timedelta"
+    ) -> "LocalizedDatetimeAdapter | timedelta":
+        """Subtract datetime or timedelta."""
         if isinstance(other, LocalizedDatetimeAdapter):
-            return self._dt - other._dt
-        elif isinstance(other, datetime):
-            return self._dt - other
-        else:  # timedelta
+            result = self._dt - other._dt
+            return result
+        elif hasattr(other, "as_datetime"):
+            result = self._dt - other.as_datetime()
+            return result
+        elif isinstance(other, timedelta):
             return LocalizedDatetimeAdapter(self._dt - other)
+        else:
+            # This should never happen due to type annotation, but kept for safety
+            return NotImplemented  # type: ignore[unreachable]
 
     def __lt__(self, other: "LocalizedDatetime") -> bool:
-        if hasattr(other, "_dt"):
+        """Less than comparison."""
+        if hasattr(other, "as_datetime"):
+            return self._dt < other.as_datetime()
+        elif hasattr(other, "_dt"):
             return self._dt < other._dt  # type: ignore
-        elif isinstance(other, datetime):
-            return self._dt < other  # type: ignore
         else:
-            raise TypeError(
-                f"'<' not supported between instances of 'LocalizedDatetimeAdapter' and '{type(other).__name__}'"
-            )
+            return NotImplemented
 
     def __le__(self, other: "LocalizedDatetime") -> bool:
-        if hasattr(other, "_dt"):
+        """Less than or equal comparison."""
+        if hasattr(other, "as_datetime"):
+            return self._dt <= other.as_datetime()
+        elif hasattr(other, "_dt"):
             return self._dt <= other._dt  # type: ignore
-        elif isinstance(other, datetime):
-            return self._dt <= other  # type: ignore
         else:
-            raise TypeError(
-                f"'<=' not supported between instances of 'LocalizedDatetimeAdapter' and '{type(other).__name__}'"
-            )
+            return NotImplemented
 
     def __gt__(self, other: "LocalizedDatetime") -> bool:
-        if hasattr(other, "_dt"):
+        """Greater than comparison."""
+        if hasattr(other, "as_datetime"):
+            return self._dt > other.as_datetime()
+        elif hasattr(other, "_dt"):
             return self._dt > other._dt  # type: ignore
-        elif isinstance(other, datetime):
-            return self._dt > other  # type: ignore
         else:
-            raise TypeError(
-                f"'>' not supported between instances of 'LocalizedDatetimeAdapter' and '{type(other).__name__}'"
-            )
+            return NotImplemented
 
     def __ge__(self, other: "LocalizedDatetime") -> bool:
-        if hasattr(other, "_dt"):
+        """Greater than or equal comparison."""
+        if hasattr(other, "as_datetime"):
+            return self._dt >= other.as_datetime()
+        elif hasattr(other, "_dt"):
             return self._dt >= other._dt  # type: ignore
-        elif isinstance(other, datetime):
-            return self._dt >= other  # type: ignore
         else:
-            raise TypeError(
-                f"'>=' not supported between instances of 'LocalizedDatetimeAdapter' and '{type(other).__name__}'"
-            )
+            return NotImplemented
 
     def __eq__(self, other: object) -> bool:
+        """Equality comparison."""
         if isinstance(other, LocalizedDatetimeAdapter):
             return self._dt == other._dt
+        elif hasattr(other, "as_datetime"):
+            return self._dt == other.as_datetime()  # type: ignore
         elif isinstance(other, datetime):
             return self._dt == other
         return False
 
+    def __ne__(self, other: object) -> bool:
+        """Not equal comparison."""
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return NotImplemented
+        return not result
+
     def as_datetime(self) -> datetime:
-        """Convert to standard datetime object."""
+        """Convert to standard datetime object.
+
+        This method provides compatibility with code that requires
+        standard datetime objects.
+        """
         return self._dt
 
     @property
     def native_datetime(self) -> datetime:
-        """Get the underlying datetime object."""
+        """Get the underlying datetime object.
+
+        This property is deprecated. Use as_datetime() instead.
+        """
         return self._dt
 
 
@@ -178,7 +292,7 @@ class PythonTimeService(TimeService):
         """Get timezone information for the given timezone name."""
         try:
             if self._prefer_zoneinfo and HAS_ZONEINFO:
-                tz = ZoneInfo(timezone_name)
+                tz: Any | tzinfo = ZoneInfo(timezone_name)
             elif HAS_PYTZ:
                 tz = pytz.timezone(timezone_name)
             else:
@@ -207,7 +321,7 @@ class PythonTimeService(TimeService):
         else:
             raise RuntimeError("No timezone library available")
 
-        return LocalizedDatetimeAdapter(utc_now)
+        return LocalizedDatetimeAdapter(utc_now)  # type: ignore[return-value]  # type: ignore[return-value]
 
     def localize_naive_datetime(
         self, naive_datetime: datetime, timezone: TimezoneInfo
@@ -232,7 +346,7 @@ class PythonTimeService(TimeService):
         else:
             raise RuntimeError("No timezone library available")
 
-        return LocalizedDatetimeAdapter(localized)
+        return LocalizedDatetimeAdapter(localized)  # type: ignore[return-value]
 
     def convert_timezone(
         self, source_datetime: LocalizedDatetime, target_timezone: TimezoneInfo
@@ -243,7 +357,7 @@ class PythonTimeService(TimeService):
         elif hasattr(source_datetime, "_dt"):
             source_dt = source_datetime._dt
         else:
-            source_dt = source_datetime
+            source_dt = source_datetime  # type: ignore[assignment]
 
         if source_dt.tzinfo is None:
             raise ValueError("Source datetime must be timezone-aware")
@@ -256,7 +370,7 @@ class PythonTimeService(TimeService):
         )
         target_dt = source_dt.astimezone(tz_adapter._tz)
 
-        return LocalizedDatetimeAdapter(target_dt)
+        return LocalizedDatetimeAdapter(target_dt)  # type: ignore[return-value]
 
     def combine_date_time_timezone(
         self, date_part: date, time_part: time, timezone: TimezoneInfo
@@ -287,7 +401,7 @@ class PythonTimeService(TimeService):
         else:
             raise RuntimeError("No timezone library available")
 
-        return LocalizedDatetimeAdapter(utc_now)
+        return LocalizedDatetimeAdapter(utc_now)  # type: ignore[return-value]
 
     def to_utc(self, dt: LocalizedDatetime) -> LocalizedDatetime:
         """Convert datetime to UTC."""
@@ -305,10 +419,10 @@ class PythonTimeService(TimeService):
         else:
             raise RuntimeError("No timezone library available")
 
-        return LocalizedDatetimeAdapter(utc_dt)
+        return LocalizedDatetimeAdapter(utc_dt)  # type: ignore[return-value]
 
     def create_adapter(self, dt: datetime) -> LocalizedDatetime:
         """Create a LocalizedDatetime adapter from a standard datetime."""
         if dt.tzinfo is None:
             raise ValueError("Datetime must be timezone-aware")
-        return LocalizedDatetimeAdapter(dt)
+        return LocalizedDatetimeAdapter(dt)  # type: ignore[return-value]

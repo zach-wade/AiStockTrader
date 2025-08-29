@@ -35,6 +35,8 @@ from src.domain.entities.portfolio import Portfolio
 from src.domain.services.order_validator import OrderValidator, ValidationResult
 from src.domain.services.risk_calculator import RiskCalculator
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 # Fixtures
@@ -106,8 +108,8 @@ def sample_order():
         symbol="AAPL",
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
-        quantity=Decimal("100"),
-        limit_price=Decimal("150.00"),
+        quantity=Quantity(Decimal("100")),
+        limit_price=Price(Decimal("150.00")),
     )
     order.id = uuid4()
     order.status = OrderStatus.SUBMITTED
@@ -897,8 +899,8 @@ class TestGetOrderStatusUseCase:
         use_case = GetOrderStatusUseCase(mock_unit_of_work, mock_broker)
 
         # Setup mocks
-        sample_order.filled_quantity = Decimal("50")
-        sample_order.average_fill_price = Decimal("149.75")
+        sample_order.filled_quantity = Quantity(Decimal("50"))
+        sample_order.average_fill_price = Price(Decimal("149.75"))
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
         mock_broker.get_order_status.return_value = OrderStatus.PARTIALLY_FILLED
 
@@ -962,8 +964,8 @@ class TestGetOrderStatusUseCase:
 
         # Setup mocks
         sample_order.status = OrderStatus.SUBMITTED
-        sample_order.filled_quantity = Decimal("25")
-        sample_order.average_fill_price = Decimal("150.00")
+        sample_order.filled_quantity = Quantity(Decimal("25"))
+        sample_order.average_fill_price = Price(Decimal("150.00"))
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
         mock_broker.get_order_status.side_effect = Exception("Broker unavailable")
 

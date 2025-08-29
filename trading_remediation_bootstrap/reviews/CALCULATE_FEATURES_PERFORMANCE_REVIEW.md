@@ -1,4 +1,5 @@
 # Performance Review: calculate_features.py
+
 ## Comprehensive 11-Phase Backend Performance Analysis
 
 ---
@@ -9,7 +10,8 @@ The `calculate_features.py` module exhibits **CRITICAL** performance issues acro
 
 **Performance Grade: D- (35/100)**
 
-### Critical Issues Found:
+### Critical Issues Found
+
 - **27 High-Priority Performance Issues**
 - **18 Medium-Priority Performance Issues**
 - **12 Low-Priority Performance Issues**
@@ -21,18 +23,21 @@ The `calculate_features.py` module exhibits **CRITICAL** performance issues acro
 ### 1.1 Module Architecture Issues
 
 **CRITICAL - Line 100-138**: Sequential symbol processing without parallelization
+
 ```python
 for symbol in symbols:  # Sequential processing
     try:
         logger.info(f"Processing {symbol}...")
         market_data = await self._fetch_market_data(...)
 ```
+
 **Impact**: Processing 1000 symbols sequentially could take hours instead of minutes
 **Fix**: Implement concurrent processing with asyncio.gather() or ThreadPoolExecutor
 
 ### 1.2 Import Analysis
 
 **ISSUE - Lines 9-20**: Heavy imports loaded regardless of usage
+
 - Imports entire pandas library (Line 13)
 - Imports complete feature engine (Line 18)
 - No lazy loading pattern implemented
@@ -45,29 +50,36 @@ for symbol in symbols:  # Sequential processing
 ### 2.1 Lack of Batch Processing
 
 **CRITICAL - Line 100**: Symbol-by-symbol processing
+
 ```python
 for symbol in symbols:  # No batching
 ```
-**Performance Impact**: 
+
+**Performance Impact**:
+
 - Database connection overhead per symbol
 - No query optimization
 - Feature calculation redundancy
 
 **CRITICAL - Line 182-196**: File-by-file loading without batching
+
 ```python
 for parquet_file in date_dir.glob('*.parquet'):
     df = pd.read_parquet(parquet_file)
     all_data.append(df)
 ```
+
 **Impact**: Excessive I/O operations, no read optimization
 
 ### 2.2 Missing Batch Configuration
 
 **CRITICAL - Line 14**: No batch_size configuration despite config mention
+
 ```python
 # From config/yaml/defaults/data.yaml line 14:
 # batch_size: 100  # Not utilized in code
 ```
+
 **Impact**: Configuration exists but ignored, processing defaults to batch_size=1
 
 ### 2.3 Recommended Batch Implementation
@@ -93,6 +105,7 @@ for i in range(0, len(symbols), batch_size):
 ### 3.1 Memory Leaks & Inefficiencies
 
 **CRITICAL - Line 182-202**: Loading all data into memory
+
 ```python
 all_data = []  # Accumulates all dataframes
 for date_dir in sorted(market_data_path.iterdir()):
@@ -101,25 +114,31 @@ for date_dir in sorted(market_data_path.iterdir()):
         all_data.append(df)  # Memory accumulation
 combined_data = pd.concat(all_data, ignore_index=False)  # Large memory spike
 ```
+
 **Impact**: For 1000 symbols × 365 days × 1MB/file = 365GB potential memory usage
 
 **HIGH - Line 218, 232**: Unnecessary data copying
+
 ```python
 ].copy()  # Creates duplicate in memory
 ```
+
 **Impact**: Doubles memory usage during filtering
 
 ### 3.2 DataFrame Memory Issues
 
 **HIGH - Line 74**: Creating DataFrame copies without cleanup
+
 ```python
 processed_df = data.copy()  # UnifiedFeatureEngine line 74
 ```
+
 **Impact**: Each feature calculation creates full data copy
 
 ### 3.3 Missing Memory Management
 
 **CRITICAL**: No memory profiling or limits
+
 - No memory usage tracking
 - No garbage collection triggers
 - No memory limit checks
@@ -147,22 +166,28 @@ def check_memory_usage():
 ### 4.1 Inefficient File I/O
 
 **CRITICAL - Line 185-196**: Sequential file reading
+
 ```python
 for date_dir in sorted(market_data_path.iterdir()):
     if date_dir.is_dir() and date_dir.name.startswith('date='):
         for parquet_file in date_dir.glob('*.parquet'):
             df = pd.read_parquet(parquet_file)  # Blocking I/O
 ```
-**Impact**: 
+
+**Impact**:
+
 - No parallel file reading
 - No I/O buffering
 - File system traversal overhead
 
 **HIGH - Line 190**: No parquet read optimization
+
 ```python
 df = pd.read_parquet(parquet_file)  # Reads entire file
 ```
+
 **Should use**:
+
 ```python
 df = pd.read_parquet(parquet_file, columns=['open','high','low','close','volume'])
 ```
@@ -170,6 +195,7 @@ df = pd.read_parquet(parquet_file, columns=['open','high','low','close','volume'
 ### 4.2 Database I/O Issues
 
 **CRITICAL - Line 304-309**: Synchronous database writes in async context
+
 ```python
 success = self.feature_store.save_features(  # Blocking call in async
     symbol=symbol,
@@ -178,6 +204,7 @@ success = self.feature_store.save_features(  # Blocking call in async
     timestamp=datetime.now()
 )
 ```
+
 **Impact**: Blocks event loop, reduces throughput by 80%
 
 ### 4.3 Missing I/O Optimizations
@@ -200,8 +227,8 @@ executor = ThreadPoolExecutor(max_workers=4)
 async def read_parquet_async(file_path):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
-        executor, 
-        pd.read_parquet, 
+        executor,
+        pd.read_parquet,
         file_path,
         ['open', 'high', 'low', 'close', 'volume']
     )
@@ -214,18 +241,22 @@ async def read_parquet_async(file_path):
 ### 5.1 Complete Lack of Parallelization
 
 **CRITICAL - Line 100-138**: Sequential symbol processing
+
 ```python
 for symbol in symbols:  # Single-threaded
     market_data = await self._fetch_market_data(...)  # Waits for each
     features_df = self._calculate_features(...)  # CPU-bound, not parallel
 ```
-**Impact**: 
+
+**Impact**:
+
 - CPU utilization: ~12% (1 of 8 cores)
 - Processing time: O(n) instead of O(n/cores)
 
 ### 5.2 Unutilized Configuration
 
 **CRITICAL - Line 15 (data.yaml)**: Configured but unused parallel workers
+
 ```yaml
 parallel_workers: 4  # Never referenced in code
 ```
@@ -233,6 +264,7 @@ parallel_workers: 4  # Never referenced in code
 ### 5.3 Missing Async Patterns
 
 **HIGH - Line 278-283**: Synchronous feature calculation in async context
+
 ```python
 features_df = self.feature_engine.calculate_features(  # Blocking
     data=market_data,
@@ -254,15 +286,15 @@ class FeatureCalculationEngine:
         self.config = config or get_config()
         self.parallel_workers = self.config.get('features.calculation.parallel_workers', 4)
         self.executor = ProcessPoolExecutor(max_workers=self.parallel_workers)
-    
+
     async def run(self, feature_config: Dict[str, Any]) -> Dict[str, Any]:
         # Process symbols in parallel batches
         semaphore = asyncio.Semaphore(self.parallel_workers)
-        
+
         async def process_with_limit(symbol):
             async with semaphore:
                 return await self._process_symbol(symbol, ...)
-        
+
         tasks = [process_with_limit(symbol) for symbol in symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 ```
@@ -274,12 +306,15 @@ class FeatureCalculationEngine:
 ### 6.1 Inefficient Write Patterns
 
 **CRITICAL - Line 125-127**: Individual writes per symbol
+
 ```python
 success = await self._store_features(
     symbol, features_df, feature_sets
 )  # One transaction per symbol
 ```
-**Impact**: 
+
+**Impact**:
+
 - 1000 symbols = 1000 database transactions
 - Network overhead per write
 - No transaction batching
@@ -287,6 +322,7 @@ success = await self._store_features(
 ### 6.2 Missing Bulk Operations
 
 **CRITICAL - Line 304-309**: No bulk insert capability
+
 ```python
 success = self.feature_store.save_features(  # Single row insert
     symbol=symbol,
@@ -310,10 +346,10 @@ success = self.feature_store.save_features(  # Single row insert
 async def _store_features_bulk(self, symbol_features_map: Dict[str, pd.DataFrame]):
     """Bulk store features for multiple symbols."""
     bulk_data = []
-    
+
     for symbol, features_df in symbol_features_map.items():
         bulk_data.extend(features_df.to_dict('records'))
-    
+
     # Use bulk insert
     async with self.db_pool.acquire() as conn:
         async with conn.transaction():
@@ -330,13 +366,15 @@ async def _store_features_bulk(self, symbol_features_map: Dict[str, pd.DataFrame
 
 ### 7.1 Missing Resource Cleanup
 
-**CRITICAL - Line 35-43**: No cleanup in __init__
+**CRITICAL - Line 35-43**: No cleanup in **init**
+
 ```python
 def __init__(self, config=None):
     self.config = config or get_config()
     self.feature_engine = UnifiedFeatureEngine(self.config)  # Never cleaned up
     self.feature_store = FeatureStore(config=self.config)  # Never closed
 ```
+
 **Impact**: Resource leaks, connection pool exhaustion
 
 ### 7.2 No Context Managers
@@ -352,7 +390,7 @@ class FeatureCalculationEngine:
     async def __aenter__(self):
         self.db_pool = await create_pool(...)
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.db_pool:
             await self.db_pool.close()
@@ -367,9 +405,11 @@ class FeatureCalculationEngine:
 ### 8.1 Cache Misconfiguration
 
 **CRITICAL - Line 282**: Cache explicitly disabled
+
 ```python
 use_cache=False  # Forces recalculation every time
 ```
+
 **Impact**: 10-100x slower for repeated calculations
 
 ### 8.2 Missing Cache Layers
@@ -388,19 +428,19 @@ class FeatureCalculationEngine:
     def __init__(self):
         self.feature_cache = {}
         self.cache_ttl = self.config.get('features.global.cache_ttl', 3600)
-    
+
     def _get_cache_key(self, symbol: str, start_date: datetime, end_date: datetime):
         key_str = f"{symbol}_{start_date}_{end_date}"
         return hashlib.md5(key_str.encode()).hexdigest()
-    
+
     async def _fetch_market_data_with_cache(self, symbol: str, start_date: datetime, end_date: datetime):
         cache_key = self._get_cache_key(symbol, start_date, end_date)
-        
+
         if cache_key in self.feature_cache:
             cache_time, data = self.feature_cache[cache_key]
             if time.time() - cache_time < self.cache_ttl:
                 return data
-        
+
         data = await self._fetch_market_data(symbol, start_date, end_date)
         self.feature_cache[cache_key] = (time.time(), data)
         return data
@@ -413,11 +453,13 @@ class FeatureCalculationEngine:
 ### 9.1 Poor Error Handling
 
 **HIGH - Line 136-138**: Generic exception catching
+
 ```python
 except Exception as e:
     logger.error(f"Error processing {symbol}: {e}")
     results['errors'].append(f"{symbol}: {str(e)}")
 ```
+
 **Impact**: Loses error context, no recovery mechanism
 
 ### 9.2 Missing Retry Logic
@@ -453,6 +495,7 @@ async def _fetch_market_data_with_retry(self, symbol: str, ...):
 ### 10.1 No Performance Monitoring
 
 **CRITICAL**: Complete absence of performance metrics
+
 - No timing measurements
 - No throughput tracking
 - No resource usage monitoring
@@ -504,6 +547,7 @@ class FeatureCalculationEngine:
 ### 11.1 Scalability Issues
 
 **CRITICAL**: Not horizontally scalable
+
 - No distributed processing support
 - No queue-based architecture
 - No load balancing
@@ -522,22 +566,22 @@ class ProductionFeatureEngine:
     def __init__(self):
         self.shutdown_event = asyncio.Event()
         self.active_tasks = set()
-        
+
     async def graceful_shutdown(self):
         """Gracefully shutdown all operations."""
         self.shutdown_event.set()
-        
+
         # Wait for active tasks
         if self.active_tasks:
             await asyncio.gather(*self.active_tasks, return_exceptions=True)
-        
+
         # Cleanup resources
         await self.cleanup_resources()
-    
+
     async def run_with_rate_limit(self, feature_config):
         """Run with rate limiting and backpressure."""
         rate_limiter = asyncio.Semaphore(10)  # Max 10 concurrent operations
-        
+
         async with rate_limiter:
             task = asyncio.create_task(self.run(feature_config))
             self.active_tasks.add(task)
@@ -552,24 +596,28 @@ class ProductionFeatureEngine:
 ## Performance Improvement Roadmap
 
 ### Immediate Actions (Week 1)
+
 1. **Line 100**: Implement parallel symbol processing
-2. **Line 282**: Enable caching 
+2. **Line 282**: Enable caching
 3. **Line 190**: Optimize parquet reading with column selection
 4. **Line 202**: Implement chunked data loading
 
 ### Short-term (Week 2-3)
+
 1. Implement bulk database writes
 2. Add connection pooling
 3. Implement retry logic with exponential backoff
 4. Add basic performance monitoring
 
 ### Medium-term (Month 1-2)
+
 1. Implement distributed processing with Celery/Ray
 2. Add comprehensive caching layer
 3. Implement async I/O throughout
 4. Add production monitoring and alerting
 
 ### Long-term (Quarter)
+
 1. Redesign for horizontal scalability
 2. Implement event-driven architecture
 3. Add machine learning-based optimization
@@ -580,6 +628,7 @@ class ProductionFeatureEngine:
 ## Estimated Performance Improvements
 
 ### Current Performance Baseline
+
 - **Symbol Processing**: 1 symbol/second
 - **Memory Usage**: 2GB per 100 symbols
 - **CPU Utilization**: 12% (1 core)
@@ -587,6 +636,7 @@ class ProductionFeatureEngine:
 - **Database Writes**: 10 records/second
 
 ### Expected After Optimization
+
 - **Symbol Processing**: 50-100 symbols/second (50-100x improvement)
 - **Memory Usage**: 500MB per 100 symbols (75% reduction)
 - **CPU Utilization**: 80% (8 cores)
@@ -598,12 +648,14 @@ class ProductionFeatureEngine:
 ## Code Quality Metrics
 
 ### Complexity Analysis
+
 - **Cyclomatic Complexity**: 18 (High - should be <10)
 - **Cognitive Complexity**: 24 (Very High - should be <15)
 - **Lines of Code**: 336 (Acceptable)
 - **Number of Dependencies**: 12 (High)
 
 ### Performance Anti-patterns Found
+
 1. Sequential processing in async context
 2. Blocking I/O in event loop
 3. Memory accumulation without bounds
@@ -628,6 +680,7 @@ The `calculate_features.py` module requires **IMMEDIATE** and **EXTENSIVE** perf
 ## Appendix: Detailed Line-by-Line Issues
 
 ### Critical Performance Issues (Lines)
+
 - **100-138**: Sequential symbol processing loop
 - **182-202**: Memory-intensive data loading
 - **190**: Unoptimized parquet reading
@@ -636,6 +689,7 @@ The `calculate_features.py` module requires **IMMEDIATE** and **EXTENSIVE** perf
 - **304-309**: Individual database writes
 
 ### High Priority Issues (Lines)
+
 - **35-43**: No resource cleanup
 - **74**: Unnecessary DataFrame copies
 - **125-127**: No bulk operations
@@ -644,6 +698,7 @@ The `calculate_features.py` module requires **IMMEDIATE** and **EXTENSIVE** perf
 - **218, 232**: Redundant copy operations
 
 ### Medium Priority Issues (Lines)
+
 - **9-20**: Heavy imports
 - **62-66**: No input validation
 - **111, 121, 134**: String concatenation in errors
@@ -652,6 +707,7 @@ The `calculate_features.py` module requires **IMMEDIATE** and **EXTENSIVE** perf
 - **325**: Late import
 
 ### Configuration Gaps
+
 - **data.yaml:14**: batch_size: 100 (unused)
 - **data.yaml:15**: parallel_workers: 4 (unused)
 - **data.yaml:16**: timeout_seconds: 300 (unused)

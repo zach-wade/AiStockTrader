@@ -5,7 +5,7 @@ Tests all market hours determination, status checking, and calendar logic.
 """
 
 from datetime import date, datetime, time, timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 import pytz
@@ -19,7 +19,97 @@ class TestMarketHoursService:
     @pytest.fixture
     def service(self):
         """Create a MarketHoursService instance."""
-        return MarketHoursService()
+        time_service_mock = Mock()
+        # Set a default return value for get_current_time to avoid Mock issues
+        time_service_mock.get_current_time.return_value = datetime.now(
+            pytz.timezone("America/New_York")
+        )
+        # Mock get_timezone to return the actual timezone string (MarketHoursService uses it as timezone identifier)
+        time_service_mock.get_timezone.return_value = "America/New_York"
+        # Mock format_datetime to return date strings for holiday checking
+        time_service_mock.format_datetime.side_effect = lambda dt, fmt: (
+            dt.strftime(fmt) if hasattr(dt, "strftime") else dt.as_datetime().strftime(fmt)
+        )
+        # Mock is_timezone_aware
+        time_service_mock.is_timezone_aware.side_effect = (
+            lambda dt: hasattr(dt, "tzinfo") and dt.tzinfo is not None
+        )
+        # Mock localize_naive_datetime
+        time_service_mock.localize_naive_datetime.side_effect = lambda dt, tz: pytz.timezone(
+            tz if isinstance(tz, str) else "America/New_York"
+        ).localize(dt)
+
+        # Mock create_adapter to return a properly functioning adapter
+        class MockAdapter:
+            def __init__(self, dt):
+                self._dt = dt
+
+            def as_datetime(self):
+                return self._dt
+
+            def time(self):
+                return self._dt.time()
+
+            def weekday(self):
+                return self._dt.weekday()
+
+            def strftime(self, fmt):
+                return self._dt.strftime(fmt)
+
+            def replace(self, **kwargs):
+                return MockAdapter(self._dt.replace(**kwargs))
+
+            def __gt__(self, other):
+                if hasattr(other, "as_datetime"):
+                    return self._dt > other.as_datetime()
+                return self._dt > other
+
+            def __lt__(self, other):
+                if hasattr(other, "as_datetime"):
+                    return self._dt < other.as_datetime()
+                return self._dt < other
+
+            def __ge__(self, other):
+                if hasattr(other, "as_datetime"):
+                    return self._dt >= other.as_datetime()
+                return self._dt >= other
+
+            def __le__(self, other):
+                if hasattr(other, "as_datetime"):
+                    return self._dt <= other.as_datetime()
+                return self._dt <= other
+
+            def __sub__(self, other):
+                if hasattr(other, "as_datetime"):
+                    return self._dt - other.as_datetime()
+                return self._dt - other
+
+            def __add__(self, other):
+                return MockAdapter(self._dt + other)
+
+            def __radd__(self, other):
+                return MockAdapter(other + self._dt)
+
+        time_service_mock.create_adapter.side_effect = lambda dt: MockAdapter(dt)
+
+        # Mock convert_timezone to properly convert timezones
+        def mock_convert_tz(dt, tz):
+            if hasattr(dt, "as_datetime"):
+                dt = dt.as_datetime()
+            # Convert to the target timezone
+            if hasattr(dt, "tzinfo") and dt.tzinfo:
+                # Convert aware datetime to target timezone
+                target_tz = pytz.timezone(tz if isinstance(tz, str) else "America/New_York")
+                converted = dt.astimezone(target_tz)
+                return MockAdapter(converted)
+            return MockAdapter(dt)
+
+        time_service_mock.convert_timezone.side_effect = mock_convert_tz
+        # Mock combine_date_time_timezone - tz here is the self.timezone which is a string now
+        time_service_mock.combine_date_time_timezone.side_effect = lambda d, t, tz: pytz.timezone(
+            tz if isinstance(tz, str) else "America/New_York"
+        ).localize(datetime.combine(d, t))
+        return MarketHoursService(time_service=time_service_mock)
 
     @pytest.fixture
     def eastern_tz(self):
@@ -31,6 +121,7 @@ class TestMarketHoursService:
     def test_market_status_regular_open(self, service, eastern_tz):
         """Test market status during regular trading hours."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 9, 30))  # Tuesday 9:30 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -40,6 +131,7 @@ class TestMarketHoursService:
     def test_market_status_regular_open_end(self, service, eastern_tz):
         """Test market status just before close."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 15, 59, 59))  # Tuesday 3:59:59 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -49,6 +141,7 @@ class TestMarketHoursService:
     def test_market_status_after_market_start(self, service, eastern_tz):
         """Test market status at after-market open."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 16, 0))  # Tuesday 4:00 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -58,6 +151,7 @@ class TestMarketHoursService:
     def test_market_status_pre_market_start(self, service, eastern_tz):
         """Test market status at pre-market open."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 4, 0))  # Tuesday 4:00 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -67,6 +161,7 @@ class TestMarketHoursService:
     def test_market_status_pre_market_end(self, service, eastern_tz):
         """Test market status just before regular open."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 9, 29, 59))  # Tuesday 9:29:59 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -76,6 +171,7 @@ class TestMarketHoursService:
     def test_market_status_after_market_close(self, service, eastern_tz):
         """Test market status at after-market close."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 20, 0))  # Tuesday 8:00 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -85,6 +181,7 @@ class TestMarketHoursService:
     def test_market_status_before_pre_market(self, service, eastern_tz):
         """Test market status before pre-market."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 3, 59, 59))  # Tuesday 3:59:59 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -94,6 +191,7 @@ class TestMarketHoursService:
     def test_market_status_weekend(self, service, eastern_tz):
         """Test market status on weekend."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 13, 12, 0))  # Saturday noon ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -103,6 +201,7 @@ class TestMarketHoursService:
     def test_market_status_holiday(self, service, eastern_tz):
         """Test market status on holiday."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 1, 12, 0))  # New Year's Day
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -138,6 +237,7 @@ class TestMarketHoursService:
     def test_is_market_open_true(self, service, eastern_tz):
         """Test is_market_open during regular hours."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 10, 0))  # Tuesday 10:00 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -146,6 +246,7 @@ class TestMarketHoursService:
     def test_is_market_open_false(self, service, eastern_tz):
         """Test is_market_open when closed."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 3, 0))  # Tuesday 3:00 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -156,6 +257,7 @@ class TestMarketHoursService:
         mock_dt = eastern_tz.localize(
             datetime(2024, 1, 16, 5, 0)
         )  # Tuesday 5:00 AM ET (pre-market)
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -167,6 +269,7 @@ class TestMarketHoursService:
         mock_dt = eastern_tz.localize(
             datetime(2024, 1, 16, 17, 0)
         )  # Tuesday 5:00 PM ET (after-market)
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -334,6 +437,7 @@ class TestMarketHoursService:
     def test_time_until_market_open_same_day(self, service, eastern_tz):
         """Test time until market open on same day."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 9, 0))  # Tuesday 9:00 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -346,6 +450,7 @@ class TestMarketHoursService:
         mock_dt = eastern_tz.localize(
             datetime(2024, 1, 16, 10, 0)
         )  # Tuesday 10:00 AM ET (market open)
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -355,6 +460,7 @@ class TestMarketHoursService:
     def test_time_until_market_open_weekend(self, service, eastern_tz):
         """Test time until market open from weekend."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 14, 20, 0))  # Sunday 8:00 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -367,6 +473,7 @@ class TestMarketHoursService:
     def test_time_until_market_open_after_close(self, service, eastern_tz):
         """Test time until market open after market close."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 17, 0))  # Tuesday 5:00 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -381,6 +488,7 @@ class TestMarketHoursService:
     def test_time_until_market_close_during_market(self, service, eastern_tz):
         """Test time until market close during trading hours."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 15, 0))  # Tuesday 3:00 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -391,6 +499,7 @@ class TestMarketHoursService:
     def test_time_until_market_close_at_open(self, service, eastern_tz):
         """Test time until market close at market open."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 9, 30))  # Tuesday 9:30 AM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -401,6 +510,7 @@ class TestMarketHoursService:
     def test_time_until_market_close_after_hours(self, service, eastern_tz):
         """Test time until market close when market is closed."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 16, 17, 0))  # Tuesday 5:00 PM ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -410,6 +520,7 @@ class TestMarketHoursService:
     def test_time_until_market_close_weekend(self, service, eastern_tz):
         """Test time until market close on weekend."""
         mock_dt = eastern_tz.localize(datetime(2024, 1, 14, 12, 0))  # Sunday noon ET
+        service._time_service.get_current_time.return_value = mock_dt
         with patch("src.domain.services.market_hours_service.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_dt
             mock_datetime.combine = datetime.combine
@@ -423,7 +534,7 @@ class TestMarketHoursService:
         start = date(2024, 1, 16)  # Tuesday
         end = date(2024, 1, 19)  # Friday
         days = service.get_trading_days_between(start, end)
-        assert len(days) == 5
+        assert len(days) == 4  # Tuesday, Wednesday, Thursday, Friday
         assert days[0] == start
         assert days[-1] == end
 
@@ -432,9 +543,10 @@ class TestMarketHoursService:
         start = date(2024, 1, 12)  # Friday
         end = date(2024, 1, 16)  # Tuesday
         days = service.get_trading_days_between(start, end)
-        assert len(days) == 3  # Friday, Tuesday, Tuesday
+        assert len(days) == 2  # Friday, Tuesday (Monday is MLK Day)
         assert date(2024, 1, 13) not in days  # Saturday
         assert date(2024, 1, 14) not in days  # Sunday
+        assert date(2024, 1, 15) not in days  # Monday (MLK Day)
 
     def test_get_trading_days_between_across_holiday(self, service):
         """Test getting trading days across holiday."""
@@ -496,12 +608,31 @@ class TestMarketHoursService:
     def test_custom_holidays(self):
         """Test MarketHoursService with custom holidays."""
         custom_holidays = {
-            date(2024, 1, 1),  # New Year's
-            date(2024, 12, 25),  # Christmas
-            date(2024, 8, 15),  # Custom holiday
+            "2024-01-01",  # New Year's
+            "2024-12-25",  # Christmas
+            "2024-08-15",  # Custom holiday
         }
 
-        service = MarketHoursService(holidays=custom_holidays)
+        time_service_mock = Mock()
+        time_service_mock.get_current_time.return_value = datetime.now(
+            pytz.timezone("America/New_York")
+        )
+        time_service_mock.get_timezone.return_value = "America/New_York"
+        time_service_mock.format_datetime.side_effect = lambda dt, fmt: (
+            dt.strftime(fmt) if hasattr(dt, "strftime") else dt.as_datetime().strftime(fmt)
+        )
+        time_service_mock.is_timezone_aware.side_effect = (
+            lambda dt: hasattr(dt, "tzinfo") and dt.tzinfo is not None
+        )
+        time_service_mock.localize_naive_datetime.side_effect = lambda dt, tz: pytz.timezone(
+            tz if isinstance(tz, str) else "America/New_York"
+        ).localize(dt)
+        time_service_mock.create_adapter.side_effect = lambda dt: dt
+        time_service_mock.convert_timezone.side_effect = lambda dt, tz: dt
+        time_service_mock.combine_date_time_timezone.side_effect = lambda d, t, tz: pytz.timezone(
+            tz if isinstance(tz, str) else "America/New_York"
+        ).localize(datetime.combine(d, t))
+        service = MarketHoursService(time_service=time_service_mock, holidays=custom_holidays)
 
         assert service.is_holiday(date(2024, 1, 1)) is True
         assert service.is_holiday(date(2024, 12, 25)) is True
@@ -513,10 +644,27 @@ class TestMarketHoursService:
     def test_custom_timezone(self):
         """Test MarketHoursService with custom timezone."""
         london_tz = "Europe/London"
-        service = MarketHoursService(timezone=london_tz)
+        time_service_mock = Mock()
+        time_service_mock.get_current_time.return_value = datetime.now(pytz.timezone(london_tz))
+        time_service_mock.get_timezone.return_value = london_tz
+        time_service_mock.format_datetime.side_effect = lambda dt, fmt: (
+            dt.strftime(fmt) if hasattr(dt, "strftime") else dt.as_datetime().strftime(fmt)
+        )
+        time_service_mock.is_timezone_aware.side_effect = (
+            lambda dt: hasattr(dt, "tzinfo") and dt.tzinfo is not None
+        )
+        time_service_mock.localize_naive_datetime.side_effect = lambda dt, tz: pytz.timezone(
+            tz if isinstance(tz, str) else london_tz
+        ).localize(dt)
+        time_service_mock.create_adapter.side_effect = lambda dt: dt
+        time_service_mock.convert_timezone.side_effect = lambda dt, tz: dt
+        time_service_mock.combine_date_time_timezone.side_effect = lambda d, t, tz: pytz.timezone(
+            tz if isinstance(tz, str) else london_tz
+        ).localize(datetime.combine(d, t))
+        service = MarketHoursService(time_service=time_service_mock, timezone=london_tz)
 
         # Service should still work with different timezone
-        assert london_tz == service.DEFAULT_TIMEZONE
+        assert london_tz == service.timezone_str
 
         # Check that timezone is properly used
         london = pytz.timezone(london_tz)
@@ -554,7 +702,7 @@ class TestMarketHoursService:
 
     def test_market_status_boundary_conditions(self, service, eastern_tz):
         """Test market status at exact boundary times."""
-        trading_day = date(2024, 1, 15)
+        trading_day = date(2024, 1, 16)  # Tuesday (not a holiday)
 
         # Exactly at pre-market open (4:00:00 AM)
         dt = eastern_tz.localize(datetime.combine(trading_day, time(4, 0, 0)))

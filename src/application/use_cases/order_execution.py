@@ -9,7 +9,6 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
 from uuid import UUID, uuid4
 
 from src.application.interfaces.unit_of_work import IUnitOfWork
@@ -17,32 +16,24 @@ from src.domain.entities.order import OrderSide, OrderType
 from src.domain.services.commission_calculator import ICommissionCalculator
 from src.domain.services.market_microstructure import IMarketMicrostructure
 from src.domain.services.order_processor import FillDetails, OrderProcessor
+from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
 from src.domain.value_objects.quantity import Quantity
 
 from .base import TransactionalUseCase, UseCaseResponse
+from .base_request import BaseRequestDTO
 
 
 # Request/Response DTOs
 @dataclass
-class ProcessOrderFillRequest:
+class ProcessOrderFillRequest(BaseRequestDTO):
     """Request to process an order fill."""
 
     order_id: UUID
     fill_price: Decimal
     fill_quantity: int | None = None  # None means fill entire order
     timestamp: datetime | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -57,22 +48,12 @@ class ProcessOrderFillResponse(UseCaseResponse):
 
 
 @dataclass
-class SimulateOrderExecutionRequest:
+class SimulateOrderExecutionRequest(BaseRequestDTO):
     """Request to simulate order execution with market impact."""
 
     order_id: UUID
     market_price: Decimal
     available_liquidity: Decimal | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -86,23 +67,13 @@ class SimulateOrderExecutionResponse(UseCaseResponse):
 
 
 @dataclass
-class CalculateCommissionRequest:
+class CalculateCommissionRequest(BaseRequestDTO):
     """Request to calculate commission for a trade."""
 
     quantity: int
     price: Decimal
     order_type: str
     symbol: str | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -176,7 +147,8 @@ class ProcessOrderFillUseCase(
         # Determine fill quantity
         remaining_quantity = order.get_remaining_quantity()
         fill_quantity = min(
-            request.fill_quantity or remaining_quantity.value, remaining_quantity.value
+            request.fill_quantity or ValueObjectConverter.extract_value(remaining_quantity),
+            ValueObjectConverter.extract_value(remaining_quantity),
         )
 
         if fill_quantity <= 0:
@@ -195,9 +167,8 @@ class ProcessOrderFillUseCase(
         try:
             # Update order with fill
             order.fill(
-                fill_quantity=Quantity(fill_quantity),
+                filled_quantity=Quantity(fill_quantity),
                 fill_price=Price(request.fill_price),
-                commission=commission,
                 timestamp=fill_timestamp,
             )
 
@@ -224,8 +195,8 @@ class ProcessOrderFillUseCase(
                 success=True,
                 filled=True,
                 fill_price=request.fill_price,
-                fill_quantity=fill_quantity,
-                commission=commission.amount,
+                fill_quantity=int(fill_quantity) if fill_quantity is not None else None,
+                commission=ValueObjectConverter.extract_amount(commission),
                 position_id=None,  # Position ID would require looking up from portfolio
                 request_id=request.request_id,
             )
@@ -293,9 +264,13 @@ class SimulateOrderExecutionUseCase(
         # Calculate slippage
         if order.order_type == OrderType.MARKET:
             if order.side == OrderSide.BUY:
-                slippage = execution_price.value - request.market_price
+                slippage = (
+                    ValueObjectConverter.extract_value(execution_price) - request.market_price
+                )
             else:
-                slippage = request.market_price - execution_price.value
+                slippage = request.market_price - ValueObjectConverter.extract_value(
+                    execution_price
+                )
         else:
             slippage = Decimal("0")
 
@@ -308,15 +283,16 @@ class SimulateOrderExecutionUseCase(
 
         # Estimate commission
         commission = self.commission_calculator.calculate(
-            quantity=order.quantity, price=Money(execution_price.value)
+            quantity=order.quantity,
+            price=Money(ValueObjectConverter.extract_value(execution_price)),
         )
 
         return SimulateOrderExecutionResponse(
             success=True,
-            execution_price=execution_price.value,
+            execution_price=ValueObjectConverter.extract_value(execution_price),
             slippage=slippage,
             market_impact=market_impact,
-            estimated_commission=commission.amount,
+            estimated_commission=ValueObjectConverter.extract_amount(commission),
             request_id=request.request_id,
         )
 
@@ -349,7 +325,7 @@ class CalculateCommissionUseCase:
 
             return CalculateCommissionResponse(
                 success=True,
-                commission=commission.amount,
+                commission=ValueObjectConverter.extract_amount(commission),
                 commission_rate=rate,
                 request_id=request.request_id,
             )

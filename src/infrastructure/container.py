@@ -37,7 +37,6 @@ from src.application.use_cases import (
     UpdatePortfolioUseCase,
     ValidateOrderRiskUseCase,
 )
-from src.domain.interfaces.time_service import TimeService
 from src.domain.services import (
     ICommissionCalculator,
     IMarketMicrostructure,
@@ -160,11 +159,11 @@ class DIContainer:
     def _register_domain_services(self) -> None:
         """Register domain services."""
         # Register TimeService first as it's needed by other services
-        self._register_singleton(TimeService, lambda: PythonTimeService())
+        self._register_singleton(PythonTimeService, lambda: PythonTimeService())
 
         # Register MarketHoursService with time service dependency
         self._register_singleton(
-            MarketHoursService, lambda: MarketHoursService(self.get(TimeService))
+            MarketHoursService, lambda: MarketHoursService(self.get(PythonTimeService))
         )
 
         # Create all domain services
@@ -184,7 +183,9 @@ class DIContainer:
         self._register_singleton(OrderValidator, lambda: services["order_validator"])
 
         # Register TradingCalendar with time service dependency (override factory version)
-        self._register_singleton(TradingCalendar, lambda: TradingCalendar(self.get(TimeService)))
+        self._register_singleton(
+            TradingCalendar, lambda: TradingCalendar(self.get(PythonTimeService))
+        )
 
         self._register_singleton(DomainValidator, lambda: services["domain_validator"])
 
@@ -215,8 +216,8 @@ class DIContainer:
             lambda: GetMarketDataUseCase(
                 unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
                 market_data_provider=(
-                    self.get(IMarketDataProvider) if self.has(IMarketDataProvider) else None
-                ),  # type: ignore[type-abstract]
+                    self.get(IMarketDataProvider) if self.has(IMarketDataProvider) else None  # type: ignore[type-abstract]
+                ),
             ),
         )
         self._register_factory(
@@ -224,8 +225,8 @@ class DIContainer:
             lambda: GetLatestPriceUseCase(
                 unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
                 market_data_provider=(
-                    self.get(IMarketDataProvider) if self.has(IMarketDataProvider) else None
-                ),  # type: ignore[type-abstract]
+                    self.get(IMarketDataProvider) if self.has(IMarketDataProvider) else None  # type: ignore[type-abstract]
+                ),
             ),
         )
         self._register_factory(

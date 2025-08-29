@@ -409,12 +409,19 @@ class JWTService:
         except jwt.InvalidTokenError as e:
             raise InvalidTokenException(f"Invalid refresh token: {e!s}")
 
-    def rotate_refresh_token(self, old_token: str) -> tuple[str, str]:
+    def rotate_refresh_token(
+        self,
+        old_token: str,
+        user_details: dict[str, Any] | None = None,
+    ) -> tuple[str, str]:
         """
         Rotate refresh token and generate new access token.
 
         Args:
             old_token: Current refresh token
+            user_details: Optional user details for creating access token.
+                         Should contain email, username, roles, permissions.
+                         If not provided, minimal access token will be created.
 
         Returns:
             Tuple of (new_access_token, new_refresh_token)
@@ -436,17 +443,30 @@ class JWTService:
             user_id=user_id, session_id=session_id, device_id=device_id, token_family=token_family
         )
 
-        # Get user details for access token (would come from database in production)
-        # For now, we'll create a minimal access token
+        # Get user details for access token
+        if user_details:
+            email = user_details.get("email", "")
+            username = user_details.get("username", "")
+            roles = user_details.get("roles", [])
+            permissions = user_details.get("permissions", [])
+            mfa_verified = user_details.get("mfa_verified", False)
+        else:
+            # Fallback to minimal token if user details not provided
+            email = ""
+            username = ""
+            roles = []
+            permissions = []
+            mfa_verified = False
+
         new_access_token = self.create_access_token(
             user_id=user_id,
-            email=payload.get("email", ""),
-            username=payload.get("username", ""),
-            roles=payload.get("roles", []),
-            permissions=payload.get("permissions", []),
+            email=email,
+            username=username,
+            roles=roles,
+            permissions=permissions,
             session_id=session_id,
             device_id=device_id,
-            mfa_verified=payload.get("mfa_verified", False),
+            mfa_verified=mfa_verified,
         )
 
         return new_access_token, new_refresh_token

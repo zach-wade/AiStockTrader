@@ -201,9 +201,7 @@ class OrderProcessor:
         order = fill_details.order
 
         # Update the order with fill information
-        order.fill(
-            fill_details.fill_quantity.value, fill_details.fill_price.value, fill_details.timestamp
-        )
+        order.fill(fill_details.fill_quantity, fill_details.fill_price, fill_details.timestamp)
 
         # Process position updates based on order side
         is_buy = order.side == OrderSide.BUY
@@ -275,7 +273,7 @@ class OrderProcessor:
             )
         elif self._is_same_direction(position, is_buy):
             # Add to existing position in same direction
-            position.add_to_position(abs(signed_quantity), price.value, commission.amount)
+            position.add_to_position(Quantity(abs(signed_quantity)), price, commission)
         else:
             # Handle position reversal (long to short or short to long)
             await self._handle_position_reversal(
@@ -354,11 +352,11 @@ class OrderProcessor:
             Commission splitting ensures accurate P&L tracking for both the
             closing and creation portions of the reversal.
         """
-        current_position_size = abs(position.quantity)
+        current_position_size = abs(position.quantity.value)
 
         if current_position_size >= quantity.value:
             # Just reducing the position, not reversing
-            position.reduce_position(quantity.value, price.value, commission.amount)
+            position.reduce_position(quantity, price, commission)
         else:
             # Close current position and create opposite position
             remaining_quantity = quantity.value - current_position_size
@@ -372,7 +370,7 @@ class OrderProcessor:
             )
 
             # First close the current position
-            position.reduce_position(current_position_size, price.value, close_commission.amount)
+            position.reduce_position(Quantity(current_position_size), price, close_commission)
 
             # Then create new position in opposite direction
             signed_remaining = remaining_quantity if is_buy else -remaining_quantity
@@ -457,9 +455,9 @@ class OrderProcessor:
         """
         request = PositionRequest(
             symbol=symbol,
-            quantity=quantity.value,
-            entry_price=price.value,
-            commission=commission.amount,
+            quantity=quantity,
+            entry_price=price,
+            commission=commission,
         )
         portfolio.open_position(request)
 
@@ -521,9 +519,9 @@ class OrderProcessor:
             if price_favorable:
                 # Execute at limit price or better
                 optimal_price = (
-                    min(market_price.value, order.limit_price)
+                    min(market_price.value, order.limit_price.value)
                     if is_buy
-                    else max(market_price.value, order.limit_price)
+                    else max(market_price.value, order.limit_price.value)
                 )
                 return Price(optimal_price)
 

@@ -85,7 +85,7 @@ class TestValueObject:
     def test_initialization(self):
         """Test value object initialization."""
         vo = ConcreteValueObject(42, "test")
-        assert vo == 42
+        assert vo.value == 42
         assert vo.name == "test"
 
     def test_equality(self):
@@ -164,8 +164,8 @@ class TestValueObject:
         vo1 = ConcreteValueObject(42, "test1")
         vo2 = ConcreteValueObject(100, "test2")
 
-        assert vo1 == 42
-        assert vo2 == 100
+        assert vo1.value == 42
+        assert vo2.value == 100
         assert vo1.name == "test1"
         assert vo2.name == "test2"
 
@@ -180,7 +180,7 @@ class TestComparableValueObject:
     def test_initialization(self):
         """Test comparable value object initialization."""
         cvo = ConcreteComparableValueObject(42)
-        assert cvo == 42
+        assert cvo.value == 42
 
     def test_equality(self):
         """Test comparable value object equality."""
@@ -255,11 +255,11 @@ class TestComparableValueObject:
 
         sorted_values = sorted(values)
 
-        assert sorted_values[0] == 10
-        assert sorted_values[1] == 15
-        assert sorted_values[2] == 20
-        assert sorted_values[3] == 25
-        assert sorted_values[4] == 30
+        assert sorted_values[0].value == 10
+        assert sorted_values[1].value == 15
+        assert sorted_values[2].value == 20
+        assert sorted_values[3].value == 25
+        assert sorted_values[4].value == 30
 
     def test_min_max(self):
         """Test min/max operations on comparable value objects."""
@@ -269,8 +269,8 @@ class TestComparableValueObject:
             ConcreteComparableValueObject(20),
         ]
 
-        assert min(values) == 10
-        assert max(values) == 30
+        assert min(values).value == 10
+        assert max(values).value == 30
 
     def test_hashability(self):
         """Test comparable value object hashability."""

@@ -92,7 +92,7 @@ class EventBuffer:
     def __init__(self, max_size: int = 10000, flush_interval: float = 30.0) -> None:
         self.max_size = max_size
         self.flush_interval = flush_interval
-        self._buffer = deque(maxlen=max_size)
+        self._buffer: deque[ObservabilityEvent] = deque(maxlen=max_size)
         self._lock = threading.Lock()
         self._flush_callbacks: list[Callable[[list[ObservabilityEvent]], None]] = []
         self._last_flush_time = time.time()
@@ -177,12 +177,12 @@ class ObservabilityCollector:
         self._exporters: list[Callable[[list[ObservabilityEvent]], None]] = []
 
         # Background tasks
-        self._export_task: asyncio.Task | None = None
-        self._collection_task: asyncio.Task | None = None
+        self._export_task: asyncio.Task[None] | None = None
+        self._collection_task: asyncio.Task[None] | None = None
         self._stop_background_tasks = False
 
         # Event aggregation
-        self._event_aggregates = defaultdict(lambda: defaultdict(int))
+        self._event_aggregates: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self._last_aggregate_reset = time.time()
 
         # Setup event buffer callback
@@ -197,7 +197,7 @@ class ObservabilityCollector:
         order_id: str,
         symbol: str,
         duration_ms: float | None = None,
-        **context,
+        **context: Any,
     ) -> None:
         """Collect order-related event."""
         event = ObservabilityEvent(
@@ -221,7 +221,7 @@ class ObservabilityCollector:
         status: str,
         symbol: str,
         duration_ms: float | None = None,
-        **context,
+        **context: Any,
     ) -> None:
         """Collect market data event."""
         event = ObservabilityEvent(
@@ -244,7 +244,7 @@ class ObservabilityCollector:
         status: str,
         portfolio_id: str | None = None,
         duration_ms: float | None = None,
-        **context,
+        **context: Any,
     ) -> None:
         """Collect risk calculation event."""
         event = ObservabilityEvent(
@@ -267,7 +267,7 @@ class ObservabilityCollector:
         status: str,
         portfolio_id: str,
         duration_ms: float | None = None,
-        **context,
+        **context: Any,
     ) -> None:
         """Collect portfolio management event."""
         event = ObservabilityEvent(
@@ -285,7 +285,7 @@ class ObservabilityCollector:
         self._collect_event(event)
 
     def collect_system_event(
-        self, operation: str, status: str, duration_ms: float | None = None, **context
+        self, operation: str, status: str, duration_ms: float | None = None, **context: Any
     ) -> None:
         """Collect system-level event."""
         event = ObservabilityEvent(
@@ -307,7 +307,7 @@ class ObservabilityCollector:
         operation: str,
         error: Exception,
         duration_ms: float | None = None,
-        **context,
+        **context: Any,
     ) -> None:
         """Collect error event."""
         event = ObservabilityEvent(
@@ -361,8 +361,8 @@ class ObservabilityCollector:
         self._event_aggregates[key]["total"] += 1
 
         if event.duration_ms:
-            self._event_aggregates[key]["total_duration"] += event.duration_ms
-            self._event_aggregates[key]["avg_duration"] = (
+            self._event_aggregates[key]["total_duration"] += int(event.duration_ms)
+            self._event_aggregates[key]["avg_duration"] = int(
                 self._event_aggregates[key]["total_duration"] / self._event_aggregates[key]["total"]
             )
 
@@ -527,7 +527,7 @@ class ObservabilityCollector:
     def create_trading_span_hook(self) -> Callable[..., Any]:
         """Create hook for trading span events."""
 
-        def span_hook(span_data) -> None:
+        def span_hook(span_data: Any) -> None:
             """Hook function for span events."""
             try:
                 # Extract trading attributes from span

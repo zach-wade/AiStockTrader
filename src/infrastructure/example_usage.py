@@ -16,6 +16,9 @@ from typing import Any
 from src.domain.entities.order import Order, OrderRequest, OrderSide
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
+from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 from src.infrastructure.database import (
     ConnectionFactory,
     DatabaseConfig,
@@ -74,9 +77,9 @@ async def example_trading_workflow() -> None:
         """Create a new trading portfolio."""
         portfolio = Portfolio(
             name="Example Trading Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("100000"),
-            max_position_size=Decimal("10000"),
+            initial_capital=Money("100000"),
+            cash_balance=Money("100000"),
+            max_position_size=Money("10000"),
             strategy="Example Strategy",
         )
 
@@ -89,7 +92,7 @@ async def example_trading_workflow() -> None:
         """Place a market buy order."""
         request = OrderRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity("100"),
             side=OrderSide.BUY,
             reason="Example market order",
         )
@@ -104,9 +107,9 @@ async def example_trading_workflow() -> None:
         """Open a new trading position."""
         position = Position.open_position(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("1.00"),
+            quantity=Quantity("100"),
+            entry_price=Price("150.00"),
+            commission=Money("1.00"),
             strategy="Example Strategy",
         )
 
@@ -125,9 +128,9 @@ async def example_trading_workflow() -> None:
         # Place a limit order
         limit_request = OrderRequest(
             symbol="TSLA",
-            quantity=Decimal("50"),
+            quantity=Quantity("50"),
             side=OrderSide.BUY,
-            limit_price=Decimal("200.00"),
+            limit_price=Price("200.00"),
             reason="Complex operation limit order",
         )
         limit_order = Order.create_limit_order(limit_request)
@@ -135,15 +138,15 @@ async def example_trading_workflow() -> None:
 
         # Simulate order filling
         limit_order.submit("BROKER123")
-        limit_order.fill(Decimal("50"), Decimal("199.50"))
+        limit_order.fill(Quantity("50"), Price("199.50"))
         await uow.orders.update_order(limit_order)
 
         # Open corresponding position
         position = Position.open_position(
             symbol="TSLA",
-            quantity=Decimal("50"),
-            entry_price=Decimal("199.50"),
-            commission=Decimal("0.50"),
+            quantity=Quantity("50"),
+            entry_price=Price("199.50"),
+            commission=Money("0.50"),
             strategy="Example Strategy",
         )
         await uow.positions.persist_position(position)

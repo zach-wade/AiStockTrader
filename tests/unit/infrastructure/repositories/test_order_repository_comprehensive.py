@@ -91,6 +91,7 @@ def sample_order_record():
 class TestOrderRepositoryCRUD:
     """Test order CRUD operations."""
 
+    @pytest.mark.asyncio
     async def test_save_order_insert_new(self, repository, mock_adapter, sample_order):
         """Test saving a new order."""
         mock_adapter.fetch_one.return_value = None  # Order doesn't exist
@@ -107,6 +108,7 @@ class TestOrderRepositoryCRUD:
         assert call_args[0][2] == sample_order.symbol
         assert call_args[0][3] == sample_order.side
 
+    @pytest.mark.asyncio
     async def test_save_order_update_existing(
         self, repository, mock_adapter, sample_order, sample_order_record
     ):
@@ -120,6 +122,7 @@ class TestOrderRepositoryCRUD:
         call_args = mock_adapter.execute_query.call_args
         assert "UPDATE orders SET" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_insert_order_all_fields(self, repository, mock_adapter, sample_order):
         """Test inserting order with all fields."""
         await repository._insert_order(sample_order)
@@ -142,6 +145,7 @@ class TestOrderRepositoryCRUD:
         params = call_args[0][1:]
         assert len(params) == 18  # All order fields
 
+    @pytest.mark.asyncio
     async def test_get_order_by_id_found(self, repository, mock_adapter, sample_order_record):
         """Test getting order by ID when it exists."""
         mock_adapter.fetch_one.return_value = sample_order_record
@@ -155,6 +159,7 @@ class TestOrderRepositoryCRUD:
         assert result.order_type == OrderType(sample_order_record["order_type"])
         assert result.status == OrderStatus(sample_order_record["status"])
 
+    @pytest.mark.asyncio
     async def test_get_order_by_id_not_found(self, repository, mock_adapter):
         """Test getting order by ID when it doesn't exist."""
         mock_adapter.fetch_one.return_value = None
@@ -163,6 +168,7 @@ class TestOrderRepositoryCRUD:
 
         assert result is None
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_symbol(self, repository, mock_adapter, sample_order_record):
         """Test getting orders by symbol."""
         mock_adapter.fetch_all.return_value = [sample_order_record, sample_order_record]
@@ -177,6 +183,7 @@ class TestOrderRepositoryCRUD:
         assert "WHERE symbol = %s" in call_args[0][0]
         assert call_args[0][1] == "AAPL"
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_status(self, repository, mock_adapter, sample_order_record):
         """Test getting orders by status."""
         mock_adapter.fetch_all.return_value = [sample_order_record]
@@ -191,6 +198,7 @@ class TestOrderRepositoryCRUD:
         assert "WHERE status = %s" in call_args[0][0]
         assert call_args[0][1] == "pending"
 
+    @pytest.mark.asyncio
     async def test_get_active_orders(self, repository, mock_adapter):
         """Test getting active orders."""
         sample_record = {
@@ -233,6 +241,7 @@ class TestOrderRepositoryCRUD:
         call_args = mock_adapter.fetch_all.call_args
         assert "WHERE status IN ('pending', 'submitted', 'partially_filled')" in call_args[0][0]
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_date_range(self, repository, mock_adapter, sample_order_record):
         """Test getting orders by date range."""
         start_date = datetime.now(UTC) - timedelta(days=7)
@@ -249,6 +258,7 @@ class TestOrderRepositoryCRUD:
         assert call_args[0][1] == start_date
         assert call_args[0][2] == end_date
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_broker_id(self, repository, mock_adapter, sample_order_record):
         """Test getting orders by broker order ID."""
         mock_adapter.fetch_all.return_value = [sample_order_record]
@@ -263,6 +273,7 @@ class TestOrderRepositoryCRUD:
         assert "WHERE broker_order_id = %s" in call_args[0][0]
         assert call_args[0][1] == "BROKER123"
 
+    @pytest.mark.asyncio
     async def test_update_order_success(self, repository, mock_adapter, sample_order):
         """Test successful order update."""
         mock_adapter.execute_query.return_value = "UPDATE 1"
@@ -278,6 +289,7 @@ class TestOrderRepositoryCRUD:
         # ID should be last parameter
         assert call_args[0][-1] == sample_order.id
 
+    @pytest.mark.asyncio
     async def test_update_order_not_found(self, repository, mock_adapter, sample_order):
         """Test updating non-existent order."""
         mock_adapter.execute_query.return_value = "UPDATE 0"
@@ -285,6 +297,7 @@ class TestOrderRepositoryCRUD:
         with pytest.raises(OrderNotFoundError):
             await repository.update_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_delete_order_success(self, repository, mock_adapter):
         """Test successful order deletion."""
         order_id = uuid4()
@@ -299,6 +312,7 @@ class TestOrderRepositoryCRUD:
         assert "DELETE FROM orders WHERE id = %s" in call_args[0][0]
         assert call_args[0][1] == order_id
 
+    @pytest.mark.asyncio
     async def test_delete_order_not_found(self, repository, mock_adapter):
         """Test deleting non-existent order."""
         mock_adapter.execute_query.return_value = "DELETE 0"
@@ -456,6 +470,7 @@ class TestOrderEntityMapping:
 class TestOrderErrorHandling:
     """Test order repository error handling."""
 
+    @pytest.mark.asyncio
     async def test_save_order_error(self, repository, mock_adapter, sample_order):
         """Test save order with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Database connection failed")
@@ -463,6 +478,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to save order"):
             await repository.save_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_get_order_by_id_error(self, repository, mock_adapter):
         """Test get order by ID with database error."""
         mock_adapter.fetch_one.side_effect = Exception("Query failed")
@@ -470,6 +486,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve order"):
             await repository.get_order_by_id(uuid4())
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_symbol_error(self, repository, mock_adapter):
         """Test get orders by symbol with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -477,6 +494,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve orders for symbol"):
             await repository.get_orders_by_symbol("AAPL")
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_status_error(self, repository, mock_adapter):
         """Test get orders by status with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -484,6 +502,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve orders by status"):
             await repository.get_orders_by_status(OrderStatus.PENDING)
 
+    @pytest.mark.asyncio
     async def test_get_active_orders_error(self, repository, mock_adapter):
         """Test get active orders with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -491,6 +510,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve active orders"):
             await repository.get_active_orders()
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_date_range_error(self, repository, mock_adapter):
         """Test get orders by date range with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -498,6 +518,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve orders by date range"):
             await repository.get_orders_by_date_range(datetime.now(UTC), datetime.now(UTC))
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_broker_id_error(self, repository, mock_adapter):
         """Test get orders by broker ID with database error."""
         mock_adapter.fetch_all.side_effect = Exception("Query failed")
@@ -505,6 +526,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to retrieve orders by broker ID"):
             await repository.get_orders_by_broker_id("BROKER123")
 
+    @pytest.mark.asyncio
     async def test_update_order_error(self, repository, mock_adapter, sample_order):
         """Test update order with database error."""
         mock_adapter.execute_query.side_effect = Exception("Update failed")
@@ -512,6 +534,7 @@ class TestOrderErrorHandling:
         with pytest.raises(RepositoryError, match="Failed to update order"):
             await repository.update_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_delete_order_error(self, repository, mock_adapter):
         """Test delete order with database error."""
         mock_adapter.execute_query.side_effect = Exception("Delete failed")
@@ -524,6 +547,7 @@ class TestOrderErrorHandling:
 class TestOrderLifecycle:
     """Test order lifecycle operations."""
 
+    @pytest.mark.asyncio
     async def test_order_submission_flow(self, repository, mock_adapter):
         """Test order from creation to submission."""
         # Create pending order
@@ -581,6 +605,7 @@ class TestOrderLifecycle:
         result = await repository.save_order(order)
         assert result.status == OrderStatus.SUBMITTED
 
+    @pytest.mark.asyncio
     async def test_order_fill_flow(self, repository, mock_adapter):
         """Test order filling process."""
         order = Order(
@@ -623,6 +648,7 @@ class TestOrderLifecycle:
         assert result.status == OrderStatus.FILLED
         assert result.filled_quantity == Decimal("100")
 
+    @pytest.mark.asyncio
     async def test_order_cancellation_flow(self, repository, mock_adapter):
         """Test order cancellation process."""
         order = Order(
@@ -663,6 +689,7 @@ class TestOrderLifecycle:
 class TestOrderBulkOperations:
     """Test bulk order operations."""
 
+    @pytest.mark.asyncio
     async def test_get_multiple_active_orders(self, repository, mock_adapter):
         """Test retrieving multiple active orders."""
         sample_record = {
@@ -698,6 +725,7 @@ class TestOrderBulkOperations:
         symbols = {order.symbol for order in result}
         assert symbols == {"AAPL", "GOOGL", "MSFT"}
 
+    @pytest.mark.asyncio
     async def test_get_orders_multiple_statuses(self, repository, mock_adapter):
         """Test getting orders with different statuses."""
         sample_record = {
@@ -732,6 +760,7 @@ class TestOrderBulkOperations:
 class TestOrderQueryOptimizations:
     """Test query optimization and edge cases."""
 
+    @pytest.mark.asyncio
     async def test_get_orders_with_empty_results(self, repository, mock_adapter):
         """Test methods that return empty lists."""
         mock_adapter.fetch_all.return_value = []
@@ -758,6 +787,7 @@ class TestOrderQueryOptimizations:
         result = await repository.get_orders_by_broker_id("NONEXISTENT")
         assert result == []
 
+    @pytest.mark.asyncio
     async def test_save_order_exception_during_get(self, repository, mock_adapter, sample_order):
         """Test save order when get_order_by_id throws exception."""
         # First call to fetch_one throws exception, should be caught and wrapped
@@ -766,6 +796,7 @@ class TestOrderQueryOptimizations:
         with pytest.raises(RepositoryError, match="Failed to save order"):
             await repository.save_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_save_order_exception_during_update(
         self, repository, mock_adapter, sample_order, sample_order_record
     ):
@@ -777,6 +808,7 @@ class TestOrderQueryOptimizations:
         with pytest.raises(RepositoryError, match="Failed to update order"):
             await repository.save_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_save_order_exception_during_insert(self, repository, mock_adapter, sample_order):
         """Test save order when insert throws exception."""
         # First call returns None (order doesn't exist), insert fails
@@ -786,6 +818,7 @@ class TestOrderQueryOptimizations:
         with pytest.raises(RepositoryError, match="Failed to save order"):
             await repository.save_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_update_order_not_found_exception_propagation(
         self, repository, mock_adapter, sample_order
     ):
@@ -795,6 +828,7 @@ class TestOrderQueryOptimizations:
         with pytest.raises(OrderNotFoundError):
             await repository.update_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_repository_initialization(self):
         """Test repository initialization."""
         mock_adapter = AsyncMock()
@@ -802,6 +836,7 @@ class TestOrderQueryOptimizations:
 
         assert repo.adapter is mock_adapter
 
+    @pytest.mark.asyncio
     async def test_private_insert_order_method(self, repository, mock_adapter, sample_order):
         """Test the private _insert_order method directly."""
         result = await repository._insert_order(sample_order)

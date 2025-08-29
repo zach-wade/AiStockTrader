@@ -148,7 +148,9 @@ class MockPositionRepository:
         self.call_log.append(("close_position", position_id))
         if position_id in self.positions:
             position = self.positions[position_id]
-            position.close(Decimal("0"), datetime.now(UTC))
+            # Use current price or average entry price as exit price for mock
+            exit_price = position.current_price or position.average_entry_price
+            position.close(exit_price, datetime.now(UTC))
             return True
         return False
 
@@ -253,6 +255,7 @@ class TestOrderRepositoryInterface:
         )
         return Order.create_limit_order(request)
 
+    @pytest.mark.asyncio
     async def test_save_order_success(self, repository, sample_order):
         """Test successful order save."""
         result = await repository.save_order(sample_order)
@@ -261,6 +264,7 @@ class TestOrderRepositoryInterface:
         assert ("save_order", sample_order.id) in repository.call_log
         assert sample_order.id in repository.orders
 
+    @pytest.mark.asyncio
     async def test_get_order_by_id_found(self, repository, sample_order):
         """Test get order by ID when order exists."""
         await repository.save_order(sample_order)
@@ -270,6 +274,7 @@ class TestOrderRepositoryInterface:
         assert result == sample_order
         assert ("get_order_by_id", sample_order.id) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_order_by_id_not_found(self, repository):
         """Test get order by ID when order doesn't exist."""
         non_existent_id = uuid4()
@@ -279,6 +284,7 @@ class TestOrderRepositoryInterface:
         assert result is None
         assert ("get_order_by_id", non_existent_id) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_symbol(self, repository, sample_order):
         """Test get orders by symbol."""
         await repository.save_order(sample_order)
@@ -302,6 +308,7 @@ class TestOrderRepositoryInterface:
         assert result[0] == sample_order
         assert ("get_orders_by_symbol", "AAPL") in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_status(self, repository, sample_order):
         """Test get orders by status."""
         await repository.save_order(sample_order)
@@ -312,6 +319,7 @@ class TestOrderRepositoryInterface:
         assert result[0] == sample_order
         assert ("get_orders_by_status", OrderStatus.PENDING) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_active_orders(self, repository, sample_order):
         """Test get active orders."""
         await repository.save_order(sample_order)
@@ -322,6 +330,7 @@ class TestOrderRepositoryInterface:
         assert result[0] == sample_order
         assert ("get_active_orders",) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_update_order_success(self, repository, sample_order):
         """Test successful order update."""
         await repository.save_order(sample_order)
@@ -333,11 +342,13 @@ class TestOrderRepositoryInterface:
         assert repository.orders[sample_order.id].status == OrderStatus.SUBMITTED
         assert ("update_order", sample_order.id) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_update_order_not_found(self, repository, sample_order):
         """Test update order when order doesn't exist."""
         with pytest.raises(OrderNotFoundError):
             await repository.update_order(sample_order)
 
+    @pytest.mark.asyncio
     async def test_delete_order_success(self, repository, sample_order):
         """Test successful order deletion."""
         await repository.save_order(sample_order)
@@ -348,6 +359,7 @@ class TestOrderRepositoryInterface:
         assert sample_order.id not in repository.orders
         assert ("delete_order", sample_order.id) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_delete_order_not_found(self, repository):
         """Test delete order when order doesn't exist."""
         non_existent_id = uuid4()
@@ -357,6 +369,7 @@ class TestOrderRepositoryInterface:
         assert result is False
         assert ("delete_order", non_existent_id) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_orders_by_broker_id(self, repository, sample_order):
         """Test get orders by broker ID."""
         sample_order.submit("broker123")
@@ -379,16 +392,20 @@ class TestPositionRepositoryInterface:
 
     @pytest.fixture
     def sample_position(self):
+        from src.domain.value_objects.price import Price
+        from src.domain.value_objects.quantity import Quantity
+
         return Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),  # Positive for long
-            average_entry_price=Decimal("145.00"),
-            current_price=Decimal("150.00"),
+            quantity=Quantity(Decimal("100")),  # Positive for long
+            average_entry_price=Price(Decimal("145.00")),
+            current_price=Price(Decimal("150.00")),
             opened_at=datetime.now(UTC),
             strategy="test_strategy",
         )
 
+    @pytest.mark.asyncio
     async def test_persist_position_success(self, repository, sample_position):
         """Test successful position save."""
         result = await repository.persist_position(sample_position)
@@ -397,6 +414,7 @@ class TestPositionRepositoryInterface:
         assert ("persist_position", sample_position.id) in repository.call_log
         assert sample_position.id in repository.positions
 
+    @pytest.mark.asyncio
     async def test_get_position_by_id_found(self, repository, sample_position):
         """Test get position by ID when position exists."""
         await repository.persist_position(sample_position)
@@ -406,6 +424,7 @@ class TestPositionRepositoryInterface:
         assert result == sample_position
         assert ("get_position_by_id", sample_position.id) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_position_by_symbol(self, repository, sample_position):
         """Test get current position by symbol."""
         await repository.persist_position(sample_position)
@@ -415,6 +434,7 @@ class TestPositionRepositoryInterface:
         assert result == sample_position
         assert ("get_position_by_symbol", "AAPL") in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_active_positions(self, repository, sample_position):
         """Test get active positions."""
         await repository.persist_position(sample_position)
@@ -425,6 +445,7 @@ class TestPositionRepositoryInterface:
         assert result[0] == sample_position
         assert ("get_active_positions",) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_close_position_success(self, repository, sample_position):
         """Test successful position closure."""
         await repository.persist_position(sample_position)
@@ -446,14 +467,17 @@ class TestPortfolioRepositoryInterface:
 
     @pytest.fixture
     def sample_portfolio(self):
+        from src.domain.value_objects.money import Money
+
         return Portfolio(
             id=uuid4(),
             name="Test Portfolio",
-            cash_balance=Decimal("100000.00"),
+            cash_balance=Money(Decimal("100000.00")),
             strategy="test_strategy",
             created_at=datetime.now(UTC),
         )
 
+    @pytest.mark.asyncio
     async def test_save_portfolio_success(self, repository, sample_portfolio):
         """Test successful portfolio save."""
         result = await repository.save_portfolio(sample_portfolio)
@@ -462,6 +486,7 @@ class TestPortfolioRepositoryInterface:
         assert ("save_portfolio", sample_portfolio.id) in repository.call_log
         assert sample_portfolio.id in repository.portfolios
 
+    @pytest.mark.asyncio
     async def test_get_portfolio_by_name(self, repository, sample_portfolio):
         """Test get portfolio by name."""
         await repository.save_portfolio(sample_portfolio)
@@ -471,6 +496,7 @@ class TestPortfolioRepositoryInterface:
         assert result == sample_portfolio
         assert ("get_portfolio_by_name", "Test Portfolio") in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_get_all_portfolios(self, repository, sample_portfolio):
         """Test get all portfolios."""
         await repository.save_portfolio(sample_portfolio)
@@ -481,6 +507,7 @@ class TestPortfolioRepositoryInterface:
         assert result[0] == sample_portfolio
         assert ("get_all_portfolios",) in repository.call_log
 
+    @pytest.mark.asyncio
     async def test_create_portfolio_snapshot(self, repository, sample_portfolio):
         """Test create portfolio snapshot."""
         await repository.save_portfolio(sample_portfolio)

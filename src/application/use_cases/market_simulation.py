@@ -9,40 +9,31 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
 from uuid import UUID, uuid4
 
 from src.application.interfaces.unit_of_work import IUnitOfWork
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
 from src.domain.services.market_microstructure import IMarketMicrostructure
 from src.domain.services.order_processor import OrderProcessor
+from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.price import Price
 from src.domain.value_objects.symbol import Symbol
 
 from .base import TransactionalUseCase, UseCaseResponse
+from .base_request import BaseRequestDTO
 
 logger = logging.getLogger(__name__)
 
 
 # Request/Response DTOs
 @dataclass
-class UpdateMarketPriceRequest:
+class UpdateMarketPriceRequest(BaseRequestDTO):
     """Request to update market price and trigger pending orders."""
 
     symbol: str
     price: Decimal
     volume: int | None = None
     timestamp: datetime | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -54,21 +45,11 @@ class UpdateMarketPriceResponse(UseCaseResponse):
 
 
 @dataclass
-class ProcessPendingOrdersRequest:
+class ProcessPendingOrdersRequest(BaseRequestDTO):
     """Request to process all pending orders."""
 
     symbol: str | None = None  # Process specific symbol or all
     current_prices: dict[str, Decimal] | None = None
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -81,21 +62,11 @@ class ProcessPendingOrdersResponse(UseCaseResponse):
 
 
 @dataclass
-class CheckOrderTriggerRequest:
+class CheckOrderTriggerRequest(BaseRequestDTO):
     """Request to check if an order should be triggered."""
 
     order_id: UUID
     current_price: Decimal
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -153,7 +124,7 @@ class UpdateMarketPriceUseCase(
         orders_filled = []
 
         for order in active_orders:
-            if order.symbol != symbol:
+            if order.symbol != symbol.value:
                 continue
 
             # Check if order should be triggered based on new price
@@ -165,15 +136,16 @@ class UpdateMarketPriceUseCase(
                     extra={
                         "order_id": str(order.id),
                         "symbol": symbol.value,
-                        "price": float(current_price.value),
+                        "price": float(ValueObjectConverter.extract_value(current_price)),
                         "reason": trigger_reason,
                     },
                 )
 
                 orders_triggered.append(order.id)
 
-                # For market simulation, we immediately "fill" triggered orders
-                # In production, this would submit to actual market
+                # For market simulation, we immediately "fill" MARKET and LIMIT orders
+                # STOP and STOP_LIMIT orders are only triggered, not filled immediately
+                # In production, triggered orders would be submitted to actual market
                 if order.order_type in [OrderType.MARKET, OrderType.LIMIT]:
                     # Calculate execution price with market impact
                     execution_price = self.market_microstructure.calculate_execution_price(
@@ -219,40 +191,56 @@ class UpdateMarketPriceUseCase(
 
         # Limit orders
         if order.order_type == OrderType.LIMIT and order.limit_price:
-            if order.side == OrderSide.BUY and current_price.value <= order.limit_price.value:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            limit_val = ValueObjectConverter.extract_value(order.limit_price)
+
+            if order.side == OrderSide.BUY and current_val <= limit_val:
                 return (
                     True,
-                    f"Buy limit triggered: price {current_price.value} <= limit {order.limit_price.value}",
+                    f"Buy limit triggered: price {current_val} <= limit {limit_val}",
                 )
-            elif order.side == OrderSide.SELL and current_price.value >= order.limit_price.value:
+            elif order.side == OrderSide.SELL and current_val >= limit_val:
                 return (
                     True,
-                    f"Sell limit triggered: price {current_price.value} >= limit {order.limit_price.value}",
+                    f"Sell limit triggered: price {current_val} >= limit {limit_val}",
                 )
 
         # Stop orders
         if order.order_type == OrderType.STOP and order.stop_price:
-            if order.side == OrderSide.BUY and current_price.value >= order.stop_price.value:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            stop_val = ValueObjectConverter.extract_value(order.stop_price)
+
+            if order.side == OrderSide.BUY and current_val >= stop_val:
                 return (
                     True,
-                    f"Buy stop triggered: price {current_price.value} >= stop {order.stop_price.value}",
+                    f"Buy stop triggered: price {current_val} >= stop {stop_val}",
                 )
-            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price.value:
+            elif order.side == OrderSide.SELL and current_val <= stop_val:
                 return (
                     True,
-                    f"Sell stop triggered: price {current_price.value} <= stop {order.stop_price.value}",
+                    f"Sell stop triggered: price {current_val} <= stop {stop_val}",
                 )
 
         # Stop-limit orders
         if order.order_type == OrderType.STOP_LIMIT and order.stop_price:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            stop_val = ValueObjectConverter.extract_value(order.stop_price)
+
             # First check if stop is triggered
-            if order.side == OrderSide.BUY and current_price.value >= order.stop_price.value:
+            if order.side == OrderSide.BUY and current_val >= stop_val:
                 # Then check if limit allows execution
-                if order.limit_price and current_price.value <= order.limit_price.value:
-                    return True, "Buy stop-limit triggered: stop hit and price within limit"
-            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price.value:
-                if order.limit_price and current_price.value >= order.limit_price.value:
-                    return True, "Sell stop-limit triggered: stop hit and price within limit"
+                if order.limit_price:
+                    limit_val = ValueObjectConverter.extract_value(order.limit_price)
+                    if current_val <= limit_val:
+                        return True, "Buy stop-limit triggered: stop hit and price within limit"
+            elif order.side == OrderSide.SELL and current_val <= stop_val:
+                if order.limit_price:
+                    limit_val = ValueObjectConverter.extract_value(order.limit_price)
+                    if current_val >= limit_val:
+                        return True, "Sell stop-limit triggered: stop hit and price within limit"
 
         return False, None
 
@@ -283,14 +271,14 @@ class ProcessPendingOrdersUseCase(
 
     async def process(self, request: ProcessPendingOrdersRequest) -> ProcessPendingOrdersResponse:
         """Process all pending orders."""
-        # Get active orders
+        # Get pending orders
         order_repo = self.unit_of_work.orders
-        active_orders = await order_repo.get_active_orders()
+        active_orders = await order_repo.get_pending_orders()
 
         # Filter by symbol if specified
         if request.symbol:
             symbol = Symbol(request.symbol)
-            active_orders = [o for o in active_orders if o.symbol == symbol]
+            active_orders = [o for o in active_orders if o.symbol == symbol.value]
 
         triggered_orders = []
         filled_orders = []
@@ -300,11 +288,15 @@ class ProcessPendingOrdersUseCase(
             processed_count += 1
 
             # Get current price for the symbol
-            if request.current_prices and order.symbol.value in request.current_prices:
-                current_price = Price(request.current_prices[order.symbol.value])
+            if request.current_prices and order.symbol in request.current_prices:
+                current_price = Price(request.current_prices[order.symbol])
             else:
-                # In real system, would fetch from market data provider
-                continue
+                # Fetch from market data provider
+                bar = await self.unit_of_work.market_data.get_latest_bar(order.symbol)
+                if bar is None:
+                    # No market data available, skip this order
+                    continue
+                current_price = Price(bar.close)
 
             # Check if order should be triggered
             should_fill, trigger_reason = self._should_trigger_order(order, current_price)
@@ -349,15 +341,23 @@ class ProcessPendingOrdersUseCase(
             return True, "Market order"
 
         if order.order_type == OrderType.LIMIT and order.limit_price:
-            if order.side == OrderSide.BUY and current_price.value <= order.limit_price.value:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            limit_val = ValueObjectConverter.extract_value(order.limit_price)
+
+            if order.side == OrderSide.BUY and current_val <= limit_val:
                 return True, "Buy limit triggered"
-            elif order.side == OrderSide.SELL and current_price.value >= order.limit_price.value:
+            elif order.side == OrderSide.SELL and current_val >= limit_val:
                 return True, "Sell limit triggered"
 
         if order.order_type == OrderType.STOP and order.stop_price:
-            if order.side == OrderSide.BUY and current_price.value >= order.stop_price.value:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            stop_val = ValueObjectConverter.extract_value(order.stop_price)
+
+            if order.side == OrderSide.BUY and current_val >= stop_val:
                 return True, "Buy stop triggered"
-            elif order.side == OrderSide.SELL and current_price.value <= order.stop_price.value:
+            elif order.side == OrderSide.SELL and current_val <= stop_val:
                 return True, "Sell stop triggered"
 
         return False, None
@@ -407,33 +407,43 @@ class CheckOrderTriggerUseCase(
             trigger_price = request.current_price
             reason = "Market order executes immediately"
         elif order.order_type == OrderType.LIMIT and order.limit_price:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            limit_val = ValueObjectConverter.extract_value(order.limit_price)
+
             if order.side == OrderSide.BUY:
-                if current_price.value <= order.limit_price.value:
+                if current_val <= limit_val:
                     should_trigger = True
-                    trigger_price = order.limit_price.value
-                    reason = f"Buy limit: market price {current_price.value} <= limit {order.limit_price.value}"
+                    trigger_price = limit_val
+                    reason = f"Buy limit: market price {current_val} <= limit {limit_val}"
                 else:
-                    reason = f"Buy limit not triggered: market price {current_price.value} > limit {order.limit_price.value}"
-            elif current_price.value >= order.limit_price.value:
+                    reason = (
+                        f"Buy limit not triggered: market price {current_val} > limit {limit_val}"
+                    )
+            elif current_val >= limit_val:
                 should_trigger = True
-                trigger_price = order.limit_price.value
-                reason = f"Sell limit: market price {current_price.value} >= limit {order.limit_price.value}"
+                trigger_price = limit_val
+                reason = f"Sell limit: market price {current_val} >= limit {limit_val}"
             else:
-                reason = f"Sell limit not triggered: market price {current_price.value} < limit {order.limit_price.value}"
+                reason = f"Sell limit not triggered: market price {current_val} < limit {limit_val}"
         elif order.order_type == OrderType.STOP and order.stop_price:
+            # Handle both Price objects and Decimals
+            current_val = ValueObjectConverter.extract_value(current_price)
+            stop_val = ValueObjectConverter.extract_value(order.stop_price)
+
             if order.side == OrderSide.BUY:
-                if current_price.value >= order.stop_price.value:
+                if current_val >= stop_val:
                     should_trigger = True
                     trigger_price = request.current_price
-                    reason = f"Buy stop: market price {current_price.value} >= stop {order.stop_price.value}"
+                    reason = f"Buy stop: market price {current_val} >= stop {stop_val}"
                 else:
-                    reason = f"Buy stop not triggered: market price {current_price.value} < stop {order.stop_price.value}"
-            elif current_price.value <= order.stop_price.value:
+                    reason = f"Buy stop not triggered: market price {current_val} < stop {stop_val}"
+            elif current_val <= stop_val:
                 should_trigger = True
                 trigger_price = request.current_price
-                reason = f"Sell stop: market price {current_price.value} <= stop {order.stop_price.value}"
+                reason = f"Sell stop: market price {current_val} <= stop {stop_val}"
             else:
-                reason = f"Sell stop not triggered: market price {current_price.value} > stop {order.stop_price.value}"
+                reason = f"Sell stop not triggered: market price {current_val} > stop {stop_val}"
 
         return CheckOrderTriggerResponse(
             success=True,

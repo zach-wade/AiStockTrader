@@ -280,6 +280,30 @@ class TradingValidationService:
         return errors
 
     @classmethod
+    def validate_trading_request(cls, request_data: dict[str, Any]) -> bool:
+        """
+        Validate trading request data according to business rules.
+        This method is extracted from the original RequestValidationService.
+
+        Args:
+            request_data: Dictionary containing trading request data
+
+        Returns:
+            True if request is valid
+
+        Raises:
+            ValueError: If validation fails
+        """
+        # Get validation errors using existing comprehensive method
+        errors = cls.validate_order(request_data)
+
+        if errors:
+            # Raise first error found for compatibility with original API
+            raise ValueError(errors[0])
+
+        return True
+
+    @classmethod
     def get_order_schema(cls) -> dict[str, Any]:
         """
         Get the order validation schema definition.

@@ -139,6 +139,7 @@ class TestUnitOfWorkInterface:
     def uow(self):
         return MockUnitOfWork()
 
+    @pytest.mark.asyncio
     async def test_transaction_lifecycle(self, uow):
         """Test basic transaction lifecycle."""
         # Begin transaction
@@ -152,6 +153,7 @@ class TestUnitOfWorkInterface:
         assert "commit" in uow.call_log
         assert uow._committed
 
+    @pytest.mark.asyncio
     async def test_transaction_rollback(self, uow):
         """Test transaction rollback."""
         await uow.begin_transaction()
@@ -162,6 +164,7 @@ class TestUnitOfWorkInterface:
         assert "rollback" in uow.call_log
         assert uow._rolled_back
 
+    @pytest.mark.asyncio
     async def test_double_begin_transaction_error(self, uow):
         """Test that beginning a transaction twice raises error."""
         await uow.begin_transaction()
@@ -169,21 +172,25 @@ class TestUnitOfWorkInterface:
         with pytest.raises(TransactionError, match="already active"):
             await uow.begin_transaction()
 
+    @pytest.mark.asyncio
     async def test_commit_without_transaction_error(self, uow):
         """Test that committing without active transaction raises error."""
         with pytest.raises(TransactionError, match="No active transaction"):
             await uow.commit()
 
+    @pytest.mark.asyncio
     async def test_flush_without_transaction_error(self, uow):
         """Test that flushing without active transaction raises error."""
         with pytest.raises(TransactionError, match="Cannot flush without active transaction"):
             await uow.flush()
 
+    @pytest.mark.asyncio
     async def test_refresh_without_transaction_error(self, uow):
         """Test that refreshing without active transaction raises error."""
         with pytest.raises(TransactionError, match="Cannot refresh without active transaction"):
             await uow.refresh("some_entity")
 
+    @pytest.mark.asyncio
     async def test_flush_with_active_transaction(self, uow):
         """Test flush with active transaction."""
         await uow.begin_transaction()
@@ -191,6 +198,7 @@ class TestUnitOfWorkInterface:
 
         assert "flush" in uow.call_log
 
+    @pytest.mark.asyncio
     async def test_refresh_with_active_transaction(self, uow):
         """Test refresh with active transaction."""
         await uow.begin_transaction()
@@ -199,12 +207,14 @@ class TestUnitOfWorkInterface:
 
         assert ("refresh", entity) in uow.call_log
 
+    @pytest.mark.asyncio
     async def test_repository_access(self, uow):
         """Test that UoW provides repository access."""
         assert hasattr(uow, "orders")
         assert hasattr(uow, "positions")
         assert hasattr(uow, "portfolios")
 
+    @pytest.mark.asyncio
     async def test_context_manager_success(self, uow):
         """Test context manager with successful operation."""
         async with uow as context_uow:
@@ -216,6 +226,7 @@ class TestUnitOfWorkInterface:
         assert uow._committed
         assert not uow._rolled_back
 
+    @pytest.mark.asyncio
     async def test_context_manager_exception(self, uow):
         """Test context manager with exception causing rollback."""
         try:
@@ -230,6 +241,7 @@ class TestUnitOfWorkInterface:
         assert not uow._committed
         assert uow._rolled_back
 
+    @pytest.mark.asyncio
     async def test_rollback_when_no_active_transaction(self, uow):
         """Test that rollback doesn't raise error when no active transaction."""
         # Should not raise error
@@ -279,9 +291,11 @@ class TestTransactionManagerInterface:
     def manager(self):
         return MockTransactionManager()
 
+    @pytest.mark.asyncio
     async def test_execute_in_transaction_success(self, manager):
         """Test successful operation execution in transaction."""
 
+        @pytest.mark.asyncio
         async def test_operation(uow):
             return "success"
 
@@ -290,6 +304,7 @@ class TestTransactionManagerInterface:
         assert result == "success"
         assert any("execute_in_transaction" in str(entry) for entry in manager.call_log)
 
+    @pytest.mark.asyncio
     async def test_execute_in_transaction_failure(self, manager):
         """Test operation failure in transaction."""
 
@@ -299,9 +314,11 @@ class TestTransactionManagerInterface:
         with pytest.raises(ValueError, match="Operation failed"):
             await manager.execute_in_transaction(failing_operation)
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_success(self, manager):
         """Test successful operation with retry mechanism."""
 
+        @pytest.mark.asyncio
         async def test_operation(uow):
             return "success"
 
@@ -310,6 +327,7 @@ class TestTransactionManagerInterface:
         assert result == "success"
         assert any("execute_with_retry" in str(entry) for entry in manager.call_log)
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_eventual_success(self, manager):
         """Test operation that succeeds after retries."""
         call_count = 0
@@ -326,6 +344,7 @@ class TestTransactionManagerInterface:
         assert result == "success"
         assert call_count == 3
 
+    @pytest.mark.asyncio
     async def test_execute_with_retry_max_retries_exceeded(self, manager):
         """Test operation that fails after max retries."""
 
@@ -335,6 +354,7 @@ class TestTransactionManagerInterface:
         with pytest.raises(ValueError, match="Persistent failure"):
             await manager.execute_with_retry(always_failing_operation, max_retries=2)
 
+    @pytest.mark.asyncio
     async def test_execute_batch_success(self, manager):
         """Test successful batch operation execution."""
 
@@ -350,6 +370,7 @@ class TestTransactionManagerInterface:
         assert results == ["result1", "result2"]
         assert any("execute_batch" in str(entry) for entry in manager.call_log)
 
+    @pytest.mark.asyncio
     async def test_execute_batch_partial_failure(self, manager):
         """Test batch operation with one failing operation."""
 
@@ -434,6 +455,7 @@ class TestInterfaceTypeAnnotations:
 class TestConcurrentTransactionBehavior:
     """Test concurrent transaction behavior patterns."""
 
+    @pytest.mark.asyncio
     async def test_nested_transaction_context_managers(self):
         """Test that nested context managers work properly."""
         uow = MockUnitOfWork()
@@ -454,6 +476,7 @@ class TestConcurrentTransactionBehavior:
         assert outer._committed
         assert inner._committed
 
+    @pytest.mark.asyncio
     async def test_transaction_isolation(self):
         """Test transaction isolation between different UoW instances."""
         uow1 = MockUnitOfWork()

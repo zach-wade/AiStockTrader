@@ -1,19 +1,20 @@
 # Universe Module - Issues Documentation
 
-**Module**: universe  
-**Files Reviewed**: 3/3 (100%)  
-**Total Issues Found**: 43  
-**Critical Issues**: 3  
-**High Priority Issues**: 10  
-**Medium Priority Issues**: 18  
-**Low Priority Issues**: 12  
-**Review Date**: 2025-08-14  
+**Module**: universe
+**Files Reviewed**: 3/3 (100%)
+**Total Issues Found**: 43
+**Critical Issues**: 3
+**High Priority Issues**: 10
+**Medium Priority Issues**: 18
+**Low Priority Issues**: 12
+**Review Date**: 2025-08-14
 
 ---
 
 ## 🔴 CRITICAL Issues (3) - Must Fix Immediately
 
 ### ISSUE-2185: God Class - UniverseManager with 12+ Responsibilities
+
 - **File**: universe_manager.py
 - **Lines**: 15-371
 - **Severity**: CRITICAL
@@ -23,6 +24,7 @@
 - **Fix**: Break into separate focused classes (UniversePopulator, LayerQualifier, UniverseStatisticsService, UniverseHealthMonitor)
 
 ### ISSUE-2186: Database Connection Pool Mismanagement
+
 - **File**: universe_manager.py
 - **Lines**: 28-43
 - **Severity**: CRITICAL
@@ -32,6 +34,7 @@
 - **Fix**: Implement singleton pattern for database connections with proper pool management
 
 ### ISSUE-2187: N+1 Query Problem in Layer Qualification
+
 - **File**: universe_manager.py
 - **Lines**: 220-241
 - **Severity**: CRITICAL
@@ -45,6 +48,7 @@
 ## 🟠 HIGH Priority Issues (10)
 
 ### ISSUE-2188: Complete Lack of Authentication and Authorization
+
 - **File**: All files
 - **Lines**: N/A
 - **Severity**: HIGH
@@ -54,6 +58,7 @@
 - **Fix**: Implement RBAC with authentication checks before sensitive operations
 
 ### ISSUE-2189: Sensitive Information Exposure in Error Messages
+
 - **File**: cli.py
 - **Lines**: 92, 122, 157, 191
 - **Severity**: HIGH
@@ -63,6 +68,7 @@
 - **Fix**: Log detailed errors internally, show generic messages to users
 
 ### ISSUE-2190: Potential SQL Injection via Layer Parameter
+
 - **File**: universe_manager.py
 - **Lines**: 117, 345-356
 - **Severity**: HIGH
@@ -72,6 +78,7 @@
 - **Fix**: Ensure all database queries use parameterized statements, add explicit validation
 
 ### ISSUE-2191: Dependency Inversion Violation
+
 - **File**: universe_manager.py
 - **Lines**: 7-11, 27-33
 - **Severity**: HIGH
@@ -81,6 +88,7 @@
 - **Fix**: Use dependency injection with interfaces instead of concrete classes
 
 ### ISSUE-2192: Resource Leaks in CLI Exception Handling
+
 - **File**: cli.py
 - **Lines**: 54-194
 - **Severity**: HIGH
@@ -90,6 +98,7 @@
 - **Fix**: Use async context manager pattern for automatic cleanup
 
 ### ISSUE-2193: Circular Dependency Risk with Scanner Module
+
 - **File**: universe_manager.py
 - **Lines**: 61-62, 192-193
 - **Severity**: HIGH
@@ -99,6 +108,7 @@
 - **Fix**: Redesign module boundaries to eliminate circular dependencies
 
 ### ISSUE-2194: DRY Violation - Repeated Database Init Pattern
+
 - **File**: cli.py
 - **Lines**: 56-57, 100-101, 130-131, 165-166
 - **Severity**: HIGH
@@ -108,6 +118,7 @@
 - **Fix**: Extract to helper function or context manager
 
 ### ISSUE-2195: Interface Segregation Violation
+
 - **File**: universe_manager.py
 - **Lines**: Entire class
 - **Severity**: HIGH
@@ -117,6 +128,7 @@
 - **Fix**: Split into focused interfaces based on client needs
 
 ### ISSUE-2196: Improper Abstraction Mixing in CLI
+
 - **File**: cli.py
 - **Lines**: 54-195
 - **Severity**: HIGH
@@ -126,6 +138,7 @@
 - **Fix**: Separate presentation and business logic layers
 
 ### ISSUE-2197: DRY Violation - Repeated Exception Handling Pattern
+
 - **File**: cli.py
 - **Lines**: 91-93, 121-123, 156-158, 190-192
 - **Severity**: HIGH
@@ -139,6 +152,7 @@
 ## 🟡 MEDIUM Priority Issues (18)
 
 ### ISSUE-2198: No Input Validation on Layer Parameter
+
 - **File**: cli.py
 - **Line**: 45
 - **Severity**: MEDIUM
@@ -148,6 +162,7 @@
 - **Fix**: Use Typer's built-in validators or choices constraint
 
 ### ISSUE-2199: Missing Rate Limiting
+
 - **File**: All files
 - **Severity**: MEDIUM
 - **Category**: Security
@@ -156,6 +171,7 @@
 - **Fix**: Implement rate limiting for database queries and external API calls
 
 ### ISSUE-2200: Unsafe Dynamic Module Import
+
 - **File**: universe_manager.py
 - **Lines**: 61, 192, 216
 - **Severity**: MEDIUM
@@ -165,6 +181,7 @@
 - **Fix**: Use whitelist of allowed modules and validate import paths
 
 ### ISSUE-2201: Database Connection Pool Not Protected
+
 - **File**: universe_manager.py
 - **Lines**: 37-43
 - **Severity**: MEDIUM
@@ -174,6 +191,7 @@
 - **Fix**: Add connection pool limits, timeouts, and proper cleanup
 
 ### ISSUE-2202: No Audit Logging
+
 - **File**: All files
 - **Severity**: MEDIUM
 - **Category**: Security
@@ -182,6 +200,7 @@
 - **Fix**: Implement comprehensive audit logging for all data modifications
 
 ### ISSUE-2203: Hardcoded Magic Number for Company Threshold
+
 - **File**: universe_manager.py
 - **Line**: 292
 - **Severity**: MEDIUM
@@ -191,6 +210,7 @@
 - **Fix**: Move to configuration or class constant
 
 ### ISSUE-2204: Open/Closed Principle Violation
+
 - **File**: universe_manager.py
 - **Lines**: 181-258
 - **Severity**: MEDIUM
@@ -200,6 +220,7 @@
 - **Fix**: Implement strategy pattern for layer qualifications
 
 ### ISSUE-2205: DRY Violation - Repeated Percentage Calculations
+
 - **File**: universe_manager.py
 - **Lines**: 273-277
 - **Severity**: MEDIUM
@@ -209,6 +230,7 @@
 - **Fix**: Create helper function for safe percentage calculation
 
 ### ISSUE-2206: Non-Pythonic Symbol Display
+
 - **File**: cli.py
 - **Lines**: 180-185
 - **Severity**: MEDIUM
@@ -218,6 +240,7 @@
 - **Fix**: Use itertools.batched() or list comprehension with slicing
 
 ### ISSUE-2207: Inconsistent datetime Usage
+
 - **File**: universe_manager.py
 - **Line**: 213
 - **Severity**: MEDIUM
@@ -227,6 +250,7 @@
 - **Fix**: Standardize to datetime.now(timezone.utc)
 
 ### ISSUE-2208: DRY Violation - Repeated Finally Blocks
+
 - **File**: cli.py
 - **Lines**: 94-95, 124-125, 159-160, 193-194
 - **Severity**: MEDIUM
@@ -236,6 +260,7 @@
 - **Fix**: Use async context manager pattern
 
 ### ISSUE-2209: Inefficient Statistics Queries
+
 - **File**: universe_manager.py
 - **Lines**: 345-356
 - **Severity**: MEDIUM
@@ -245,6 +270,7 @@
 - **Fix**: Use single aggregated query with GROUP BY
 
 ### ISSUE-2210: Missing Transaction Retry Logic
+
 - **File**: universe_manager.py
 - **Severity**: MEDIUM
 - **Category**: Resilience
@@ -253,6 +279,7 @@
 - **Fix**: Implement retry with exponential backoff
 
 ### ISSUE-2211: Memory Issues with Large Datasets
+
 - **File**: universe_manager.py
 - **Lines**: Various
 - **Severity**: MEDIUM
@@ -262,6 +289,7 @@
 - **Fix**: Implement pagination or streaming for large datasets
 
 ### ISSUE-2212: Missing Error Abstraction
+
 - **File**: All files
 - **Severity**: MEDIUM
 - **Category**: Architecture
@@ -270,6 +298,7 @@
 - **Fix**: Create domain-specific exception hierarchy
 
 ### ISSUE-2213: Hardcoded Display Columns
+
 - **File**: cli.py
 - **Line**: 181
 - **Severity**: MEDIUM
@@ -279,6 +308,7 @@
 - **Fix**: Move to constant or configuration
 
 ### ISSUE-2214: Database Init Flag Anti-pattern
+
 - **File**: universe_manager.py
 - **Lines**: 35, 37-43
 - **Severity**: MEDIUM
@@ -288,6 +318,7 @@
 - **Fix**: Use @functools.lru_cache or property pattern
 
 ### ISSUE-2215: Sequential Processing in qualify_layer1
+
 - **File**: universe_manager.py
 - **Lines**: 181-258
 - **Severity**: MEDIUM
@@ -301,6 +332,7 @@
 ## 🟢 LOW Priority Issues (12)
 
 ### ISSUE-2216: Verbose Logging May Leak Information
+
 - **File**: universe_manager.py
 - **Lines**: 87, 142, 145, 170, 178, 254, 311, 316
 - **Severity**: LOW
@@ -310,6 +342,7 @@
 - **Fix**: Sanitize log messages, implement log rotation
 
 ### ISSUE-2217: Missing Input Sanitization for Symbol Display
+
 - **File**: cli.py
 - **Lines**: 180-185
 - **Severity**: LOW
@@ -319,6 +352,7 @@
 - **Fix**: Sanitize output before display
 
 ### ISSUE-2218: Configuration Access Not Validated
+
 - **File**: All files using get_config()
 - **Severity**: LOW
 - **Category**: Security
@@ -327,7 +361,8 @@
 - **Fix**: Validate configuration integrity
 
 ### ISSUE-2219: Empty Module with Placeholder Comments
-- **File**: __init__.py
+
+- **File**: **init**.py
 - **Lines**: 7-12
 - **Severity**: LOW
 - **Category**: Code Quality
@@ -336,6 +371,7 @@
 - **Fix**: Either import actual exports or remove placeholder comments
 
 ### ISSUE-2220: Hardcoded Display Messages
+
 - **File**: cli.py
 - **Lines**: 61-67
 - **Severity**: LOW
@@ -345,6 +381,7 @@
 - **Fix**: Use constants or configuration for message templates
 
 ### ISSUE-2221: Inconsistent Method Naming
+
 - **File**: universe_manager.py
 - **Severity**: LOW
 - **Category**: Code Quality
@@ -353,6 +390,7 @@
 - **Fix**: Establish clear naming convention for public vs private
 
 ### ISSUE-2222: Comment Instead of Proper Pattern
+
 - **File**: universe_manager.py
 - **Line**: 34
 - **Severity**: LOW
@@ -362,6 +400,7 @@
 - **Fix**: Use @property with lazy loading pattern
 
 ### ISSUE-2223: Try-Except with Multiple Return Points
+
 - **File**: universe_manager.py
 - **Lines**: 117-146
 - **Severity**: LOW
@@ -371,6 +410,7 @@
 - **Fix**: Simplify with early returns
 
 ### ISSUE-2224: Lazy Import Inside Method
+
 - **File**: universe_manager.py
 - **Lines**: 59-62
 - **Severity**: LOW
@@ -380,6 +420,7 @@
 - **Fix**: Restructure modules to avoid circular dependencies
 
 ### ISSUE-2225: Missing Docstrings for Helper Methods
+
 - **File**: universe_manager.py
 - **Severity**: LOW
 - **Category**: Documentation
@@ -388,6 +429,7 @@
 - **Fix**: Add comprehensive docstrings
 
 ### ISSUE-2226: No Caching Strategy
+
 - **File**: universe_manager.py
 - **Severity**: LOW
 - **Category**: Performance
@@ -396,6 +438,7 @@
 - **Fix**: Implement caching with TTL for statistics
 
 ### ISSUE-2227: Missing Integration Tests
+
 - **File**: All files
 - **Severity**: LOW
 - **Category**: Testing
@@ -414,6 +457,7 @@
 - **Low**: 12 (28%)
 
 ### By Category
+
 - **Security**: 9 issues
 - **Architecture**: 8 issues
 - **Code Quality**: 8 issues
@@ -425,6 +469,7 @@
 - **Testing**: 1 issue
 
 ### Top Priority Actions
+
 1. Break down the God class (UniverseManager)
 2. Fix database connection pool management
 3. Implement authentication and authorization

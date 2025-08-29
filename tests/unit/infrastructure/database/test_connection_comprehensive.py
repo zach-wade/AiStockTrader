@@ -261,6 +261,7 @@ class TestDatabaseConnection:
         database_connection._is_closed = True
         assert database_connection.is_closed is True
 
+    @pytest.mark.asyncio
     async def test_connect_success(self, database_connection, mock_pool, mock_connection):
         """Test successful connection."""
         with patch(
@@ -275,6 +276,7 @@ class TestDatabaseConnection:
             mock_pool.open.assert_called_once()
             mock_connection.cursor().execute.assert_called_with("SELECT 1")
 
+    @pytest.mark.asyncio
     async def test_connect_already_connected(self, database_connection, mock_pool):
         """Test connecting when already connected."""
         database_connection._pool = mock_pool
@@ -285,6 +287,7 @@ class TestDatabaseConnection:
         assert pool is mock_pool
         mock_pool.open.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_connect_after_closed(self, database_connection):
         """Test connecting after connection was closed."""
         database_connection._is_closed = True
@@ -292,6 +295,7 @@ class TestDatabaseConnection:
         with pytest.raises(ConnectionError, match="Connection manager has been closed"):
             await database_connection.connect()
 
+    @pytest.mark.asyncio
     async def test_connect_timeout_error(self, database_connection):
         """Test connection timeout."""
         with patch("src.infrastructure.database.connection.AsyncConnectionPool") as mock_pool_class:
@@ -300,6 +304,7 @@ class TestDatabaseConnection:
             with pytest.raises(ConnectionError, match="Failed to connect to database"):
                 await database_connection.connect()
 
+    @pytest.mark.asyncio
     async def test_connect_operational_error(self, database_connection):
         """Test connection with operational error."""
         with patch("src.infrastructure.database.connection.AsyncConnectionPool") as mock_pool_class:
@@ -308,6 +313,7 @@ class TestDatabaseConnection:
             with pytest.raises(ConnectionError, match="Failed to connect to database"):
                 await database_connection.connect()
 
+    @pytest.mark.asyncio
     async def test_disconnect(self, database_connection, mock_pool):
         """Test disconnecting."""
         database_connection._pool = mock_pool
@@ -320,12 +326,14 @@ class TestDatabaseConnection:
         assert database_connection._pool is None
         mock_pool.close.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_disconnect_already_closed(self, database_connection):
         """Test disconnecting when already closed."""
         database_connection._is_closed = True
 
         await database_connection.disconnect()  # Should not raise
 
+    @pytest.mark.asyncio
     async def test_cleanup(self, database_connection, mock_pool):
         """Test resource cleanup."""
         database_connection._pool = mock_pool
@@ -362,6 +370,7 @@ class TestDatabaseConnection:
             database_connection._start_health_monitoring()
             mock_create_task.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_health_monitor_loop_success(
         self, database_connection, mock_pool, mock_connection
     ):
@@ -379,6 +388,7 @@ class TestDatabaseConnection:
 
         mock_connection.cursor().execute.assert_called_with("SELECT 1")
 
+    @pytest.mark.asyncio
     async def test_health_monitor_loop_failure(self, database_connection, mock_pool):
         """Test health monitor loop with failed check."""
         database_connection._pool = mock_pool
@@ -394,6 +404,7 @@ class TestDatabaseConnection:
 
                 mock_logger.warning.assert_called()
 
+    @pytest.mark.asyncio
     async def test_get_pool_stats_connected(self, database_connection, mock_pool):
         """Test getting pool statistics when connected."""
         database_connection._pool = mock_pool
@@ -408,11 +419,13 @@ class TestDatabaseConnection:
         assert stats["min_size"] == 5
         assert stats["is_closed"] is False
 
+    @pytest.mark.asyncio
     async def test_get_pool_stats_disconnected(self, database_connection):
         """Test getting pool statistics when disconnected."""
         stats = await database_connection.get_pool_stats()
         assert stats == {"status": "disconnected"}
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_success(
         self, database_connection, mock_pool, mock_connection
     ):
@@ -424,12 +437,14 @@ class TestDatabaseConnection:
         async with database_connection.acquire() as conn:
             assert conn is mock_connection
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_not_connected(self, database_connection):
         """Test acquiring connection when not connected."""
         with pytest.raises(ConnectionError, match="Database is not connected"):
             async with database_connection.acquire():
                 pass
 
+    @pytest.mark.asyncio
     async def test_acquire_connection_no_pool(self, database_connection):
         """Test acquiring connection when pool is None."""
         database_connection._pool = None
@@ -461,6 +476,7 @@ class TestConnectionFactory:
         factory2 = ConnectionFactory()
         assert factory1 is factory2
 
+    @pytest.mark.asyncio
     async def test_create_connection_success(self, database_config):
         """Test successful connection creation."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock) as mock_connect:
@@ -470,6 +486,7 @@ class TestConnectionFactory:
             assert connection.config == database_config
             mock_connect.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_create_connection_default_config(self):
         """Test connection creation with default config."""
         with patch.object(DatabaseConfig, "from_env") as mock_from_env:
@@ -480,6 +497,7 @@ class TestConnectionFactory:
                 assert isinstance(connection, DatabaseConnection)
                 mock_from_env.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_create_connection_force_new(self):
         """Test forcing creation of new connection."""
         # Create first connection
@@ -495,6 +513,7 @@ class TestConnectionFactory:
                 assert conn1 is not conn2
                 mock_disconnect.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_create_connection_reuse_existing(self):
         """Test reusing existing connection."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock) as mock_connect:
@@ -504,6 +523,7 @@ class TestConnectionFactory:
             assert conn1 is conn2
             mock_connect.assert_called_once()  # Only called for first connection
 
+    @pytest.mark.asyncio
     async def test_create_connection_replace_closed(self):
         """Test replacing closed connection."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock):
@@ -514,6 +534,7 @@ class TestConnectionFactory:
 
             assert conn1 is not conn2
 
+    @pytest.mark.asyncio
     async def test_create_connection_error(self):
         """Test connection creation error."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock) as mock_connect:
@@ -522,6 +543,7 @@ class TestConnectionFactory:
             with pytest.raises(FactoryError, match="Failed to create connection"):
                 await ConnectionFactory.create_connection()
 
+    @pytest.mark.asyncio
     async def test_get_connection_exists(self):
         """Test getting existing connection."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock):
@@ -530,11 +552,13 @@ class TestConnectionFactory:
 
             assert created_conn is retrieved_conn
 
+    @pytest.mark.asyncio
     async def test_get_connection_not_exists(self):
         """Test getting connection when none exists."""
         with pytest.raises(FactoryError, match="No active database connection"):
             await ConnectionFactory.get_connection()
 
+    @pytest.mark.asyncio
     async def test_get_connection_closed(self):
         """Test getting connection when it's closed."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock):
@@ -544,6 +568,7 @@ class TestConnectionFactory:
             with pytest.raises(FactoryError, match="No active database connection"):
                 await ConnectionFactory.get_connection()
 
+    @pytest.mark.asyncio
     async def test_close_all(self):
         """Test closing all connections."""
         with patch.object(DatabaseConnection, "connect", new_callable=AsyncMock):
@@ -555,6 +580,7 @@ class TestConnectionFactory:
                 mock_disconnect.assert_called_once()
                 assert ConnectionFactory._connection is None
 
+    @pytest.mark.asyncio
     async def test_close_all_no_connection(self):
         """Test closing when no connection exists."""
         await ConnectionFactory.close_all()  # Should not raise

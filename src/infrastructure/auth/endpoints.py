@@ -6,7 +6,7 @@ registration, password management, and MFA operations.
 """
 
 import logging
-from typing import Any
+from collections.abc import Generator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -14,9 +14,11 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
 from sqlalchemy.orm import Session
 
 from .jwt_service import JWTService
-from .middleware import JWTBearer, RequireRole
+from .middleware import RequireRole
 from .rbac_service import RBACService
-from .user_service import AuthenticationResult, RegistrationResult, UserService
+from .services.registration import RegistrationResult
+from .services.user_service import UserService
+from .types import AuthenticationResult
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +152,9 @@ class UserProfileResponse(BaseModel):
 
 
 # Dependency injection functions
-def get_db() -> Session:
+
+
+def get_db() -> Generator[Session, None, None]:
     """Get database session."""
     # This should be replaced with actual database session management
     from infrastructure.database.connection import DatabaseConnection
@@ -180,11 +184,9 @@ def get_rbac_service(db: Session = Depends(get_db)) -> RBACService:
     return RBACService(db_session=db)
 
 
-def get_current_user(
-    request: Request, jwt_bearer: dict[str, Any] = Depends(JWTBearer(get_jwt_service(), get_db()))
-) -> str:
+def get_current_user(request: Request) -> str:
     """Get current authenticated user ID."""
-    return request.state.user_id
+    return str(request.state.user_id)
 
 
 # Public endpoints (no authentication required)
@@ -333,6 +335,8 @@ async def refresh_token(
     refresh_request: RefreshTokenRequest,
     jwt_service: JWTService = Depends(get_jwt_service),
     user_service: UserService = Depends(get_user_service),
+    db: Session = Depends(get_db),
+    rbac_service: RBACService = Depends(get_rbac_service),
 ) -> LoginResponse:
     """
     Refresh access token using refresh token.
@@ -340,9 +344,48 @@ async def refresh_token(
     Implements token rotation for enhanced security.
     """
     try:
-        # Rotate refresh token
+        # First verify the refresh token to get user_id
+        payload = jwt_service.verify_refresh_token(refresh_request.refresh_token)
+        user_id_str = payload["sub"]
+
+        # Import UUID and User model
+        from uuid import UUID
+
+        from .models import User
+
+        # Log for debugging
+        logger.info(f"Refreshing token for user_id: {user_id_str}")
+
+        # Convert string user_id to UUID for database query
+        try:
+            user_id_uuid = UUID(user_id_str)
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Failed to convert user_id to UUID: {user_id_str}, error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID format"
+            )
+
+        # Fetch user details from database
+        user = db.query(User).filter(User.id == user_id_uuid).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+        # Get roles and permissions
+        user_roles = await rbac_service.get_user_roles(str(user.id))
+        user_permissions = await rbac_service.get_user_permissions(str(user.id))
+
+        # Prepare user details
+        user_details = {
+            "email": user.email,
+            "username": user.username,
+            "roles": user_roles,
+            "permissions": user_permissions,
+            "mfa_verified": user.mfa_enabled,
+        }
+
+        # Rotate refresh token with user details
         new_access_token, new_refresh_token = jwt_service.rotate_refresh_token(
-            refresh_request.refresh_token
+            refresh_request.refresh_token, user_details=user_details
         )
 
         # Decode new access token to get user info
@@ -483,14 +526,14 @@ async def get_profile(
 
     return UserProfileResponse(
         id=str(user.id),
-        email=user.email,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
+        email=str(user.email),
+        username=str(user.username),
+        first_name=str(user.first_name) if user.first_name else None,
+        last_name=str(user.last_name) if user.last_name else None,
         roles=roles,
         permissions=permissions,
-        email_verified=user.email_verified,
-        mfa_enabled=user.mfa_enabled,
+        email_verified=bool(user.email_verified),
+        mfa_enabled=bool(user.mfa_enabled),
         created_at=user.created_at.isoformat(),
         last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
     )

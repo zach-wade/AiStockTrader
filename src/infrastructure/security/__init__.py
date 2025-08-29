@@ -23,6 +23,23 @@ from .hardening import (
     secure_endpoint,
 )
 from .input_sanitizer import InputSanitizer, SanitizationError
+from .key_management import (
+    FileSystemKeyStorage,
+    KeyMetadata,
+    KeyStatus,
+    KeyStorage,
+    KeyUsage,
+    RSAKeyManager,
+    create_development_key_manager,
+    create_production_key_manager,
+)
+from .key_rotation import (
+    KeyRotationService,
+    RotationJob,
+    RotationStatus,
+    RotationTrigger,
+    create_production_rotation_service,
+)
 from .secrets import (
     SecretConfig,
     SecretEncryptionError,
@@ -52,6 +69,21 @@ __all__ = [
     "SecretProviderError",
     "SecretEncryptionError",
     "SecretRateLimitError",
+    # Key management
+    "RSAKeyManager",
+    "KeyStorage",
+    "FileSystemKeyStorage",
+    "KeyMetadata",
+    "KeyStatus",
+    "KeyUsage",
+    "create_production_key_manager",
+    "create_development_key_manager",
+    # Key rotation
+    "KeyRotationService",
+    "RotationJob",
+    "RotationStatus",
+    "RotationTrigger",
+    "create_production_rotation_service",
     # Input validation
     "ValidationError",
     "SchemaValidationError",

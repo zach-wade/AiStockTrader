@@ -6,6 +6,7 @@ sessions, and API keys used in the JWT-based authentication system.
 """
 
 from datetime import datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -26,13 +27,13 @@ from sqlalchemy.types import String as SQLString
 from sqlalchemy.types import TypeDecorator
 
 
-class IPAddress(TypeDecorator):
+class IPAddress(TypeDecorator[str]):
     """Database-agnostic IP address field."""
 
     impl = SQLString
     cache_ok = True
 
-    def load_dialect_impl(self, dialect):
+    def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name == "postgresql":
             return dialect.type_descriptor(INET())
         else:
@@ -118,7 +119,13 @@ class User(Base):  # type: ignore[valid-type, misc]
     deleted_at = Column(DateTime, nullable=True)
 
     # Relationships
-    roles = relationship("Role", secondary=user_roles, back_populates="users")
+    roles = relationship(
+        "Role",
+        secondary=user_roles,
+        back_populates="users",
+        primaryjoin="User.id == user_roles.c.user_id",
+        secondaryjoin="Role.id == user_roles.c.role_id",
+    )
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     oauth_connections = relationship(
@@ -137,19 +144,19 @@ class User(Base):  # type: ignore[valid-type, misc]
 
     def lock_account(self, duration_minutes: int = 30) -> None:
         """Lock account for specified duration."""
-        self.locked_until = datetime.utcnow() + timedelta(minutes=duration_minutes)
-        self.failed_login_attempts = 0
+        self.locked_until = datetime.utcnow() + timedelta(minutes=duration_minutes)  # type: ignore[assignment]
+        self.failed_login_attempts = 0  # type: ignore[assignment]
 
     def increment_failed_attempts(self) -> int:
         """Increment failed login attempts."""
         current = getattr(self, "failed_login_attempts", 0) or 0
-        self.failed_login_attempts = current + 1
+        self.failed_login_attempts = current + 1  # type: ignore[assignment]
         return getattr(self, "failed_login_attempts", 0)
 
     def reset_failed_attempts(self) -> None:
         """Reset failed login attempts after successful login."""
-        self.failed_login_attempts = 0
-        self.locked_until = None
+        self.failed_login_attempts = 0  # type: ignore[assignment]
+        self.locked_until = None  # type: ignore[assignment]
 
     def get_permissions(self) -> list[str]:
         """Get all permissions for this user through their roles."""
@@ -184,7 +191,13 @@ class Role(Base):  # type: ignore[valid-type, misc]
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    users = relationship("User", secondary=user_roles, back_populates="roles")
+    users = relationship(
+        "User",
+        secondary=user_roles,
+        back_populates="roles",
+        primaryjoin="Role.id == user_roles.c.role_id",
+        secondaryjoin="User.id == user_roles.c.user_id",
+    )
     permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
 
 
@@ -260,9 +273,9 @@ class APIKey(Base):  # type: ignore[valid-type, misc]
 
     def revoke(self, reason: str | None = None) -> None:
         """Revoke the API key."""
-        self.is_active = False
-        self.revoked_at = datetime.utcnow()
-        self.revoked_reason = reason
+        self.is_active = False  # type: ignore[assignment]
+        self.revoked_at = datetime.utcnow()  # type: ignore[assignment]
+        self.revoked_reason = reason  # type: ignore[assignment]
 
 
 class OAuthConnection(Base):  # type: ignore[valid-type, misc]
@@ -344,19 +357,19 @@ class UserSession(Base):  # type: ignore[valid-type, misc]
 
     def extend(self, duration: timedelta) -> None:
         """Extend session expiration."""
-        self.expires_at = datetime.utcnow() + duration
+        self.expires_at = datetime.utcnow() + duration  # type: ignore[assignment]
         if self.refresh_expires_at:
-            self.refresh_expires_at = datetime.utcnow() + timedelta(days=7)
+            self.refresh_expires_at = datetime.utcnow() + timedelta(days=7)  # type: ignore[assignment]
 
     def revoke(self, reason: str | None = None) -> None:
         """Revoke the session."""
-        self.is_active = False
-        self.revoked_at = datetime.utcnow()
-        self.revoked_reason = reason
+        self.is_active = False  # type: ignore[assignment]
+        self.revoked_at = datetime.utcnow()  # type: ignore[assignment]
+        self.revoked_reason = reason  # type: ignore[assignment]
 
     def update_activity(self) -> None:
         """Update last activity timestamp."""
-        self.last_activity = datetime.utcnow()
+        self.last_activity = datetime.utcnow()  # type: ignore[assignment]
 
 
 class AuthAuditLog(Base):  # type: ignore[valid-type, misc]
@@ -400,4 +413,4 @@ class MFABackupCode(Base):  # type: ignore[valid-type, misc]
 
     def mark_used(self) -> None:
         """Mark backup code as used."""
-        self.used_at = datetime.utcnow()
+        self.used_at = datetime.utcnow()  # type: ignore[assignment]

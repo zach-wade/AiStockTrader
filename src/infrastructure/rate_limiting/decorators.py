@@ -278,7 +278,8 @@ def no_rate_limit(func: Callable[..., Any]) -> Callable[..., Any]:
         # Simply call the function without any rate limiting
         return func(*args, **kwargs)
 
-    wrapper._no_rate_limit = True  # Mark function as exempt
+    # Mark function as exempt by adding attribute to wrapper
+    wrapper._no_rate_limit = True
     return wrapper
 
 

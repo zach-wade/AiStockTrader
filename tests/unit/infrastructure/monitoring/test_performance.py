@@ -1006,6 +1006,7 @@ class TestPerformanceDecorators:
         mock_get_monitor.return_value = mock_monitor
 
         @profile_performance(env="prod")
+        @pytest.mark.asyncio
         async def test_func(x):
             await asyncio.sleep(0.01)
             return x + 10

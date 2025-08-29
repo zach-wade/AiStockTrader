@@ -326,6 +326,7 @@ class TestConnectionFactory:
             ConnectionFactory.from_url(url)
 
     @patch("src.infrastructure.database.connection.AsyncConnectionPool")
+    @pytest.mark.asyncio
     async def test_create_connection_pool_success(self, mock_pool_class, valid_config):
         """Test successful connection pool creation."""
         mock_pool = AsyncMock()
@@ -338,6 +339,7 @@ class TestConnectionFactory:
         mock_pool.open.assert_called_once()
 
     @patch("src.infrastructure.database.connection.AsyncConnectionPool")
+    @pytest.mark.asyncio
     async def test_create_connection_pool_failure(self, mock_pool_class, valid_config):
         """Test connection pool creation failure."""
         mock_pool_class.side_effect = Exception("Pool creation failed")
@@ -347,6 +349,7 @@ class TestConnectionFactory:
 
     @patch("src.infrastructure.database.connection.PostgreSQLAdapter")
     @patch("src.infrastructure.database.connection.AsyncConnectionPool")
+    @pytest.mark.asyncio
     async def test_create_connection_success(
         self, mock_pool_class, mock_adapter_class, valid_config
     ):
@@ -379,6 +382,7 @@ class TestDatabaseConnection:
         assert manager._adapter is None
 
     @patch("src.infrastructure.database.connection.ConnectionFactory.create_connection_pool")
+    @pytest.mark.asyncio
     async def test_connect_success(self, mock_create_pool, manager):
         """Test successful connection."""
         mock_pool = AsyncMock()
@@ -391,6 +395,7 @@ class TestDatabaseConnection:
         mock_create_pool.assert_called_once_with(manager.config)
 
     @patch("src.infrastructure.database.connection.ConnectionFactory.create_connection_pool")
+    @pytest.mark.asyncio
     async def test_connect_failure(self, mock_create_pool, manager):
         """Test connection failure."""
         mock_create_pool.side_effect = Exception("Connection failed")
@@ -399,6 +404,7 @@ class TestDatabaseConnection:
             await manager.connect()
 
     @patch("src.infrastructure.database.connection.ConnectionFactory.create_connection_pool")
+    @pytest.mark.asyncio
     async def test_connect_already_connected(self, mock_create_pool, manager):
         """Test connecting when already connected."""
         mock_pool = AsyncMock()
@@ -412,6 +418,7 @@ class TestDatabaseConnection:
         await manager.connect()
         mock_create_pool.assert_called_once()  # Should only be called once
 
+    @pytest.mark.asyncio
     async def test_disconnect_when_connected(self, manager):
         """Test disconnection when connected."""
         mock_pool = AsyncMock()
@@ -424,6 +431,7 @@ class TestDatabaseConnection:
         assert manager._adapter is None
         mock_pool.close.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_disconnect_when_not_connected(self, manager):
         """Test disconnection when not connected."""
         # Should not raise error
@@ -432,6 +440,7 @@ class TestDatabaseConnection:
         assert manager._pool is None
         assert manager._adapter is None
 
+    @pytest.mark.asyncio
     async def test_disconnect_pool_close_error(self, manager):
         """Test disconnection when pool close fails."""
         mock_pool = AsyncMock()
@@ -481,6 +490,7 @@ class TestDatabaseConnection:
             _ = manager.pool
 
     @patch("src.infrastructure.database.connection.ConnectionFactory.create_connection_pool")
+    @pytest.mark.asyncio
     async def test_health_check_success(self, mock_create_pool, manager):
         """Test successful health check."""
         mock_pool = AsyncMock()
@@ -496,6 +506,7 @@ class TestDatabaseConnection:
         assert result is True
         mock_adapter.health_check.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_health_check_when_not_connected(self, manager):
         """Test health check when not connected."""
         result = await manager.health_check()
@@ -503,6 +514,7 @@ class TestDatabaseConnection:
         assert result is False
 
     @patch("src.infrastructure.database.connection.ConnectionFactory.create_connection_pool")
+    @pytest.mark.asyncio
     async def test_health_check_adapter_failure(self, mock_create_pool, manager):
         """Test health check when adapter check fails."""
         mock_pool = AsyncMock()
@@ -518,6 +530,7 @@ class TestDatabaseConnection:
         assert result is False
 
     @patch("src.infrastructure.database.connection.ConnectionFactory.create_connection_pool")
+    @pytest.mark.asyncio
     async def test_get_stats(self, mock_create_pool, manager):
         """Test getting connection statistics."""
         mock_pool = AsyncMock()
@@ -541,6 +554,7 @@ class TestDatabaseConnection:
         }
         assert stats == expected
 
+    @pytest.mark.asyncio
     async def test_get_stats_when_not_connected(self, manager):
         """Test getting statistics when not connected."""
         stats = await manager.get_stats()
@@ -548,6 +562,7 @@ class TestDatabaseConnection:
         expected = {"is_connected": False, "config": manager.config, "pool_info": None}
         assert stats == expected
 
+    @pytest.mark.asyncio
     async def test_context_manager_success(self, manager):
         """Test context manager successful usage."""
         with patch(
@@ -563,6 +578,7 @@ class TestDatabaseConnection:
             assert not manager.is_connected
             mock_pool.close.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_context_manager_exception(self, manager):
         """Test context manager with exception."""
         with patch(

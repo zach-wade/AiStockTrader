@@ -62,7 +62,7 @@ class TestPositionCreation:
 
     def test_cannot_open_position_with_negative_price(self):
         """Test that position cannot be opened with negative price"""
-        with pytest.raises(ValueError, match="Entry price must be positive"):
+        with pytest.raises(ValueError, match="Price must be positive"):
             Position.open_position(
                 symbol="AAPL", quantity=Decimal("100"), entry_price=Decimal("-150.00")
             )

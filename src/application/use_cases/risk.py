@@ -11,14 +11,16 @@ from uuid import UUID, uuid4
 
 from src.application.interfaces.unit_of_work import IUnitOfWork
 from src.domain.services.risk_calculator import RiskCalculator
+from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.price import Price
 
 from .base import TransactionalUseCase, UseCaseResponse
+from .base_request import BaseRequestDTO
 
 
 # Request/Response DTOs
 @dataclass
-class CalculateRiskRequest:
+class CalculateRiskRequest(BaseRequestDTO):
     """Request to calculate portfolio risk metrics."""
 
     portfolio_id: UUID
@@ -26,16 +28,6 @@ class CalculateRiskRequest:
     include_sharpe: bool = True
     include_drawdown: bool = True
     confidence_level: float = 0.95
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -50,22 +42,12 @@ class CalculateRiskResponse(UseCaseResponse):
 
 
 @dataclass
-class ValidateOrderRiskRequest:
+class ValidateOrderRiskRequest(BaseRequestDTO):
     """Request to validate order risk."""
 
     order_id: UUID
     portfolio_id: UUID
     current_price: Decimal
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -82,20 +64,10 @@ class ValidateOrderRiskResponse(UseCaseResponse):
 
 
 @dataclass
-class GetRiskMetricsRequest:
+class GetRiskMetricsRequest(BaseRequestDTO):
     """Request to get current risk metrics."""
 
     portfolio_id: UUID
-    request_id: UUID | None = None
-    correlation_id: UUID | None = None
-    metadata: dict[str, Any] | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize request with defaults."""
-        if self.request_id is None:
-            self.request_id = uuid4()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 @dataclass
@@ -151,7 +123,7 @@ class CalculateRiskUseCase(TransactionalUseCase[CalculateRiskRequest, CalculateR
                 confidence_level=Decimal(str(request.confidence_level)),
                 time_horizon=1,
             )
-            response.value_at_risk = var.amount
+            response.value_at_risk = ValueObjectConverter.to_decimal(var)
 
         # Calculate Sharpe ratio if requested
         if request.include_sharpe:
@@ -222,12 +194,14 @@ class ValidateOrderRiskUseCase(
         violations = [] if risk_check[0] else [risk_check[1]]
 
         # Calculate risk metrics
-        position_value = order.quantity * current_price.value
-        portfolio_value = portfolio.get_total_value_sync()
+        quantity_value = ValueObjectConverter.extract_value(order.quantity)
+        position_value = quantity_value * ValueObjectConverter.extract_value(current_price)
+        portfolio_value = ValueObjectConverter.extract_amount(portfolio.get_total_value())
+        cash_balance_value = ValueObjectConverter.extract_amount(portfolio.cash_balance)
 
         risk_metrics = {
             "position_size_pct": float(position_value / portfolio_value * 100),
-            "leverage": float(portfolio_value / portfolio.cash_balance),
+            "leverage": float(portfolio_value / cash_balance_value),
             "concentration": float(position_value / portfolio_value),
             "max_loss": float(position_value * Decimal("0.1")),  # 10% max loss assumption
         }
@@ -276,15 +250,35 @@ class GetRiskMetricsUseCase(TransactionalUseCase[GetRiskMetricsRequest, GetRiskM
         cash_balance = portfolio.cash_balance
 
         metrics = {
-            "portfolio_value": float(portfolio_value),
-            "positions_value": float(positions_value),
-            "cash_balance": float(cash_balance),
-            "leverage": float(portfolio_value / cash_balance) if cash_balance > 0 else 0,
+            "portfolio_value": float(ValueObjectConverter.extract_amount(portfolio_value)),
+            "positions_value": float(ValueObjectConverter.extract_amount(positions_value)),
+            "cash_balance": float(ValueObjectConverter.extract_amount(cash_balance)),
+            "leverage": (
+                float(
+                    ValueObjectConverter.extract_amount(portfolio_value)
+                    / ValueObjectConverter.extract_amount(cash_balance)
+                )
+                if ValueObjectConverter.extract_amount(cash_balance) > 0
+                else 0
+            ),
             "position_count": len(portfolio.get_open_positions()),
-            "concentration": float(positions_value / portfolio_value) if portfolio_value > 0 else 0,
-            "unrealized_pnl": float(portfolio.get_unrealized_pnl()),
-            "realized_pnl": float(portfolio.total_realized_pnl),
-            "total_return_pct": float(portfolio.get_total_return() * 100),
+            "concentration": (
+                float(
+                    ValueObjectConverter.extract_amount(positions_value)
+                    / ValueObjectConverter.extract_amount(portfolio_value)
+                )
+                if ValueObjectConverter.extract_amount(portfolio_value) > 0
+                else 0
+            ),
+            "unrealized_pnl": float(
+                ValueObjectConverter.extract_amount(portfolio.get_unrealized_pnl())
+            ),
+            "realized_pnl": float(
+                ValueObjectConverter.extract_amount(portfolio.total_realized_pnl)
+            ),
+            "total_return_pct": float(
+                ValueObjectConverter.extract_amount(portfolio.get_total_return()) * 100
+            ),
         }
 
         return GetRiskMetricsResponse(success=True, metrics=metrics, request_id=request.request_id)

@@ -9,6 +9,7 @@ The backtesting analysis module exhibits severe architectural violations across 
 ## Pattern Compliance Checklist
 
 ### SOLID Principles
+
 - ❌ **Single Responsibility Principle (SRP)** - Multiple violations
 - ❌ **Open/Closed Principle (OCP)** - Hard to extend without modification
 - ❌ **Liskov Substitution Principle (LSP)** - No interface contracts
@@ -16,6 +17,7 @@ The backtesting analysis module exhibits severe architectural violations across 
 - ❌ **Dependency Inversion Principle (DIP)** - Direct concrete dependencies
 
 ### Architecture Patterns
+
 - ❌ **Consistency with established patterns** - No clear architectural pattern
 - ❌ **Proper dependency management** - Circular and hard dependencies
 - ❌ **Appropriate abstraction levels** - Missing abstraction layers
@@ -30,15 +32,18 @@ The backtesting analysis module exhibits severe architectural violations across 
 No interfaces or abstract base classes exist for any analysis components. All modules directly instantiate concrete classes.
 
 **Impact:**
+
 - Cannot mock/stub for testing
 - Cannot swap implementations
 - Tight coupling between modules
 - Violates Dependency Inversion Principle
 
 **Files Affected:**
+
 - All 5 files lack interface definitions
 
 **Recommendation:**
+
 ```python
 # Create analysis/interfaces.py
 from abc import ABC, abstractmethod
@@ -47,18 +52,18 @@ import pandas as pd
 
 class IPerformanceAnalyzer(ABC):
     @abstractmethod
-    def calculate_metrics(self, equity_curve: pd.Series, 
-                         trades: pd.DataFrame, 
+    def calculate_metrics(self, equity_curve: pd.Series,
+                         trades: pd.DataFrame,
                          risk_free_rate: float = 0.02) -> Dict[str, float]:
         pass
 
 class IRiskAnalyzer(ABC):
     @abstractmethod
-    def calculate_var(self, returns: pd.Series, 
+    def calculate_var(self, returns: pd.Series,
                      confidence_levels: Optional[List[float]] = None,
                      method: str = 'historical') -> Dict[str, float]:
         pass
-    
+
     @abstractmethod
     def stress_test(self, portfolio_returns: pd.Series,
                    portfolio_positions: pd.DataFrame,
@@ -72,14 +77,14 @@ class ICorrelationAnalyzer(ABC):
 
 class ISymbolSelector(ABC):
     @abstractmethod
-    async def select_symbols(self, criteria: Any, 
+    async def select_symbols(self, criteria: Any,
                            as_of_date: Optional[datetime] = None,
                            limit: Optional[int] = None) -> List[str]:
         pass
 
 class IValidationSuite(ABC):
     @abstractmethod
-    async def run_walk_forward_analysis(self, strategy: Any, 
+    async def run_walk_forward_analysis(self, strategy: Any,
                                        symbol: str,
                                        features: pd.DataFrame) -> List[Any]:
         pass
@@ -92,7 +97,9 @@ class IValidationSuite(ABC):
 Multiple classes violate SRP by handling too many responsibilities:
 
 #### risk_analysis.py - RiskAnalyzer (502 lines)
+
 **Line 29-502:** Single class handles:
+
 - VaR calculations (3 different methods)
 - CVaR calculations
 - Risk metrics computation
@@ -102,6 +109,7 @@ Multiple classes violate SRP by handling too many responsibilities:
 - Correlation risk analysis
 
 **Recommendation:**
+
 ```python
 # Separate into focused classes
 class VaRCalculator:
@@ -129,7 +137,9 @@ class RiskAttributor:
 ```
 
 #### correlation_matrix.py - CorrelationMatrix (481 lines)
+
 **Line 47-481:** Single class handles:
+
 - Correlation matrix calculation
 - Signal generation
 - Divergence analysis
@@ -140,17 +150,18 @@ class RiskAttributor:
 - Data export
 
 **Recommendation:**
+
 ```python
 # Separate into focused components
 class CorrelationCalculator:
     """Pure correlation calculations"""
-    
+
 class SignalGenerator:
     """Signal generation from correlations"""
-    
+
 class RegimeDetector:
     """Market regime detection"""
-    
+
 class SectorRotationAnalyzer:
     """Sector rotation analysis"""
 ```
@@ -160,9 +171,11 @@ class SectorRotationAnalyzer:
 **Severity: HIGH**
 
 #### performance_metrics.py
+
 **Line 11-48:** The `calculate_metrics` method hardcodes all metrics. Adding new metrics requires modifying the method.
 
 **Recommendation:**
+
 ```python
 class MetricCalculator(ABC):
     @abstractmethod
@@ -172,19 +185,21 @@ class MetricCalculator(ABC):
 class PerformanceAnalyzer:
     def __init__(self):
         self.calculators: Dict[str, MetricCalculator] = {}
-    
+
     def register_metric(self, name: str, calculator: MetricCalculator):
         self.calculators[name] = calculator
-    
+
     def calculate_metrics(self, equity_curve, trades):
-        return {name: calc.calculate(equity_curve, trades) 
+        return {name: calc.calculate(equity_curve, trades)
                 for name, calc in self.calculators.items()}
 ```
 
 #### risk_analysis.py
+
 **Line 49-87:** Stress scenarios hardcoded in `_load_stress_scenarios`
 
 **Recommendation:**
+
 ```python
 class StressScenario(ABC):
     @abstractmethod
@@ -201,19 +216,22 @@ class ScenarioRegistry:
 **Severity: HIGH**
 
 #### symbol_selector.py
+
 **Line 101-105:** Direct dependency on concrete `DatabasePool`
+
 ```python
 def __init__(self, db_pool: DatabasePool, config: Optional[Dict[str, Any]] = None):
     self.db_pool = db_pool  # Direct concrete dependency
 ```
 
 **Recommendation:**
+
 ```python
 class IDataProvider(ABC):
     @abstractmethod
     async def get_symbols(self, as_of_date: datetime) -> List[str]:
         pass
-    
+
     @abstractmethod
     async def get_symbol_stats(self, symbols: List[str]) -> Dict[str, Any]:
         pass
@@ -224,9 +242,11 @@ class SymbolSelector:
 ```
 
 #### validation_suite.py
+
 **Line 39-51:** Direct dependencies on concrete classes
+
 ```python
-def __init__(self, config: Dict, backtest_engine: BacktestEngine, 
+def __init__(self, config: Dict, backtest_engine: BacktestEngine,
              performance_analyzer: PerformanceAnalyzer):
     # Direct concrete dependencies
     self.backtest_engine = backtest_engine
@@ -236,12 +256,15 @@ def __init__(self, config: Dict, backtest_engine: BacktestEngine,
 ### 5. MEDIUM: Improper Error Handling and Security Issues
 
 #### risk_analysis.py
+
 **Line 309:** Undefined function `secure_numpy_normal`
+
 ```python
 vol_shock = secure_numpy_normal(0, safe_divide(...))  # Function doesn't exist
 ```
 
 **Line 393:** Using np.random without seed control
+
 ```python
 random_returns = np.random.multivariate_normal(...)  # Non-deterministic
 ```
@@ -251,16 +274,17 @@ random_returns = np.random.multivariate_normal(...)  # Non-deterministic
 All components use direct instantiation instead of factory pattern:
 
 **Recommendation:**
+
 ```python
 class AnalysisComponentFactory:
     @staticmethod
     def create_performance_analyzer(config: Dict) -> IPerformanceAnalyzer:
         return PerformanceAnalyzer(config)
-    
+
     @staticmethod
     def create_risk_analyzer(config: Dict) -> IRiskAnalyzer:
         return RiskAnalyzer(config)
-    
+
     @staticmethod
     def create_correlation_analyzer(config: Dict) -> ICorrelationAnalyzer:
         return CorrelationMatrix(config)
@@ -269,12 +293,15 @@ class AnalysisComponentFactory:
 ### 7. LOW: Interface Segregation Issues
 
 #### correlation_matrix.py
+
 **Line 107-125:** The `analyze_correlations` method does too much internally:
+
 - Calls 6 different analysis methods
 - No way to selectively run analyses
 - Forces all analyses even if not needed
 
 **Recommendation:**
+
 ```python
 class ICorrelationBreakdownAnalyzer(ABC):
     @abstractmethod
@@ -290,6 +317,7 @@ class IDivergenceAnalyzer(ABC):
 ## Recommended Refactoring Priority
 
 ### Phase 1: Critical (Immediate)
+
 1. **Create Interface Layer**
    - Define all interfaces in `analysis/interfaces.py`
    - Update all classes to implement interfaces
@@ -301,6 +329,7 @@ class IDivergenceAnalyzer(ABC):
    - Estimated effort: 0.5 days
 
 ### Phase 2: High Priority (This Sprint)
+
 1. **Break Down God Classes**
    - Split RiskAnalyzer into 4-5 focused classes
    - Split CorrelationMatrix into 5-6 focused classes
@@ -312,6 +341,7 @@ class IDivergenceAnalyzer(ABC):
    - Estimated effort: 2 days
 
 ### Phase 3: Medium Priority (Next Sprint)
+
 1. **Implement Strategy Pattern**
    - For metric calculations
    - For stress scenarios
@@ -325,6 +355,7 @@ class IDivergenceAnalyzer(ABC):
 ## Long-term Implications
 
 ### Current State Impact
+
 1. **Testing Difficulty**: Cannot unit test in isolation due to concrete dependencies
 2. **Maintenance Burden**: Changes require modifying multiple files
 3. **Extension Difficulty**: Cannot add new analyses without modifying existing code
@@ -332,6 +363,7 @@ class IDivergenceAnalyzer(ABC):
 5. **Debugging Complexity**: Large classes make debugging difficult
 
 ### After Refactoring Benefits
+
 1. **Improved Testability**: Mock dependencies, test in isolation
 2. **Better Maintainability**: Clear responsibilities, easier to understand
 3. **Enhanced Extensibility**: Add new analyses via interface implementation
@@ -341,6 +373,7 @@ class IDivergenceAnalyzer(ABC):
 ## Architecture Recommendations
 
 ### 1. Implement Hexagonal Architecture
+
 ```
 ├── analysis/
 │   ├── domain/           # Business logic
@@ -357,6 +390,7 @@ class IDivergenceAnalyzer(ABC):
 ```
 
 ### 2. Use Dependency Injection Container
+
 ```python
 from typing import Protocol
 
@@ -364,10 +398,10 @@ class ServiceContainer:
     def __init__(self):
         self._services = {}
         self._singletons = {}
-    
+
     def register(self, interface: Type, implementation: Type, singleton: bool = False):
         self._services[interface] = (implementation, singleton)
-    
+
     def resolve(self, interface: Type):
         implementation, is_singleton = self._services[interface]
         if is_singleton:
@@ -378,7 +412,9 @@ class ServiceContainer:
 ```
 
 ### 3. Implement Event-Driven Communication
+
 Instead of direct method calls between analysis components, use events:
+
 ```python
 class AnalysisEvent:
     pass

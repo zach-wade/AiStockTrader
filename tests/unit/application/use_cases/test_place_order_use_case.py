@@ -351,7 +351,9 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-123"
 
@@ -362,7 +364,7 @@ class TestPlaceOrderProcessing:
         assert response.success is True
         assert response.order_id is not None
         assert response.broker_order_id == "BROKER-123"
-        assert response.status == OrderStatus.SUBMITTED
+        assert response.status == "submitted"
         assert response.request_id == valid_request.request_id
 
         # Verify calls
@@ -399,7 +401,9 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-456"
 
@@ -413,8 +417,8 @@ class TestPlaceOrderProcessing:
         assert submitted_order.symbol == "AAPL"
         assert submitted_order.side == OrderSide.SELL
         assert submitted_order.order_type == OrderType.LIMIT
-        assert submitted_order.quantity == Decimal("50")
-        assert submitted_order.limit_price == Decimal("155.50")
+        assert submitted_order.quantity.value == Decimal("50")
+        assert submitted_order.limit_price.value == Decimal("155.50")
 
     @pytest.mark.asyncio
     async def test_process_successful_stop_limit_order(
@@ -442,7 +446,9 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-789"
 
@@ -456,9 +462,9 @@ class TestPlaceOrderProcessing:
         assert submitted_order.symbol == "TSLA"
         assert submitted_order.side == OrderSide.BUY
         assert submitted_order.order_type == OrderType.STOP_LIMIT
-        assert submitted_order.quantity == Decimal("25")
-        assert submitted_order.limit_price == Decimal("200.00")
-        assert submitted_order.stop_price == Decimal("195.00")
+        assert submitted_order.quantity.value == Decimal("25")
+        assert submitted_order.limit_price.value == Decimal("200.00")
+        assert submitted_order.stop_price.value == Decimal("195.00")
         assert submitted_order.time_in_force == TimeInForce.IOC
 
     @pytest.mark.asyncio
@@ -504,8 +510,8 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(
-            is_valid=False, error_message="Insufficient buying power"
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=False, error_message="Insufficient buying power")
         )
 
         response = await place_order_use_case.process(valid_request)
@@ -528,8 +534,8 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(
-            is_valid=False, error_message=None
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=False, error_message=None)
         )
 
         response = await place_order_use_case.process(valid_request)
@@ -552,7 +558,9 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (
             False,
             "Position size exceeds maximum",
@@ -579,7 +587,9 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.side_effect = Exception("Connection timeout")
 
@@ -605,7 +615,9 @@ class TestPlaceOrderProcessing:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-123"
         mock_unit_of_work.orders.save_order.side_effect = Exception("Database error")
@@ -658,7 +670,9 @@ class TestTransactionManagement:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-123"
 
@@ -707,7 +721,9 @@ class TestTransactionManagement:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.side_effect = Exception("Broker error")
 
@@ -759,7 +775,9 @@ class TestConcurrentOrderHandling:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
 
         # Create unique broker IDs for each order
@@ -824,7 +842,9 @@ class TestConcurrentOrderHandling:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(side_effect=portfolios)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-MULTI"
 
@@ -871,7 +891,9 @@ class TestConcurrentOrderHandling:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
 
         # Make some orders fail at broker submission
@@ -935,7 +957,9 @@ class TestLoggingBehavior:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-123"
 
@@ -978,7 +1002,9 @@ class TestLoggingBehavior:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.side_effect = RuntimeError("Broker unavailable")
 
@@ -1018,7 +1044,9 @@ class TestEdgeCases:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-DUP"
 
@@ -1055,7 +1083,9 @@ class TestEdgeCases:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (False, "Quantity exceeds maximum")
 
         response = await place_order_use_case.process(request)
@@ -1087,7 +1117,9 @@ class TestEdgeCases:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-SMALL"
 
@@ -1096,7 +1128,7 @@ class TestEdgeCases:
         assert response.success is True
         # Verify the order was created with the small price
         submitted_order = mock_broker.submit_order.call_args[0][0]
-        assert submitted_order.limit_price == Decimal("0.0001")
+        assert submitted_order.limit_price.value == Decimal("0.0001")
 
     @pytest.mark.asyncio
     async def test_special_characters_in_symbol(
@@ -1121,7 +1153,9 @@ class TestEdgeCases:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-SPECIAL"
 
@@ -1155,7 +1189,9 @@ class TestEdgeCases:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-META"
 
@@ -1187,7 +1223,9 @@ class TestEdgeCases:
         mock_unit_of_work.portfolios.get_portfolio_by_id = AsyncMock(return_value=sample_portfolio)
         mock_unit_of_work.market_data.get_latest_bar = AsyncMock(return_value=sample_market_bar)
         mock_unit_of_work.orders.save_order = AsyncMock()
-        mock_order_validator.validate_order.return_value = ValidationResult(is_valid=True)
+        mock_order_validator.validate_order = AsyncMock(
+            return_value=ValidationResult(is_valid=True)
+        )
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
         mock_broker.submit_order.return_value = "BROKER-NULL-META"
 

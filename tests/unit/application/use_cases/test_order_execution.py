@@ -37,6 +37,7 @@ from src.domain.services.market_microstructure import IMarketMicrostructure
 from src.domain.services.order_processor import OrderProcessor
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 # ============================================================================
 # Test Fixtures
@@ -78,7 +79,7 @@ def mock_unit_of_work():
 def mock_order_processor():
     """Create a mock order processor."""
     processor = Mock(spec=OrderProcessor)
-    processor.process_fill = Mock()
+    processor.process_fill = AsyncMock()
     processor.validate_fill = Mock(return_value=True)
     return processor
 
@@ -117,13 +118,13 @@ def sample_order():
     order.symbol = "AAPL"
     order.side = OrderSide.BUY
     order.order_type = OrderType.MARKET
-    order.quantity = 100
+    order.quantity = Quantity(100)
     order.status = OrderStatus.SUBMITTED
     order.time_in_force = TimeInForce.DAY
     order.submitted_at = datetime.now(UTC)
-    order.filled_quantity = 0
+    order.filled_quantity = Quantity(0)
     order.is_active = Mock(return_value=True)
-    order.get_remaining_quantity = Mock(return_value=100)
+    order.get_remaining_quantity = Mock(return_value=Quantity(100))
     order.fill = Mock()
     return order
 
@@ -348,7 +349,7 @@ class TestProcessOrderFillUseCase:
         response = await process_fill_use_case.process(request)
 
         assert response.success is False
-        assert response.error == f"Cannot fill order in status: {OrderStatus.CANCELLED}"
+        assert response.error == "Cannot fill order in status: cancelled"
         assert response.filled is False
 
     @pytest.mark.asyncio
@@ -376,7 +377,7 @@ class TestProcessOrderFillUseCase:
     ):
         """Test process when order has no remaining quantity."""
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=0)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(0))
 
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = sample_portfolio
@@ -404,7 +405,7 @@ class TestProcessOrderFillUseCase:
         """Test successful processing of a full order fill."""
         # Setup order
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock()
 
         # Setup mocks
@@ -445,7 +446,7 @@ class TestProcessOrderFillUseCase:
         """Test successful processing of a partial order fill."""
         # Setup order
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock()
 
         # Setup mocks
@@ -468,7 +469,7 @@ class TestProcessOrderFillUseCase:
 
         # Verify fill was called with correct quantity
         call_args = sample_order.fill.call_args
-        assert call_args[1]["fill_quantity"] == 50
+        assert call_args[1]["filled_quantity"] == Quantity(50)
 
     @pytest.mark.asyncio
     async def test_process_with_positions_update(
@@ -482,7 +483,7 @@ class TestProcessOrderFillUseCase:
         """Test that positions are properly saved after fill."""
         # Setup order and portfolio
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock()
 
         # Create mock positions
@@ -512,7 +513,7 @@ class TestProcessOrderFillUseCase:
     ):
         """Test exception handling during fill processing."""
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock(side_effect=Exception("Fill processing failed"))
 
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
@@ -536,7 +537,7 @@ class TestProcessOrderFillUseCase:
         custom_timestamp = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock()
 
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
@@ -560,7 +561,7 @@ class TestProcessOrderFillUseCase:
     ):
         """Test that fill quantity is capped at remaining quantity."""
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=50)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(50))
         sample_order.fill = Mock()
 
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
@@ -743,7 +744,7 @@ class TestSimulateOrderExecutionUseCase:
         order = Mock(spec=Order)
         order.side = OrderSide.BUY
         order.order_type = OrderType.MARKET
-        order.quantity = 100
+        order.quantity = Quantity(100)
 
         mock_unit_of_work.orders.get_order_by_id.return_value = order
 
@@ -772,7 +773,7 @@ class TestSimulateOrderExecutionUseCase:
         mock_market_microstructure.calculate_execution_price.assert_called_once_with(
             base_price=Price(Decimal("100.50")),
             side=OrderSide.BUY,
-            quantity=100,
+            quantity=Quantity(100),
             order_type=OrderType.MARKET,
         )
 
@@ -785,7 +786,7 @@ class TestSimulateOrderExecutionUseCase:
         order = Mock(spec=Order)
         order.side = OrderSide.SELL
         order.order_type = OrderType.MARKET
-        order.quantity = 100
+        order.quantity = Quantity(100)
 
         mock_unit_of_work.orders.get_order_by_id.return_value = order
 
@@ -810,7 +811,7 @@ class TestSimulateOrderExecutionUseCase:
         order = Mock(spec=Order)
         order.side = OrderSide.BUY
         order.order_type = OrderType.LIMIT
-        order.quantity = 100
+        order.quantity = Quantity(100)
         order.limit_price = Price(Decimal("100.00"))
 
         mock_unit_of_work.orders.get_order_by_id.return_value = order
@@ -835,7 +836,7 @@ class TestSimulateOrderExecutionUseCase:
         order = Mock(spec=Order)
         order.side = OrderSide.BUY
         order.order_type = OrderType.MARKET
-        order.quantity = 100
+        order.quantity = Quantity(100)
 
         mock_unit_of_work.orders.get_order_by_id.return_value = order
         mock_market_microstructure.calculate_execution_price.return_value = Price(Decimal("100.50"))
@@ -909,7 +910,7 @@ class TestCalculateCommissionRequest:
     def test_post_init_initializes_empty_metadata(self):
         """Test that __post_init__ initializes empty metadata dict."""
         request = CalculateCommissionRequest(
-            quantity=100, price=Decimal("100.50"), order_type="MARKET", metadata=None
+            quantity=Quantity(100), price=Decimal("100.50"), order_type="MARKET", metadata=None
         )
 
         assert request.metadata == {}
@@ -948,7 +949,7 @@ class TestCalculateCommissionUseCase:
 
         # Verify calculator was called correctly
         mock_commission_calculator.calculate.assert_called_once_with(
-            quantity=200, price=Money(Decimal("150.00"))
+            quantity=Quantity(200), price=Money(Decimal("150.00"))
         )
 
     @pytest.mark.asyncio
@@ -957,7 +958,7 @@ class TestCalculateCommissionUseCase:
     ):
         """Test commission calculation with symbol parameter."""
         request = CalculateCommissionRequest(
-            quantity=100, price=Decimal("100.00"), order_type="MARKET", symbol="TSLA"
+            quantity=Quantity(100), price=Decimal("100.00"), order_type="MARKET", symbol="TSLA"
         )
 
         response = await calculate_commission_use_case.execute(request)
@@ -973,7 +974,7 @@ class TestCalculateCommissionUseCase:
         mock_commission_calculator.calculate.side_effect = Exception("Calculation failed")
 
         request = CalculateCommissionRequest(
-            quantity=100, price=Decimal("100.00"), order_type="MARKET"
+            quantity=Quantity(100), price=Decimal("100.00"), order_type="MARKET"
         )
 
         response = await calculate_commission_use_case.execute(request)
@@ -991,7 +992,7 @@ class TestCalculateCommissionUseCase:
         mock_commission_calculator.calculate.side_effect = Exception("Error")
 
         request = CalculateCommissionRequest(
-            quantity=100,
+            quantity=Quantity(100),
             price=Decimal("100.00"),
             order_type="MARKET",
             request_id=None,  # Explicitly set to None
@@ -1018,7 +1019,7 @@ class TestCalculateCommissionUseCase:
         use_case = CalculateCommissionUseCase(mock_commission_calculator)
 
         request = CalculateCommissionRequest(
-            quantity=100, price=Decimal("100.00"), order_type="MARKET"
+            quantity=Quantity(100), price=Decimal("100.00"), order_type="MARKET"
         )
 
         response = await use_case.execute(request)
@@ -1180,13 +1181,13 @@ class TestOrderExecutionIntegration:
         order.symbol = "AAPL"
         order.side = OrderSide.BUY
         order.order_type = OrderType.MARKET
-        order.quantity = 100
+        order.quantity = Quantity(100)
         order.status = OrderStatus.PENDING
         order.time_in_force = TimeInForce.DAY
         order.submitted_at = datetime.now(UTC)
-        order.filled_quantity = 0
+        order.filled_quantity = Quantity(0)
         order.is_active = Mock(return_value=True)
-        order.get_remaining_quantity = Mock(return_value=100)
+        order.get_remaining_quantity = Mock(return_value=Quantity(100))
         order.fill = Mock()
 
         # Create portfolio mock
@@ -1239,7 +1240,7 @@ class TestOrderExecutionIntegration:
         order.symbol = "GOOGL"
         order.side = OrderSide.SELL
         order.order_type = OrderType.MARKET
-        order.quantity = 200
+        order.quantity = Quantity(200)
         order.status = OrderStatus.PENDING
         order.time_in_force = TimeInForce.GTC
         order.submitted_at = datetime.now(UTC)
@@ -1286,7 +1287,7 @@ class TestEdgeCases:
     ):
         """Test concurrent fill processing requests."""
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock()
 
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
@@ -1316,7 +1317,7 @@ class TestEdgeCases:
         mock_commission_calculator.calculate.return_value = Money(Decimal("10.123456789"))
 
         request = CalculateCommissionRequest(
-            quantity=100, price=Decimal("100.123456789"), order_type="MARKET"
+            quantity=Quantity(100), price=Decimal("100.123456789"), order_type="MARKET"
         )
 
         response = await calculate_commission_use_case.execute(request)
@@ -1331,7 +1332,7 @@ class TestEdgeCases:
         """Test that errors are properly logged."""
         # Setup order and portfolio
         sample_order.is_active = Mock(return_value=True)
-        sample_order.get_remaining_quantity = Mock(return_value=100)
+        sample_order.get_remaining_quantity = Mock(return_value=Quantity(100))
         sample_order.fill = Mock(side_effect=Exception("Processing error"))
 
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order

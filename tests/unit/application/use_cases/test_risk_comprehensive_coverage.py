@@ -33,6 +33,8 @@ from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.domain.services.risk_calculator import RiskCalculator
 from src.domain.value_objects.money import Money
+from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 @pytest.fixture
@@ -74,21 +76,28 @@ def sample_portfolio():
     portfolio = Portfolio(
         id=uuid4(),
         name="Test Portfolio",
-        initial_capital=Decimal("100000"),
-        cash_balance=Decimal("50000"),
+        initial_capital=Money(Decimal("100000")),
+        cash_balance=Money(Decimal("50000")),
     )
-    portfolio.total_realized_pnl = Decimal("5000")
+    portfolio.total_realized_pnl = Money(Decimal("5000"))
+    portfolio.get_total_return = Mock(return_value=Decimal("0.15"))
+    portfolio.get_total_value = Mock(return_value=Money(Decimal("115000")))
+    portfolio.get_total_value_sync = Mock(return_value=Decimal("115000"))
 
     # Add some positions
     position1 = Position(
-        symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("150.00")
+        symbol="AAPL",
+        quantity=Quantity(Decimal("100")),
+        average_entry_price=Price(Decimal("150.00")),
     )
-    position1.current_price = Decimal("155.00")
+    position1.current_price = Price(Decimal("155.00"))
 
     position2 = Position(
-        symbol="GOOGL", quantity=Decimal("50"), average_entry_price=Decimal("2800.00")
+        symbol="GOOGL",
+        quantity=Quantity(Decimal("50")),
+        average_entry_price=Price(Decimal("2800.00")),
     )
-    position2.current_price = Decimal("2850.00")
+    position2.current_price = Price(Decimal("2850.00"))
 
     portfolio.positions = {position1.id: position1, position2.id: position2}
 
@@ -99,7 +108,10 @@ def sample_portfolio():
 def sample_order():
     """Create a sample order for testing."""
     order = Order(
-        symbol="AAPL", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=Decimal("100")
+        symbol="AAPL",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=Quantity(Decimal("100")),
     )
     order.portfolio_id = uuid4()
     return order

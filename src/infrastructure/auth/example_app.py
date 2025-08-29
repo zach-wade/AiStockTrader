@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db = SessionLocal()
     rbac_service = RBACService(db)
     await rbac_service.initialize_default_roles_and_permissions()
-    await db.close()
+    db.close()
 
     yield
 
@@ -162,7 +162,7 @@ app.add_middleware(
 
 
 @app.post("/api/v1/auth/register", status_code=status.HTTP_201_CREATED)
-async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+async def register(request: RegisterRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     """Register a new user."""
     user_service = UserService(db, jwt_service)
 
@@ -191,7 +191,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/auth/login")
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: LoginRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     """Login user and get tokens."""
     user_service = UserService(db, jwt_service)
 
@@ -221,7 +221,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/auth/mfa/verify")
-async def verify_mfa(request: MFAVerifyRequest, db: Session = Depends(get_db)):
+async def verify_mfa(request: MFAVerifyRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
     """Verify MFA code."""
     user_service = UserService(db, jwt_service)
 
@@ -261,7 +261,7 @@ async def logout(
     everywhere: bool = False,
     current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> None:
     """Logout user."""
     user_service = UserService(db, jwt_service)
 
@@ -273,7 +273,9 @@ async def logout(
 
 
 @app.post("/api/v1/auth/password/reset-request")
-async def request_password_reset(request: PasswordResetRequest, db: Session = Depends(get_db)):
+async def request_password_reset(
+    request: PasswordResetRequest, db: Session = Depends(get_db)
+) -> dict[str, str]:
     """Request password reset."""
     user_service = UserService(db, jwt_service)
 
@@ -284,7 +286,9 @@ async def request_password_reset(request: PasswordResetRequest, db: Session = De
 
 
 @app.post("/api/v1/auth/password/reset-confirm")
-async def reset_password(request: PasswordResetConfirm, db: Session = Depends(get_db)):
+async def reset_password(
+    request: PasswordResetConfirm, db: Session = Depends(get_db)
+) -> dict[str, str]:
     """Reset password with token."""
     user_service = UserService(db, jwt_service)
 
@@ -303,7 +307,7 @@ async def change_password(
     request: ChangePasswordRequest,
     current_user: str = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> dict[str, str]:
     """Change user password."""
     user_service = UserService(db, jwt_service)
 
@@ -320,7 +324,7 @@ async def change_password(
 
 
 @app.get("/api/v1/auth/verify-email")
-async def verify_email(token: str, db: Session = Depends(get_db)):
+async def verify_email(token: str, db: Session = Depends(get_db)) -> dict[str, str]:
     """Verify email address."""
     user_service = UserService(db, jwt_service)
 
@@ -340,7 +344,7 @@ async def get_current_user_info(
     current_user: str = Depends(get_current_user),
     permissions: list[str] = Depends(get_current_user_permissions),
     db: Session = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Get current user information."""
     from .models import User
 
@@ -371,7 +375,7 @@ async def create_api_key(
     current_user: str = Depends(get_current_user),
     _: bool = Depends(RequirePermission("api_keys", "create")),
     db: Session = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Create new API key."""
     rbac_service = RBACService(db)
 
@@ -391,7 +395,7 @@ async def create_api_key(
 @app.get("/api/v1/api-keys")
 async def list_api_keys(
     current_user: str = Depends(get_current_user), db: Session = Depends(get_db)
-):
+) -> dict[str, list[Any]]:
     """List user's API keys."""
     rbac_service = RBACService(db)
 
@@ -407,7 +411,7 @@ async def revoke_api_key(
     current_user: str = Depends(get_current_user),
     _: bool = Depends(RequirePermission("api_keys", "revoke")),
     db: Session = Depends(get_db),
-):
+) -> None:
     """Revoke API key."""
     rbac_service = RBACService(db)
 
@@ -424,7 +428,7 @@ async def revoke_api_key(
 async def get_trades(
     current_user: str = Depends(get_current_user),
     _: bool = Depends(RequirePermission("trades", "read")),
-):
+) -> dict[str, Any]:
     """Get user trades (protected endpoint)."""
     return {"user_id": current_user, "trades": []}  # Placeholder
 
@@ -434,13 +438,15 @@ async def execute_trade(
     trade_data: dict[str, Any],
     current_user: str = Depends(get_current_user),
     _: bool = Depends(RequirePermission("trades", "execute")),
-):
+) -> dict[str, Any]:
     """Execute trade (protected endpoint)."""
     return {"user_id": current_user, "trade": trade_data, "status": "executed"}
 
 
 @app.get("/api/v1/admin/users")
-async def list_users(_: bool = Depends(RequireRole("admin")), db: Session = Depends(get_db)):
+async def list_users(
+    _: bool = Depends(RequireRole("admin")), db: Session = Depends(get_db)
+) -> dict[str, list[dict[str, Any]]]:
     """List all users (admin only)."""
     from .models import User
 

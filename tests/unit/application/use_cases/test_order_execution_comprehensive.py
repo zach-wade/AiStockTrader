@@ -99,11 +99,14 @@ def mock_market_microstructure():
 def sample_order():
     """Create a sample order for testing."""
     order = Order(
-        symbol="AAPL", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=Decimal("100")
+        symbol="AAPL",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=Quantity(Decimal("100")),
     )
     order.portfolio_id = uuid4()
-    order.status = OrderStatus.PENDING
-    order.filled_quantity = Decimal("0")
+    order.status = OrderStatus.SUBMITTED
+    order.filled_quantity = Quantity(Decimal("0"))
     return order
 
 
@@ -113,13 +116,15 @@ def sample_portfolio():
     portfolio = Portfolio(
         id=uuid4(),
         name="Test Portfolio",
-        initial_capital=Decimal("100000"),
-        cash_balance=Decimal("50000"),
+        initial_capital=Money(Decimal("100000")),
+        cash_balance=Money(Decimal("50000")),
     )
 
     # Add a position
     position = Position(
-        symbol="AAPL", quantity=Decimal("50"), average_entry_price=Decimal("145.00")
+        symbol="AAPL",
+        quantity=Quantity(Decimal("50")),
+        average_entry_price=Price(Decimal("145.00")),
     )
     portfolio.positions = {position.id: position}
 
@@ -183,7 +188,7 @@ class TestProcessOrderFillUseCase:
     ):
         """Test processing a partial order fill."""
         # Setup
-        sample_order.quantity = Decimal("200")
+        sample_order.quantity = Quantity(Decimal("200"))
         mock_unit_of_work.orders.get_order_by_id.return_value = sample_order
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = sample_portfolio
 

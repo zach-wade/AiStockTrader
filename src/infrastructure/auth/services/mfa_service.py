@@ -56,7 +56,7 @@ class MFAService:
         backup_codes = self._generate_backup_codes(user)
 
         # Store secret (should be encrypted in production)
-        user.mfa_secret = secret
+        user.mfa_secret = secret  # type: ignore[assignment]
         self.db.commit()
 
         self._log_audit_event(event_type="mfa_setup_initiated", user_id=str(user.id), success=True)
@@ -86,7 +86,7 @@ class MFAService:
 
         # Verify the code to ensure user has successfully set up their authenticator
         if self._verify_mfa_code(user, verification_code):
-            user.mfa_enabled = True
+            user.mfa_enabled = True  # type: ignore[assignment]
             self.db.commit()
 
             self._log_audit_event(event_type="mfa_enabled", user_id=str(user.id), success=True)
@@ -128,8 +128,8 @@ class MFAService:
             raise ValueError("Invalid password")
 
         # Disable MFA and clear secret
-        user.mfa_enabled = False
-        user.mfa_secret = None
+        user.mfa_enabled = False  # type: ignore[assignment]
+        user.mfa_secret = None  # type: ignore[assignment]
 
         # Delete all backup codes
         self.db.query(MFABackupCode).filter_by(user_id=user.id).delete()
@@ -182,7 +182,7 @@ class MFAService:
 
         try:
             # Create TOTP instance with user's secret
-            totp = pyotp.TOTP(user.mfa_secret)
+            totp = pyotp.TOTP(user.mfa_secret)  # type: ignore[arg-type]
 
             # Verify the code with a window of 1 to allow for time drift
             # This accepts codes from 30 seconds before/after current time
