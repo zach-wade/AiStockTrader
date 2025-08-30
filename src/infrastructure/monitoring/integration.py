@@ -177,7 +177,7 @@ class CircuitBreakerMonitor:
                 original_on_state_change(old_state, new_state)
 
         # Replace methods using setattr to avoid MyPy method assignment issues
-        circuit_breaker.call = monitored_call
+        circuit_breaker.call = monitored_call  # type: ignore[assignment]
         if hasattr(circuit_breaker, "on_state_change"):
             circuit_breaker.on_state_change = monitored_state_change
 

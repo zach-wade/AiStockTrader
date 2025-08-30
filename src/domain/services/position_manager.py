@@ -50,6 +50,7 @@ Note:
 """
 
 # Standard library imports
+from datetime import UTC
 from decimal import Decimal
 
 from ..entities import Order, OrderSide, OrderStatus, Position
@@ -449,19 +450,31 @@ class PositionManager:
             qty = abs(pos.quantity.value)
             total_quantity = Quantity(total_quantity.value + pos.quantity.value)
             total_cost = Money(total_cost.amount + (qty * pos.average_entry_price.value))
-            total_pnl = Money(total_pnl.amount + pos.realized_pnl.amount)
-            total_commission = Money(total_commission.amount + pos.commission_paid.amount)
+            # Handle both Money and Decimal types for PnL
+            pnl_amount = (
+                pos.realized_pnl.amount if hasattr(pos.realized_pnl, "amount") else pos.realized_pnl
+            )
+            commission_amount = (
+                pos.commission_paid.amount
+                if hasattr(pos.commission_paid, "amount")
+                else pos.commission_paid
+            )
+            total_pnl = Money(total_pnl.amount + pnl_amount)
+            total_commission = Money(total_commission.amount + commission_amount)
 
         if total_quantity.value == 0:
-            # All positions cancelled out
+            # All positions cancelled out - use last position's entry price as placeholder
+            from datetime import datetime
+
+            last_entry_price = positions[-1].average_entry_price
             merged = Position(
                 symbol=symbol,
                 quantity=Quantity(Decimal("0")),
-                average_entry_price=Price(Decimal("0")),
+                average_entry_price=last_entry_price,
                 realized_pnl=total_pnl,
                 commission_paid=total_commission,
+                closed_at=datetime.now(UTC),  # Mark as closed since net position is zero
             )
-            merged.closed_at = positions[-1].closed_at
         else:
             # Safe division - we've already checked total_quantity != 0
             abs_quantity = abs(total_quantity.value)

@@ -17,6 +17,7 @@ from src.domain.entities.position import Position
 from src.domain.services.order_processor import FillDetails, IPositionRepository, OrderProcessor
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 class TestFillDetails:
@@ -24,27 +25,32 @@ class TestFillDetails:
 
     def test_fill_details_creation(self):
         """Test creating FillDetails with all required fields."""
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+        )
 
         fill_details = FillDetails(
             order=order,
             fill_price=Price(Decimal("150.00")),
-            fill_quantity=100,
+            fill_quantity=Quantity(Decimal("100")),
             commission=Money(Decimal("1.00")),
             timestamp=datetime.now(UTC),
         )
 
         assert fill_details.order == order
-        assert fill_details.fill_price == Decimal("150.00")
-        assert fill_details.fill_quantity == Decimal("100")
-        assert fill_details.commission == Decimal("1.00")
+        assert fill_details.fill_price == Price(Decimal("150.00"))
+        assert fill_details.fill_quantity == Quantity(Decimal("100"))
+        assert fill_details.commission == Money(Decimal("1.00"))
         assert isinstance(fill_details.timestamp, datetime)
 
     def test_partial_fill_details(self):
         """Test FillDetails for partial order fill."""
         order = Order(
             symbol="AAPL",
-            quantity=1000,
+            quantity=Quantity(Decimal("1000")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
             limit_price=Price(Decimal("150.00")),
@@ -54,13 +60,13 @@ class TestFillDetails:
         fill_details = FillDetails(
             order=order,
             fill_price=Price(Decimal("149.95")),
-            fill_quantity=300,
+            fill_quantity=Quantity(Decimal("300")),
             commission=Money(Decimal("0.30")),
             timestamp=datetime.now(UTC),
         )
 
-        assert fill_details.fill_quantity == Decimal("300")
-        assert fill_details.fill_quantity < Decimal("1000")
+        assert fill_details.fill_quantity == Quantity(Decimal("300"))
+        assert fill_details.fill_quantity.value < Decimal("1000")
 
 
 class TestOrderProcessor:

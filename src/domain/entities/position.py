@@ -40,7 +40,9 @@ class Position:
     symbol: str = ""
 
     # Position details
-    quantity: Quantity = Quantity(Decimal("0"))  # Positive for long, negative for short
+    quantity: Quantity = field(
+        default_factory=lambda: Quantity(Decimal("0"))
+    )  # Positive for long, negative for short
     original_quantity: Quantity | None = None  # Store original quantity for closed positions
 
     # Market data
@@ -48,8 +50,8 @@ class Position:
     last_updated: datetime | None = None
 
     # P&L tracking
-    realized_pnl: Money = Money(Decimal("0"))
-    commission_paid: Money = Money(Decimal("0"))
+    realized_pnl: Money = field(default_factory=lambda: Money(Decimal("0")))
+    commission_paid: Money = field(default_factory=lambda: Money(Decimal("0")))
 
     # Risk management
     stop_loss_price: Price | None = None
@@ -249,15 +251,21 @@ class Position:
         if self.is_closed() or self.current_price is None:
             return None
 
+        # Extract values from both Price objects and raw Decimals
+        current_value = (
+            self.current_price.value if hasattr(self.current_price, "value") else self.current_price
+        )
+        entry_value = (
+            self.average_entry_price.value
+            if hasattr(self.average_entry_price, "value")
+            else self.average_entry_price
+        )
+        quantity_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+
         if self.is_long():
-            return Money(
-                self.quantity.value * (self.current_price.value - self.average_entry_price.value)
-            )
+            return Money(quantity_value * (current_value - entry_value))
         else:
-            return Money(
-                abs(self.quantity.value)
-                * (self.average_entry_price.value - self.current_price.value)
-            )
+            return Money(abs(quantity_value) * (entry_value - current_value))
 
     def get_total_pnl(self) -> Money | None:
         """Calculate total P&L (realized + unrealized)"""
@@ -301,20 +309,40 @@ class Position:
         if self.stop_loss_price is None or self.current_price is None:
             return False
 
+        # Extract values from both Price objects and raw Decimals
+        current_value = (
+            self.current_price.value if hasattr(self.current_price, "value") else self.current_price
+        )
+        stop_loss_value = (
+            self.stop_loss_price.value
+            if hasattr(self.stop_loss_price, "value")
+            else self.stop_loss_price
+        )
+
         if self.is_long():
-            return self.current_price.value <= self.stop_loss_price.value
+            return current_value <= stop_loss_value
         else:
-            return self.current_price.value >= self.stop_loss_price.value
+            return current_value >= stop_loss_value
 
     def should_take_profit(self) -> bool:
         """Check if take profit should be triggered"""
         if self.take_profit_price is None or self.current_price is None:
             return False
 
+        # Extract values from both Price objects and raw Decimals
+        current_value = (
+            self.current_price.value if hasattr(self.current_price, "value") else self.current_price
+        )
+        take_profit_value = (
+            self.take_profit_price.value
+            if hasattr(self.take_profit_price, "value")
+            else self.take_profit_price
+        )
+
         if self.is_long():
-            return self.current_price.value >= self.take_profit_price.value
+            return current_value >= take_profit_value
         else:
-            return self.current_price.value <= self.take_profit_price.value
+            return current_value <= take_profit_value
 
     def close(self, final_price: Price, close_time: datetime) -> None:
         """

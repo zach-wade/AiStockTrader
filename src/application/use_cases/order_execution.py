@@ -180,7 +180,7 @@ class ProcessOrderFillUseCase(
                 commission=commission,
                 timestamp=fill_timestamp,
             )
-            await self.order_processor.process_fill(fill_details, portfolio)
+            self.order_processor.process_fill(fill_details, portfolio)
 
             # Save updates
             await order_repo.update_order(order)

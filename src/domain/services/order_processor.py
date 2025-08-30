@@ -156,7 +156,7 @@ class OrderProcessor:
         at a higher level.
     """
 
-    async def process_fill(self, fill_details: FillDetails, portfolio: Portfolio) -> None:
+    def process_fill(self, fill_details: FillDetails, portfolio: Portfolio) -> None:
         """
         Process an order fill and update portfolio positions.
 
@@ -205,7 +205,7 @@ class OrderProcessor:
 
         # Process position updates based on order side
         is_buy = order.side == OrderSide.BUY
-        await self._process_fill_with_direction(
+        self._process_fill_with_direction(
             order,
             fill_details.fill_quantity,
             fill_details.fill_price,
@@ -226,7 +226,7 @@ class OrderProcessor:
             },
         )
 
-    async def _process_fill_with_direction(
+    def _process_fill_with_direction(
         self,
         order: Order,
         quantity: Quantity,
@@ -268,7 +268,7 @@ class OrderProcessor:
 
         if position is None or position.is_closed():
             # Create new position with appropriate sign
-            await self._create_new_position(
+            self._create_new_position(
                 portfolio, order.symbol, Quantity(signed_quantity), price, commission
             )
         elif self._is_same_direction(position, is_buy):
@@ -276,7 +276,7 @@ class OrderProcessor:
             position.add_to_position(Quantity(abs(signed_quantity)), price, commission)
         else:
             # Handle position reversal (long to short or short to long)
-            await self._handle_position_reversal(
+            self._handle_position_reversal(
                 position, quantity, price, commission, portfolio, order.symbol, is_buy
             )
 
@@ -305,7 +305,7 @@ class OrderProcessor:
         """
         return (position.is_long() and is_buy) or (position.is_short() and not is_buy)
 
-    async def _handle_position_reversal(
+    def _handle_position_reversal(
         self,
         position: Position,
         quantity: Quantity,
@@ -374,7 +374,7 @@ class OrderProcessor:
 
             # Then create new position in opposite direction
             signed_remaining = remaining_quantity if is_buy else -remaining_quantity
-            await self._create_new_position(
+            self._create_new_position(
                 portfolio, symbol, Quantity(signed_remaining), price, create_commission
             )
 
@@ -416,7 +416,7 @@ class OrderProcessor:
         ratio = partial_qty / total_qty
         return Money(total_commission.amount * ratio)
 
-    async def _create_new_position(
+    def _create_new_position(
         self, portfolio: Portfolio, symbol: str, quantity: Quantity, price: Price, commission: Money
     ) -> None:
         """

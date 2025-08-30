@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 
 from ..exceptions import StaleDataException
 from ..value_objects import Money, Price, Quantity
-from ..value_objects.converter import ValueObjectConverter
 from .position import Position
 
 
@@ -19,7 +18,7 @@ class PositionRequest:
     symbol: str
     quantity: Quantity
     entry_price: Price
-    commission: Money = Money(Decimal("0"))
+    commission: Money = field(default_factory=lambda: Money(Decimal("0")))
     strategy: str | None = None
 
 
@@ -32,21 +31,21 @@ class Portfolio:
     name: str = "Default Portfolio"
 
     # Capital
-    initial_capital: Money = Money(Decimal("100000"))
-    cash_balance: Money = Money(Decimal("100000"))
+    initial_capital: Money = field(default_factory=lambda: Money(Decimal("100000")))
+    cash_balance: Money = field(default_factory=lambda: Money(Decimal("100000")))
 
     # Positions
     positions: dict[str, Position] = field(default_factory=dict)
 
     # Risk limits
-    max_position_size: Money = Money(Decimal("10000"))
+    max_position_size: Money = field(default_factory=lambda: Money(Decimal("10000")))
     max_portfolio_risk: Decimal = Decimal("0.02")
     max_positions: int = 10
     max_leverage: Decimal = Decimal("1.0")
 
     # Performance tracking
-    total_realized_pnl: Money = Money(Decimal("0"))
-    total_commission_paid: Money = Money(Decimal("0"))
+    total_realized_pnl: Money = field(default_factory=lambda: Money(Decimal("0")))
+    total_commission_paid: Money = field(default_factory=lambda: Money(Decimal("0")))
     trades_count: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
@@ -85,20 +84,9 @@ class Portfolio:
 
     def _validate(self) -> None:
         """Validate portfolio attributes"""
-        if self.max_position_size and ValueObjectConverter.to_decimal(self.max_position_size) <= 0:
-            raise ValueError("Max position size must be positive")
-        if self.max_portfolio_risk is not None and (
-            self.max_portfolio_risk <= 0 or self.max_portfolio_risk > 1
-        ):
-            raise ValueError("Max portfolio risk must be between 0 and 1")
-        if self.max_positions <= 0:
-            raise ValueError("Max positions must be positive")
-        if self.max_leverage < 1:
-            raise ValueError("Max leverage must be at least 1.0")
-        if ValueObjectConverter.to_decimal(self.initial_capital) <= 0:
-            raise ValueError("Initial capital must be positive")
-        if ValueObjectConverter.to_decimal(self.cash_balance) < 0:
-            raise ValueError("Cash balance cannot be negative")
+        from ..services.portfolio_validation_service import PortfolioValidationService
+
+        PortfolioValidationService.validate_portfolio(self)
 
     # Position Management - Delegated to Service
 
@@ -112,22 +100,11 @@ class Portfolio:
 
     def open_position(self, request: PositionRequest) -> Position:
         """Open a new position in the portfolio."""
+        from ..services.portfolio_state_service import PortfolioStateService
         from ..services.portfolio_transaction_service import PortfolioTransactionService
 
         position = PortfolioTransactionService.open_position(self, request)
-
-        # Update state
-        qty_val = ValueObjectConverter.extract_value(request.quantity)
-        price_val = ValueObjectConverter.extract_value(request.entry_price)
-        cost = Money(str(abs(qty_val) * price_val))
-        comm = ValueObjectConverter.to_decimal(request.commission)
-        required = cost + Money(str(comm))
-
-        self.cash_balance = self.cash_balance - required
-        self.total_commission_paid = self.total_commission_paid + Money(str(comm))
-        self.trades_count += 1
-        self.positions[position.symbol] = position
-        self._increment_version()
+        PortfolioStateService.update_state_after_open_position(self, request, position)
 
         return position
 
@@ -135,28 +112,13 @@ class Portfolio:
         self, symbol: str, exit_price: Price, commission: Money = Money(Decimal("0"))
     ) -> Money:
         """Close a position and update portfolio."""
+        from ..services.portfolio_state_service import PortfolioStateService
         from ..services.portfolio_transaction_service import PortfolioTransactionService
 
-        # Service returns both pnl and net proceeds
         pnl, net_proceeds = PortfolioTransactionService.close_position(
             self, symbol, exit_price, commission
         )
-
-        # Update cash with net proceeds
-        if net_proceeds.amount > 0:
-            self.cash_balance = self.cash_balance + net_proceeds
-        elif net_proceeds.amount < 0:
-            deduct = Money(abs(net_proceeds.amount))
-            if deduct > self.cash_balance:
-                raise ValueError(
-                    f"Insufficient cash: {self.cash_balance} available, {deduct} required"
-                )
-            self.cash_balance = self.cash_balance - deduct
-
-        self.total_realized_pnl = self.total_realized_pnl + pnl
-        self.total_commission_paid = self.total_commission_paid + commission
-        PortfolioTransactionService.record_trade_statistics(self, pnl)
-        self._increment_version()
+        PortfolioStateService.update_cash_after_close_position(self, net_proceeds, pnl, commission)
 
         return pnl
 
@@ -222,114 +184,69 @@ class Portfolio:
 
     # Core Metrics - Delegated to Service
 
-    def get_total_value(self) -> Money:
-        """Calculate total portfolio value"""
+    def _get_metrics_calculator(self):
+        """Get the metrics calculator service."""
         from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
 
-        return PortfolioMetricsCalculator.get_total_value(self)
+        return PortfolioMetricsCalculator
+
+    # Core Value Calculations
+    def get_total_value(self) -> Money:
+        """Calculate total portfolio value"""
+        return self._get_metrics_calculator().get_total_value(self)
 
     def get_positions_value(self) -> Money:
         """Calculate total value of all open positions"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
-
-        return PortfolioMetricsCalculator.get_positions_value(self)
+        return self._get_metrics_calculator().get_positions_value(self)
 
     def get_unrealized_pnl(self) -> Money:
         """Calculate total unrealized P&L"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
-
-        return PortfolioMetricsCalculator.get_unrealized_pnl(self)
+        return self._get_metrics_calculator().get_unrealized_pnl(self)
 
     def get_total_pnl(self) -> Money:
         """Calculate total P&L (realized + unrealized)"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
+        return self._get_metrics_calculator().get_total_pnl(self)
 
-        return PortfolioMetricsCalculator.get_total_pnl(self)
-
+    # Return Calculations
     def get_return_percentage(self) -> Decimal:
         """Calculate portfolio return percentage"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
-
-        return PortfolioMetricsCalculator.get_return_percentage(self)
+        return self._get_metrics_calculator().get_return_percentage(self)
 
     def get_total_return(self) -> Decimal:
         """Calculate portfolio total return as a ratio (not percentage)"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
+        return self._get_metrics_calculator().get_total_return(self)
 
-        # Get return percentage and convert to ratio
-        return_pct = PortfolioMetricsCalculator.get_return_percentage(self)
-        return return_pct / Decimal("100")
-
+    # Trade Statistics
     def get_win_rate(self) -> Decimal | None:
         """Calculate win rate percentage"""
-        total_trades = self.winning_trades + self.losing_trades
-        return (
-            Decimal(self.winning_trades) / Decimal(total_trades) * 100 if total_trades > 0 else None
-        )
+        return self._get_metrics_calculator().get_win_rate(self)
 
     def get_profit_factor(self) -> Decimal | None:
         """Calculate profit factor (gross profits / gross losses)"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
-
-        return PortfolioMetricsCalculator.get_profit_factor(self)
+        return self._get_metrics_calculator().get_profit_factor(self)
 
     def get_average_win(self) -> Money | None:
         """Calculate average winning trade amount"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
-
-        return PortfolioMetricsCalculator.get_average_win(self)
+        return self._get_metrics_calculator().get_average_win(self)
 
     def get_average_loss(self) -> Money | None:
         """Calculate average losing trade amount"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
+        return self._get_metrics_calculator().get_average_loss(self)
 
-        return PortfolioMetricsCalculator.get_average_loss(self)
-
+    # Risk Metrics
     def get_sharpe_ratio(self, risk_free_rate: Decimal = Decimal("0.02")) -> Decimal | None:
         """Calculate Sharpe ratio"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
-
-        return PortfolioMetricsCalculator.get_sharpe_ratio(self, risk_free_rate)
+        return self._get_metrics_calculator().get_sharpe_ratio(self, risk_free_rate)
 
     def get_max_drawdown(self, historical_values: list[Money] | None = None) -> Decimal:
         """Calculate maximum drawdown using historical portfolio values"""
-        from ..services.portfolio_metrics_calculator import PortfolioMetricsCalculator
+        return self._get_metrics_calculator().get_max_drawdown(self, historical_values)
 
-        return PortfolioMetricsCalculator.get_max_drawdown(self, historical_values)
-
+    # Serialization
     def to_dict(self) -> dict[str, Any]:
         """Convert portfolio to dictionary for serialization"""
-        total_trades = self.winning_trades + self.losing_trades
-        return {
-            "id": str(self.id),
-            "name": self.name,
-            "cash_balance": float(self.cash_balance.amount),
-            "total_value": float(self.get_total_value().amount),
-            "positions_value": float(self.get_positions_value().amount),
-            "unrealized_pnl": float(self.get_unrealized_pnl().amount),
-            "realized_pnl": float(self.total_realized_pnl.amount),
-            "total_pnl": float(self.get_total_pnl().amount),
-            "return_pct": float(self.get_return_percentage()),
-            "open_positions": len(self.get_open_positions()),
-            "total_trades": self.trades_count,
-            "winning_trades": self.winning_trades,
-            "losing_trades": self.losing_trades,
-            "win_rate": (self.winning_trades / total_trades * 100) if total_trades > 0 else None,
-            "commission_paid": float(self.total_commission_paid.amount),
-        }
+        return self._get_metrics_calculator().portfolio_to_dict(self)
 
     def __str__(self) -> str:
         """String representation of the portfolio"""
-        total_value = self.get_total_value()
-        total_pnl = self.get_total_pnl()
-        return_pct = self.get_return_percentage()
-        open_positions = len(self.get_open_positions())
-
-        return (
-            f"{self.name} - "
-            f"Value=${total_value.amount:,.2f} | "
-            f"Cash=${self.cash_balance.amount:,.2f} | "
-            f"Positions={open_positions} | "
-            f"P&L=${total_pnl.amount:,.2f} | "
-            f"Return={return_pct:.2f}%"
-        )
+        return self._get_metrics_calculator().portfolio_to_string(self)

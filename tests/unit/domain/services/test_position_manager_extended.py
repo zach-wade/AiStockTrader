@@ -529,7 +529,7 @@ class TestPnLCalculations:
 
         pnl = self.manager.calculate_pnl(position, current_price=Decimal("160.00"))
 
-        assert pnl == Decimal("1000.00")  # 100 * (160 - 150)
+        assert pnl.amount == Decimal("1000.00")  # 100 * (160 - 150)
 
     def test_calculate_pnl_short_position(self):
         """Test P&L calculation for short position."""
@@ -539,7 +539,7 @@ class TestPnLCalculations:
 
         pnl = self.manager.calculate_pnl(position, current_price=Decimal("145.00"))
 
-        assert pnl == Decimal("500.00")  # -100 * (145 - 150) = 500 profit
+        assert pnl.amount == Decimal("500.00")  # -100 * (145 - 150) = 500 profit
 
     def test_calculate_pnl_closed_position(self):
         """Test P&L for closed position uses realized P&L."""
@@ -549,7 +549,7 @@ class TestPnLCalculations:
         position.close(Decimal("160.00"))
 
         pnl = self.manager.calculate_pnl(position, Decimal("165.00"))
-        assert pnl == Decimal("1000.00")  # Uses realized, not current price
+        assert pnl.amount == Decimal("1000.00")  # Uses realized, not current price
 
     def test_calculate_pnl_percentage_long(self):
         """Test percentage P&L calculation for long position."""

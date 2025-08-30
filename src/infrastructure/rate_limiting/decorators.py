@@ -18,6 +18,68 @@ from .manager import RateLimitContext, RateLimitManager
 _rate_limit_manager: RateLimitManager | None = None
 
 
+def _create_custom_limiter(manager: RateLimitManager, algorithm: str, rule: RateLimitRule) -> str:
+    """Create a custom rate limiter and add it to the manager.
+
+    Args:
+        manager: The rate limit manager instance
+        algorithm: The algorithm type string
+        rule: The rate limit rule to create a limiter for
+
+    Returns:
+        The limiter ID that was created
+    """
+    from .algorithms import create_rate_limiter
+
+    algorithm_map = {
+        "token_bucket": RateLimitAlgorithm.TOKEN_BUCKET,
+        "sliding_window": RateLimitAlgorithm.SLIDING_WINDOW,
+        "fixed_window": RateLimitAlgorithm.FIXED_WINDOW,
+    }
+
+    # Update the rule with the mapped algorithm
+    rule.algorithm = algorithm_map.get(algorithm.lower(), RateLimitAlgorithm.TOKEN_BUCKET)
+
+    # Create and store the limiter
+    limiter_id = rule.identifier or "unknown"
+    manager._limiters[limiter_id] = create_rate_limiter(rule)
+
+    return limiter_id
+
+
+def _check_and_handle_rate_limit(
+    manager: RateLimitManager,
+    limiter_id: str,
+    identifier: str,
+    limit: int,
+    window: str | int,
+    error_message: str,
+) -> None:
+    """Check rate limit and raise RateLimitExceeded if exceeded.
+
+    Args:
+        manager: The rate limit manager instance
+        limiter_id: The ID of the limiter to check
+        identifier: The unique identifier for this rate limit check
+        limit: The limit value for error reporting
+        window: The window value for error reporting
+        error_message: The error message to use if rate limit exceeded
+
+    Raises:
+        RateLimitExceeded: If the rate limit has been exceeded
+    """
+    result = manager._check_limiter(limiter_id, identifier, 1)
+
+    if not result.allowed:
+        raise RateLimitExceeded(
+            message=error_message,
+            limit=limit,
+            window_size=str(TimeWindow(window)),
+            current_count=result.current_count,
+            retry_after=result.retry_after,
+        )
+
+
 def initialize_rate_limiting(config: RateLimitConfig) -> None:
     """Initialize the global rate limit manager."""
     global _rate_limit_manager
@@ -69,42 +131,24 @@ def rate_limit(
 
             # Create custom rule if needed
             if not rule_types:
-                # Use the rate limit parameters to create a temporary rule
-                from .config import RateLimitAlgorithm
-
-                algorithm_map = {
-                    "token_bucket": RateLimitAlgorithm.TOKEN_BUCKET,
-                    "sliding_window": RateLimitAlgorithm.SLIDING_WINDOW,
-                    "fixed_window": RateLimitAlgorithm.FIXED_WINDOW,
-                }
-
+                # Create a temporary rule with the provided parameters
                 custom_rule = RateLimitRule(
                     limit=limit,
                     window=TimeWindow(window),
-                    algorithm=algorithm_map.get(algorithm.lower(), RateLimitAlgorithm.TOKEN_BUCKET),
+                    algorithm=RateLimitAlgorithm.TOKEN_BUCKET,  # Will be updated in _create_custom_limiter
                     burst_allowance=burst_allowance,
                     identifier=f"custom:{func.__name__}",
                 )
 
-                # Temporarily add this rule to the manager
-                limiter_id = f"custom:{func.__name__}"
-                from .algorithms import create_rate_limiter
-
-                manager._limiters[limiter_id] = create_rate_limiter(custom_rule)
+                # Create and add the custom limiter
+                limiter_id = _create_custom_limiter(manager, algorithm, custom_rule)
 
                 # Check the custom rate limit
                 identifier = _build_custom_identifier(context, per, func.__name__)
-                result = manager._check_limiter(limiter_id, identifier, 1)
-
-                if not result.allowed:
-                    message = error_message or f"Rate limit exceeded for {func.__name__}"
-                    raise RateLimitExceeded(
-                        message=message,
-                        limit=limit,
-                        window_size=str(TimeWindow(window)),
-                        current_count=result.current_count,
-                        retry_after=result.retry_after,
-                    )
+                message = error_message or f"Rate limit exceeded for {func.__name__}"
+                _check_and_handle_rate_limit(
+                    manager, limiter_id, identifier, limit, window, message
+                )
             else:
                 # Use existing rule types
                 statuses = manager.check_rate_limit(context, 1, rule_types)
@@ -226,39 +270,20 @@ def ip_rate_limit(
             context = _build_ip_context(func, args, kwargs)
 
             # Create IP-specific rule
-
-            algorithm_map = {
-                "token_bucket": RateLimitAlgorithm.TOKEN_BUCKET,
-                "sliding_window": RateLimitAlgorithm.SLIDING_WINDOW,
-                "fixed_window": RateLimitAlgorithm.FIXED_WINDOW,
-            }
-
             custom_rule = RateLimitRule(
                 limit=limit,
                 window=TimeWindow(window),
-                algorithm=algorithm_map.get(algorithm.lower(), RateLimitAlgorithm.TOKEN_BUCKET),
+                algorithm=RateLimitAlgorithm.TOKEN_BUCKET,  # Will be updated in _create_custom_limiter
                 identifier=f"ip:{func.__name__}",
             )
 
-            # Temporarily add this rule
-            limiter_id = f"ip:{func.__name__}"
-            from .algorithms import create_rate_limiter
-
-            manager._limiters[limiter_id] = create_rate_limiter(custom_rule)
+            # Create and add the IP-specific limiter
+            limiter_id = _create_custom_limiter(manager, algorithm, custom_rule)
 
             # Check rate limit
             identifier = f"ip:{context.ip_address}:{func.__name__}"
-            result = manager._check_limiter(limiter_id, identifier, 1)
-
-            if not result.allowed:
-                message = error_message or f"IP rate limit exceeded for {func.__name__}"
-                raise RateLimitExceeded(
-                    message=message,
-                    limit=limit,
-                    window_size=str(TimeWindow(window)),
-                    current_count=result.current_count,
-                    retry_after=result.retry_after,
-                )
+            message = error_message or f"IP rate limit exceeded for {func.__name__}"
+            _check_and_handle_rate_limit(manager, limiter_id, identifier, limit, window, message)
 
             return func(*args, **kwargs)
 
@@ -279,7 +304,7 @@ def no_rate_limit(func: Callable[..., Any]) -> Callable[..., Any]:
         return func(*args, **kwargs)
 
     # Mark function as exempt by adding attribute to wrapper
-    wrapper._no_rate_limit = True
+    wrapper._no_rate_limit = True  # type: ignore[attr-defined]
     return wrapper
 
 

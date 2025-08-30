@@ -11,7 +11,7 @@ import pytest
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
 from src.domain.entities.position import Position
 from src.domain.services.position_manager import PositionManager
-from src.domain.value_objects import Money, Price
+from src.domain.value_objects import Money, Price, Quantity
 
 
 class TestPositionManager:
@@ -28,12 +28,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("150.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("150.00")),
             created_at=datetime.now(UTC),
         )
         order.tags = {"strategy": "momentum"}
@@ -45,12 +45,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("50"),
-            average_fill_price=Decimal("155.00"),
+            filled_quantity=Quantity(Decimal("50")),
+            average_fill_price=Price(Decimal("155.00")),
             created_at=datetime.now(UTC),
         )
         order.tags = {"strategy": "momentum"}
@@ -61,9 +61,9 @@ class TestPositionManager:
         """Create a long position"""
         return Position.open_position(
             symbol="AAPL",
-            quantity=Decimal("100"),
-            entry_price=Decimal("150.00"),
-            commission=Decimal("1.00"),
+            quantity=Quantity(Decimal("100")),
+            entry_price=Price(Decimal("150.00")),
+            commission=Money(Decimal("1.00")),
             strategy="momentum",
         )
 
@@ -72,9 +72,9 @@ class TestPositionManager:
         """Create a short position"""
         return Position.open_position(
             symbol="AAPL",
-            quantity=Decimal("-50"),
-            entry_price=Decimal("155.00"),
-            commission=Decimal("0.50"),
+            quantity=Quantity(Decimal("-50")),
+            entry_price=Price(Decimal("155.00")),
+            commission=Money(Decimal("0.50")),
             strategy="mean_reversion",
         )
 
@@ -87,8 +87,8 @@ class TestPositionManager:
 
         # Assert
         assert position.symbol == "AAPL"
-        assert position.quantity == Decimal("100")
-        assert position.average_entry_price == Decimal("150.00")
+        assert position.quantity == Quantity(Decimal("100"))
+        assert position.average_entry_price == Price(Decimal("150.00"))
         assert position.is_long()
         assert position.strategy == "momentum"
 
@@ -99,8 +99,8 @@ class TestPositionManager:
 
         # Assert
         assert position.symbol == "AAPL"
-        assert position.quantity == Decimal("-50")
-        assert position.average_entry_price == Decimal("155.00")
+        assert position.quantity == Quantity(Decimal("-50"))
+        assert position.average_entry_price == Price(Decimal("155.00"))
         assert position.is_short()
         assert position.strategy == "momentum"
 
@@ -113,7 +113,7 @@ class TestPositionManager:
         position = manager.open_position(filled_buy_order, override_price)
 
         # Assert
-        assert position.average_entry_price == Decimal("149.50")
+        assert position.average_entry_price == Price(Decimal("149.50"))
 
     def test_open_position_from_unfilled_order_raises_error(self, manager):
         """Test that opening position from unfilled order raises error"""
@@ -121,7 +121,7 @@ class TestPositionManager:
         unfilled_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
@@ -138,11 +138,11 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("0"),
+            filled_quantity=Quantity(Decimal("0")),
             created_at=datetime.now(UTC),
         )
 
@@ -156,11 +156,11 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
+            filled_quantity=Quantity(Decimal("100")),
             average_fill_price=None,
             created_at=datetime.now(UTC),
         )
@@ -174,28 +174,28 @@ class TestPositionManager:
     def test_update_position_add_to_long(self, manager, long_position, filled_buy_order):
         """Test adding to a long position"""
         # Arrange
-        filled_buy_order.average_fill_price = Decimal("152.00")
+        filled_buy_order.average_fill_price = Price(Decimal("152.00"))
 
         # Act
         manager.update_position(long_position, filled_buy_order)
 
         # Assert
-        assert long_position.quantity == Decimal("200")  # 100 + 100
+        assert long_position.quantity == Quantity(Decimal("200"))  # 100 + 100
         # Weighted average: (100*150 + 100*152) / 200 = 151
-        assert long_position.average_entry_price == Decimal("151.00")
+        assert long_position.average_entry_price == Price(Decimal("151.00"))
 
     def test_update_position_add_to_short(self, manager, short_position, filled_sell_order):
         """Test adding to a short position"""
         # Arrange
-        filled_sell_order.average_fill_price = Decimal("157.00")
+        filled_sell_order.average_fill_price = Price(Decimal("157.00"))
 
         # Act
         manager.update_position(short_position, filled_sell_order)
 
         # Assert
-        assert short_position.quantity == Decimal("-100")  # -50 + (-50)
+        assert short_position.quantity == Quantity(Decimal("-100"))  # -50 + (-50)
         # Weighted average: (50*155 + 50*157) / 100 = 156
-        assert short_position.average_entry_price == Decimal("156.00")
+        assert short_position.average_entry_price == Price(Decimal("156.00"))
 
     def test_update_position_reduce_long(self, manager, long_position, filled_sell_order):
         """Test reducing a long position"""
@@ -203,8 +203,8 @@ class TestPositionManager:
         manager.update_position(long_position, filled_sell_order)
 
         # Assert
-        assert long_position.quantity == Decimal("50")  # 100 - 50
-        assert long_position.average_entry_price == Decimal("150.00")  # Unchanged
+        assert long_position.quantity == Quantity(Decimal("50"))  # 100 - 50
+        assert long_position.average_entry_price == Price(Decimal("150.00"))  # Unchanged
         assert long_position.realized_pnl > 0  # Profit from selling at 155
 
     def test_update_position_reduce_short(self, manager, short_position):
@@ -213,12 +213,12 @@ class TestPositionManager:
         buy_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("25"),
+            quantity=Quantity(Decimal("25")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("25"),
-            average_fill_price=Decimal("153.00"),
+            filled_quantity=Quantity(Decimal("25")),
+            average_fill_price=Price(Decimal("153.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -226,8 +226,8 @@ class TestPositionManager:
         manager.update_position(short_position, buy_order)
 
         # Assert
-        assert short_position.quantity == Decimal("-25")  # -50 + 25
-        assert short_position.average_entry_price == Decimal("155.00")  # Unchanged
+        assert short_position.quantity == Quantity(Decimal("-25"))  # -50 + 25
+        assert short_position.average_entry_price == Price(Decimal("155.00"))  # Unchanged
         assert short_position.realized_pnl > 0  # Profit from buying back at 153
 
     def test_update_position_with_override_price(self, manager, long_position, filled_sell_order):
@@ -239,9 +239,11 @@ class TestPositionManager:
         manager.update_position(long_position, filled_sell_order, override_price)
 
         # Assert
-        assert long_position.quantity == Decimal("50")
+        assert long_position.quantity == Quantity(Decimal("50"))
         # Should have used override price for P&L calculation
-        assert long_position.realized_pnl == Decimal("50") * (Decimal("160.00") - Decimal("150.00"))
+        assert long_position.realized_pnl.amount == Decimal("50") * (
+            Decimal("160.00") - Decimal("150.00")
+        )
 
     def test_update_position_with_unfilled_order_raises_error(self, manager, long_position):
         """Test that updating position with unfilled order raises error"""
@@ -249,7 +251,7 @@ class TestPositionManager:
         unfilled_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
@@ -268,12 +270,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("300.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("300.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -287,13 +289,13 @@ class TestPositionManager:
         partial_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("152.00"),
+            limit_price=Price(Decimal("152.00")),
             status=OrderStatus.PARTIALLY_FILLED,
-            filled_quantity=Decimal("50"),
-            average_fill_price=Decimal("152.00"),
+            filled_quantity=Quantity(Decimal("50")),
+            average_fill_price=Price(Decimal("152.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -301,22 +303,22 @@ class TestPositionManager:
         manager.update_position(long_position, partial_order)
 
         # Assert
-        assert long_position.quantity == Decimal("150")  # 100 + 50
+        assert long_position.quantity == Quantity(Decimal("150"))  # 100 + 50
 
     # Test close_position method
 
     def test_close_position_long(self, manager, long_position, filled_sell_order):
         """Test closing a long position"""
         # Arrange
-        filled_sell_order.filled_quantity = Decimal("100")
-        filled_sell_order.quantity = Decimal("100")
+        filled_sell_order.filled_quantity = Quantity(Decimal("100"))
+        filled_sell_order.quantity = Quantity(Decimal("100"))
 
         # Act
         pnl = manager.close_position(long_position, filled_sell_order)
 
         # Assert
         assert long_position.is_closed()
-        assert long_position.quantity == Decimal("0")
+        assert long_position.quantity == Quantity(Decimal("0"))
         assert pnl == Decimal("100") * (Decimal("155.00") - Decimal("150.00"))  # 500
 
     def test_close_position_short(self, manager, short_position):
@@ -325,12 +327,12 @@ class TestPositionManager:
         buy_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("50"),
-            average_fill_price=Decimal("153.00"),
+            filled_quantity=Quantity(Decimal("50")),
+            average_fill_price=Price(Decimal("153.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -339,13 +341,13 @@ class TestPositionManager:
 
         # Assert
         assert short_position.is_closed()
-        assert short_position.quantity == Decimal("0")
+        assert short_position.quantity == Quantity(Decimal("0"))
         assert pnl == Decimal("50") * (Decimal("155.00") - Decimal("153.00"))  # 100
 
     def test_close_position_with_override_price(self, manager, long_position, filled_sell_order):
         """Test closing position with override price"""
         # Arrange
-        filled_sell_order.filled_quantity = Decimal("100")
+        filled_sell_order.filled_quantity = Quantity(Decimal("100"))
         override_price = Price(Decimal("160.00"))
 
         # Act
@@ -360,7 +362,7 @@ class TestPositionManager:
     ):
         """Test that closing already closed position raises error"""
         # Arrange
-        filled_sell_order.filled_quantity = Decimal("100")
+        filled_sell_order.filled_quantity = Quantity(Decimal("100"))
         manager.close_position(long_position, filled_sell_order)
 
         # Act & Assert
@@ -373,12 +375,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("300.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("300.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -392,11 +394,11 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
+            filled_quantity=Quantity(Decimal("100")),
             average_fill_price=None,
             created_at=datetime.now(UTC),
         )
@@ -416,7 +418,7 @@ class TestPositionManager:
         pnl = manager.calculate_pnl(long_position, current_price)
 
         # Assert
-        assert pnl == Decimal("100") * (Decimal("155.00") - Decimal("150.00")) - Decimal(
+        assert pnl.amount == Decimal("100") * (Decimal("155.00") - Decimal("150.00")) - Decimal(
             "1.00"
         )  # 499
         assert pnl.currency == "USD"
@@ -430,7 +432,7 @@ class TestPositionManager:
         pnl = manager.calculate_pnl(short_position, current_price)
 
         # Assert
-        assert pnl == Decimal("50") * (Decimal("155.00") - Decimal("152.00")) - Decimal(
+        assert pnl.amount == Decimal("50") * (Decimal("155.00") - Decimal("152.00")) - Decimal(
             "0.50"
         )  # 149.50
         assert pnl.currency == "USD"
@@ -438,7 +440,7 @@ class TestPositionManager:
     def test_calculate_pnl_closed_position(self, manager, long_position):
         """Test calculating P&L for closed position"""
         # Arrange
-        long_position.close_position(Decimal("160.00"))
+        long_position.close_position(Price(Decimal("160.00")))
         current_price = Price(Decimal("165.00"))  # Should be ignored
 
         # Act
@@ -456,7 +458,7 @@ class TestPositionManager:
         manager.calculate_pnl(long_position, current_price)
 
         # Assert
-        assert long_position.current_price == Decimal("155.00")
+        assert long_position.current_price == Price(Decimal("155.00"))
 
     # Test merge_positions method
 
@@ -479,29 +481,35 @@ class TestPositionManager:
     def test_merge_multiple_long_positions(self, manager):
         """Test merging multiple long positions"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos2 = Position.open_position("AAPL", Decimal("50"), Decimal("152.00"), Decimal("0.50"))
-        pos3 = Position.open_position("AAPL", Decimal("25"), Decimal("154.00"), Decimal("0.25"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("50")), Price(Decimal("152.00")), Money(Decimal("0.50"))
+        )
+        pos3 = Position.open_position(
+            "AAPL", Quantity(Decimal("25")), Price(Decimal("154.00")), Money(Decimal("0.25"))
+        )
 
         # Act
         merged = manager.merge_positions([pos1, pos2, pos3])
 
         # Assert
         assert merged.symbol == "AAPL"
-        assert merged.quantity == Decimal("175")  # 100 + 50 + 25
+        assert merged.quantity == Quantity(Decimal("175"))  # 100 + 50 + 25
         # Weighted average: (100*150 + 50*152 + 25*154) / 175 = 151.14...
         expected_avg = (100 * Decimal("150") + 50 * Decimal("152") + 25 * Decimal("154")) / 175
-        assert abs(merged.average_entry_price - expected_avg) < Decimal("0.01")
-        assert merged.commission_paid == Decimal("1.75")  # 1.00 + 0.50 + 0.25
+        assert abs(merged.average_entry_price.value - expected_avg) < Decimal("0.01")
+        assert merged.commission_paid.amount == Decimal("1.75")  # 1.00 + 0.50 + 0.25
 
     def test_merge_long_and_short_positions(self, manager):
         """Test merging long and short positions that cancel out"""
         # Arrange
         long_pos = Position.open_position(
-            "AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00")
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
         )
         short_pos = Position.open_position(
-            "AAPL", Decimal("-100"), Decimal("155.00"), Decimal("1.00")
+            "AAPL", Quantity(Decimal("-100")), Price(Decimal("155.00")), Money(Decimal("1.00"))
         )
 
         # Act
@@ -509,30 +517,38 @@ class TestPositionManager:
 
         # Assert
         assert merged.symbol == "AAPL"
-        assert merged.quantity == Decimal("0")
+        assert merged.quantity == Quantity(Decimal("0"))
         assert merged.is_closed()
-        assert merged.commission_paid == Decimal("2.00")
+        assert merged.commission_paid.amount == Decimal("2.00")
 
     def test_merge_positions_with_realized_pnl(self, manager):
         """Test merging positions preserves realized P&L"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
         pos1.realized_pnl = Decimal("500.00")
 
-        pos2 = Position.open_position("AAPL", Decimal("50"), Decimal("152.00"), Decimal("0.50"))
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("50")), Price(Decimal("152.00")), Money(Decimal("0.50"))
+        )
         pos2.realized_pnl = Decimal("250.00")
 
         # Act
         merged = manager.merge_positions([pos1, pos2])
 
         # Assert
-        assert merged.realized_pnl == Decimal("750.00")  # 500 + 250
+        assert merged.realized_pnl.amount == Decimal("750.00")  # 500 + 250
 
     def test_merge_positions_different_symbols_raises_error(self, manager):
         """Test that merging positions with different symbols raises error"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos2 = Position.open_position("MSFT", Decimal("50"), Decimal("300.00"), Decimal("0.50"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos2 = Position.open_position(
+            "MSFT", Quantity(Decimal("50")), Price(Decimal("300.00")), Money(Decimal("0.50"))
+        )
 
         # Act & Assert
         with pytest.raises(ValueError, match="Cannot merge positions with different symbols"):
@@ -541,15 +557,21 @@ class TestPositionManager:
     def test_merge_positions_net_flat(self, manager):
         """Test merging positions that net to flat"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos2 = Position.open_position("AAPL", Decimal("-75"), Decimal("155.00"), Decimal("0.75"))
-        pos3 = Position.open_position("AAPL", Decimal("-25"), Decimal("157.00"), Decimal("0.25"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("-75")), Price(Decimal("155.00")), Money(Decimal("0.75"))
+        )
+        pos3 = Position.open_position(
+            "AAPL", Quantity(Decimal("-25")), Price(Decimal("157.00")), Money(Decimal("0.25"))
+        )
 
         # Act
         merged = manager.merge_positions([pos1, pos2, pos3])
 
         # Assert
-        assert merged.quantity == Decimal("0")
+        assert merged.quantity == Quantity(Decimal("0"))
         assert merged.is_closed()
 
     # Test should_close_position method
@@ -673,7 +695,7 @@ class TestPositionManager:
         # Risk amount = 100000 * 0.02 = 2000
         # Price diff = 150 - 145 = 5
         # Position size = 2000 / 5 = 400
-        assert size == Decimal("400")
+        assert size == Quantity(Decimal("400"))
 
     def test_calculate_position_size_short(self, manager):
         """Test position size calculation for short position"""
@@ -692,7 +714,7 @@ class TestPositionManager:
         # Risk amount = 50000 * 0.01 = 500
         # Price diff = |200 - 210| = 10
         # Position size = 500 / 10 = 50
-        assert size == Decimal("50")
+        assert size == Quantity(Decimal("50"))
 
     def test_calculate_position_size_fractional_result(self, manager):
         """Test position size calculation with fractional result"""
@@ -711,7 +733,7 @@ class TestPositionManager:
         # Risk amount = 75000 * 0.015 = 1125
         # Price diff = 100 - 97.50 = 2.50
         # Position size = 1125 / 2.50 = 450
-        assert size == Decimal("450")
+        assert size == Quantity(Decimal("450"))
 
     def test_calculate_position_size_invalid_risk_raises_error(self, manager):
         """Test that invalid risk percentage raises error"""
@@ -754,12 +776,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("33.333333"),
+            quantity=Quantity(Decimal("33.333333")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("33.333333"),
-            average_fill_price=Decimal("149.999999"),
+            filled_quantity=Quantity(Decimal("33.333333")),
+            average_fill_price=Price(Decimal("149.999999")),
             created_at=datetime.now(UTC),
         )
 
@@ -767,8 +789,8 @@ class TestPositionManager:
         position = manager.open_position(order)
 
         # Assert
-        assert position.quantity == Decimal("33.333333")
-        assert position.average_entry_price == Decimal("149.999999")
+        assert position.quantity == Quantity(Decimal("33.333333"))
+        assert position.average_entry_price == Price(Decimal("149.999999"))
 
     def test_position_manager_handles_large_quantities(self, manager):
         """Test that PositionManager handles large quantities"""
@@ -776,12 +798,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="BRK.A",
-            quantity=Decimal("1000000"),
+            quantity=Quantity(Decimal("1000000")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("1000000"),
-            average_fill_price=Decimal("450000.00"),
+            filled_quantity=Quantity(Decimal("1000000")),
+            average_fill_price=Price(Decimal("450000.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -789,8 +811,8 @@ class TestPositionManager:
         position = manager.open_position(order)
 
         # Assert
-        assert position.quantity == Decimal("1000000")
-        assert position.average_entry_price == Decimal("450000.00")
+        assert position.quantity == Quantity(Decimal("1000000"))
+        assert position.average_entry_price == Price(Decimal("450000.00"))
 
     def test_position_manager_handles_small_prices(self, manager):
         """Test that PositionManager handles small prices (penny stocks)"""
@@ -809,16 +831,20 @@ class TestPositionManager:
         # Risk amount = 10000 * 0.02 = 200
         # Price diff = 0.05 - 0.04 = 0.01
         # Position size = 200 / 0.01 = 20000
-        assert size == Decimal("20000")
+        assert size == Quantity(Decimal("20000"))
 
     def test_merge_positions_preserves_metadata(self, manager):
         """Test that merging positions preserves metadata correctly"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
         pos1.strategy = "momentum"
         pos1.tags = {"entry_signal": "breakout"}
 
-        pos2 = Position.open_position("AAPL", Decimal("50"), Decimal("152.00"), Decimal("0.50"))
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("50")), Price(Decimal("152.00")), Money(Decimal("0.50"))
+        )
         pos2.strategy = "momentum"
 
         # Note: merge_positions doesn't preserve closed_at for non-zero positions
@@ -828,8 +854,8 @@ class TestPositionManager:
         merged = manager.merge_positions([pos1, pos2])
 
         # Assert
-        assert merged.quantity == Decimal("150")  # Combined quantity
-        assert merged.commission_paid == Decimal("1.50")  # Combined commission
+        assert merged.quantity == Quantity(Decimal("150"))  # Combined quantity
+        assert merged.commission_paid.amount == Decimal("1.50")  # Combined commission
 
     # Additional tests for uncovered branches
 
@@ -841,16 +867,16 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("150.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("150.00")),
             created_at=datetime.now(UTC),
         )
         # Manually override to negative (bypassing validation)
-        order.filled_quantity = Decimal("-100")
+        order.filled_quantity = Quantity(Decimal("-100"))
 
         # Act & Assert
         with pytest.raises(ValueError, match="Cannot open position with zero or negative quantity"):
@@ -862,12 +888,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("150.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("150.00")),
             created_at=datetime.now(UTC),
         )
         order.tags = {}  # No strategy tag
@@ -884,11 +910,11 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("50"),
+            filled_quantity=Quantity(Decimal("50")),
             average_fill_price=None,
             created_at=datetime.now(UTC),
         )
@@ -901,7 +927,7 @@ class TestPositionManager:
         """Test calculate_pnl with position that has no unrealized P&L"""
         # Arrange
         position = Position.open_position(
-            "AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00")
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
         )
         position.quantity = Decimal("100")
         position.current_price = None  # No current price, so get_total_pnl returns None
@@ -911,15 +937,21 @@ class TestPositionManager:
         pnl = manager.calculate_pnl(position, current_price)
 
         # Assert - Should calculate P&L even when initial state has no price
-        assert pnl == Decimal("100") * (Decimal("155.00") - Decimal("150.00")) - Decimal("1.00")
+        assert pnl.amount == Decimal("100") * (Decimal("155.00") - Decimal("150.00")) - Decimal(
+            "1.00"
+        )
 
     def test_merge_positions_with_zero_total_quantity_edge_case(self, manager):
         """Test merge positions where abs_quantity could be zero (defensive check)"""
         # This tests the defensive check in merge_positions line 368-372
         # Though the logic flow prevents this, the code has a defensive check
         # Arrange - Create positions that perfectly cancel
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos2 = Position.open_position("AAPL", Decimal("-100"), Decimal("155.00"), Decimal("1.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("-100")), Price(Decimal("155.00")), Money(Decimal("1.00"))
+        )
 
         # Set some realized P&L
         pos1.realized_pnl = Decimal("500")
@@ -929,10 +961,10 @@ class TestPositionManager:
         merged = manager.merge_positions([pos1, pos2])
 
         # Assert
-        assert merged.quantity == Decimal("0")
+        assert merged.quantity == Quantity(Decimal("0"))
         assert merged.is_closed()
         assert merged.realized_pnl == Decimal("800")
-        assert merged.average_entry_price == Decimal("0")
+        assert merged.average_entry_price == Price(Decimal("0"))
 
     def test_calculate_position_size_with_zero_risk(self, manager):
         """Test that zero risk per trade raises error"""
@@ -967,7 +999,7 @@ class TestPositionManager:
         # Risk amount = 100000 * 0.02 = 2000
         # Price diff = 0.01 - 0.005 = 0.005
         # Position size = 2000 / 0.005 = 400000
-        assert size == Decimal("400000")
+        assert size == Quantity(Decimal("400000"))
 
     def test_calculate_position_size_with_risk_exactly_one(self, manager):
         """Test position size calculation with risk = 1 (100%)"""
@@ -986,7 +1018,7 @@ class TestPositionManager:
         # Risk amount = 10000 * 1 = 10000
         # Price diff = 100 - 90 = 10
         # Position size = 10000 / 10 = 1000
-        assert size == Decimal("1000")
+        assert size == Quantity(Decimal("1000"))
 
     def test_calculate_position_size_rounds_down_fractional_shares(self, manager):
         """Test that position size calculation rounds down fractional shares"""
@@ -1005,21 +1037,25 @@ class TestPositionManager:
         # Risk amount = 10000 * 0.02 = 200
         # Price diff = 33.33 - 30.00 = 3.33
         # Position size = 200 / 3.33 = 60.06... -> should round down to 60
-        assert size == Decimal("60")
+        assert size == Quantity(Decimal("60"))
 
     def test_merge_positions_with_closed_at_timestamp(self, manager):
         """Test that merge_positions preserves closed_at for zero quantity positions"""
         # Arrange
         now = datetime.now(UTC)
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos2 = Position.open_position("AAPL", Decimal("-100"), Decimal("155.00"), Decimal("1.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("-100")), Price(Decimal("155.00")), Money(Decimal("1.00"))
+        )
         pos2.closed_at = now  # Set closed_at on one position
 
         # Act
         merged = manager.merge_positions([pos1, pos2])
 
         # Assert
-        assert merged.quantity == Decimal("0")
+        assert merged.quantity == Quantity(Decimal("0"))
         assert merged.is_closed()
         assert merged.closed_at == now  # Should use the last position's closed_at
 
@@ -1093,7 +1129,7 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.CANCELLED,
@@ -1112,7 +1148,7 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.REJECTED,
@@ -1131,7 +1167,7 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.EXPIRED,
@@ -1148,7 +1184,7 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.CANCELLED,
@@ -1167,7 +1203,7 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.REJECTED,
@@ -1186,7 +1222,7 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.EXPIRED,
@@ -1208,12 +1244,12 @@ class TestPositionManager:
         sell_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("150"),
+            quantity=Quantity(Decimal("150")),
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("150"),
-            average_fill_price=Decimal("155.00"),
+            filled_quantity=Quantity(Decimal("150")),
+            average_fill_price=Price(Decimal("155.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -1232,12 +1268,12 @@ class TestPositionManager:
         buy_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("152.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("152.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -1318,13 +1354,19 @@ class TestPositionManager:
     def test_merge_positions_mixed_with_different_realized_pnl(self, manager):
         """Test merging positions with mixed long/short and different P&L"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
         pos1.realized_pnl = Decimal("1000.00")
 
-        pos2 = Position.open_position("AAPL", Decimal("-30"), Decimal("155.00"), Decimal("0.30"))
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("-30")), Price(Decimal("155.00")), Money(Decimal("0.30"))
+        )
         pos2.realized_pnl = Decimal("-200.00")
 
-        pos3 = Position.open_position("AAPL", Decimal("50"), Decimal("152.00"), Decimal("0.50"))
+        pos3 = Position.open_position(
+            "AAPL", Quantity(Decimal("50")), Price(Decimal("152.00")), Money(Decimal("0.50"))
+        )
         pos3.realized_pnl = Decimal("300.00")
 
         # Act
@@ -1332,7 +1374,7 @@ class TestPositionManager:
 
         # Assert
         assert merged.symbol == "AAPL"
-        assert merged.quantity == Decimal("120")  # 100 - 30 + 50
+        assert merged.quantity == Quantity(Decimal("120"))  # 100 - 30 + 50
         assert merged.realized_pnl == Decimal("1100.00")  # 1000 - 200 + 300
         assert merged.commission_paid == Decimal("1.80")  # 1.00 + 0.30 + 0.50
 
@@ -1340,7 +1382,7 @@ class TestPositionManager:
         """Test calculate_pnl when position.get_total_pnl() returns None"""
         # Arrange
         position = Position.open_position(
-            "AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00")
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
         )
         # Clear current price to ensure get_total_pnl might return None initially
         position.current_price = None
@@ -1370,15 +1412,15 @@ class TestPositionManager:
         # Risk amount = 100000 * 0.02 = 2000
         # Price diff = 0.0001
         # Position size = 2000 / 0.0001 = 20000000
-        assert size == Decimal("20000000")
+        assert size == Quantity(Decimal("20000000"))
 
     def test_update_position_adding_to_flat_position_raises_error(self, manager):
         """Test that updating a closed/flat position raises error (current behavior)"""
         # Arrange - Create a position and flatten it
         position = Position.open_position(
-            "AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00")
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
         )
-        position.reduce_position(Decimal("100"), Decimal("155.00"))
+        position.reduce_position(Quantity(Decimal("100")), Price(Decimal("155.00")))
         assert position.quantity == Decimal("0")
         assert position.is_closed()
 
@@ -1386,12 +1428,12 @@ class TestPositionManager:
         buy_order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("50"),
-            average_fill_price=Decimal("160.00"),
+            filled_quantity=Quantity(Decimal("50")),
+            average_fill_price=Price(Decimal("160.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -1405,12 +1447,12 @@ class TestPositionManager:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.FILLED,
-            filled_quantity=Decimal("100"),
-            average_fill_price=Decimal("150.00"),
+            filled_quantity=Quantity(Decimal("100")),
+            average_fill_price=Price(Decimal("150.00")),
             created_at=datetime.now(UTC),
         )
         # Set tags to empty dict (no strategy key)
@@ -1421,7 +1463,7 @@ class TestPositionManager:
 
         # Assert
         assert position.symbol == "AAPL"
-        assert position.quantity == Decimal("100")
+        assert position.quantity == Quantity(Decimal("100"))
         assert position.strategy is None
 
     def test_merge_positions_preserves_latest_closed_at(self, manager):
@@ -1431,20 +1473,26 @@ class TestPositionManager:
         now2 = datetime.now(UTC)
         now3 = datetime.now(UTC)
 
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
         pos1.closed_at = now1
 
-        pos2 = Position.open_position("AAPL", Decimal("-50"), Decimal("155.00"), Decimal("0.50"))
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("-50")), Price(Decimal("155.00")), Money(Decimal("0.50"))
+        )
         pos2.closed_at = now2
 
-        pos3 = Position.open_position("AAPL", Decimal("-50"), Decimal("157.00"), Decimal("0.25"))
+        pos3 = Position.open_position(
+            "AAPL", Quantity(Decimal("-50")), Price(Decimal("157.00")), Money(Decimal("0.25"))
+        )
         pos3.closed_at = now3  # Latest timestamp
 
         # Act
         merged = manager.merge_positions([pos1, pos2, pos3])
 
         # Assert
-        assert merged.quantity == Decimal("0")
+        assert merged.quantity == Quantity(Decimal("0"))
         assert merged.is_closed()
         assert merged.closed_at == now3  # Should use the last position's closed_at
 
@@ -1465,16 +1513,16 @@ class TestPositionManager:
         # Risk amount = 50000 * 0.01 = 500
         # Price diff = |100 - 105| = 5
         # Position size = 500 / 5 = 100
-        assert size == Decimal("100")
+        assert size == Quantity(Decimal("100"))
 
     def test_calculate_pnl_with_closed_position_ignores_current_price(self, manager):
         """Test that calculate_pnl for closed position completely ignores current price"""
         # Arrange
         position = Position.open_position(
-            "AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00")
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
         )
         # Close the position with a specific P&L
-        position.close_position(Decimal("160.00"))
+        position.close_position(Price(Decimal("160.00")))
         realized_pnl_at_close = position.realized_pnl
 
         # Provide a different current price that should be ignored
@@ -1490,17 +1538,21 @@ class TestPositionManager:
     def test_merge_positions_with_all_closed_positions(self, manager):
         """Test merging multiple closed positions"""
         # Arrange
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos1.close_position(Decimal("155.00"))
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos1.close_position(Price(Decimal("155.00")))
 
-        pos2 = Position.open_position("AAPL", Decimal("50"), Decimal("152.00"), Decimal("0.50"))
-        pos2.close_position(Decimal("158.00"))
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("50")), Price(Decimal("152.00")), Money(Decimal("0.50"))
+        )
+        pos2.close_position(Price(Decimal("158.00")))
 
         # Act
         merged = manager.merge_positions([pos1, pos2])
 
         # Assert - Should combine the closed positions
-        assert merged.quantity == Decimal("0")
+        assert merged.quantity == Quantity(Decimal("0"))
         assert merged.is_closed()
         assert merged.realized_pnl == pos1.realized_pnl + pos2.realized_pnl
 
@@ -1524,13 +1576,13 @@ class TestPositionManager:
         partial_sell = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("75"),  # Original order for 75
+            quantity=Quantity(Decimal("75")),  # Original order for 75
             side=OrderSide.SELL,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("155.00"),
+            limit_price=Price(Decimal("155.00")),
             status=OrderStatus.PARTIALLY_FILLED,
-            filled_quantity=Decimal("30"),  # Only 30 filled
-            average_fill_price=Decimal("155.00"),
+            filled_quantity=Quantity(Decimal("30")),  # Only 30 filled
+            average_fill_price=Price(Decimal("155.00")),
             created_at=datetime.now(UTC),
         )
 
@@ -1558,27 +1610,35 @@ class TestPositionManager:
         # Risk amount = 10000 * 0.000001 = 0.01
         # Price diff = 0.01
         # Position size = 0.01 / 0.01 = 1
-        assert size == Decimal("1")
+        assert size == Quantity(Decimal("1"))
 
     def test_merge_positions_complex_scenario(self, manager):
         """Test merging positions in a complex trading scenario"""
         # Arrange - Simulate a day of trading with multiple partial positions
-        pos1 = Position.open_position("AAPL", Decimal("100"), Decimal("150.00"), Decimal("1.00"))
-        pos1.add_to_position(Decimal("50"), Decimal("152.00"))  # Add to position
-        pos1.reduce_position(Decimal("75"), Decimal("155.00"))  # Take partial profit
+        pos1 = Position.open_position(
+            "AAPL", Quantity(Decimal("100")), Price(Decimal("150.00")), Money(Decimal("1.00"))
+        )
+        pos1.add_to_position(Quantity(Decimal("50")), Price(Decimal("152.00")))  # Add to position
+        pos1.reduce_position(
+            Quantity(Decimal("75")), Price(Decimal("155.00"))
+        )  # Take partial profit
         pos1.realized_pnl = Decimal("225.00")  # (155-150)*75 - some of the avg cost
 
-        pos2 = Position.open_position("AAPL", Decimal("-50"), Decimal("156.00"), Decimal("0.50"))
-        pos2.reduce_position(Decimal("25"), Decimal("154.00"))  # Cover half
+        pos2 = Position.open_position(
+            "AAPL", Quantity(Decimal("-50")), Price(Decimal("156.00")), Money(Decimal("0.50"))
+        )
+        pos2.reduce_position(Quantity(Decimal("25")), Price(Decimal("154.00")))  # Cover half
         pos2.realized_pnl = Decimal("50.00")  # (156-154)*25
 
-        pos3 = Position.open_position("AAPL", Decimal("30"), Decimal("153.00"), Decimal("0.30"))
+        pos3 = Position.open_position(
+            "AAPL", Quantity(Decimal("30")), Price(Decimal("153.00")), Money(Decimal("0.30"))
+        )
 
         # Act
         merged = manager.merge_positions([pos1, pos2, pos3])
 
         # Assert
         # Final quantity: 75 (from pos1) - 25 (from pos2) + 30 (pos3) = 80
-        assert merged.quantity == Decimal("80")
+        assert merged.quantity == Quantity(Decimal("80"))
         assert merged.realized_pnl == Decimal("275.00")  # 225 + 50
         assert merged.commission_paid == Decimal("1.80")  # 1.00 + 0.50 + 0.30

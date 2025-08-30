@@ -13,7 +13,7 @@ from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.domain.services.risk_calculator import RiskCalculator
-from src.domain.value_objects import Money, Price
+from src.domain.value_objects import Money, Price, Quantity
 
 
 class TestRiskCalculator:
@@ -29,9 +29,9 @@ class TestRiskCalculator:
         """Create a test portfolio with some settings"""
         return Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("50000"),
-            max_position_size=Decimal("20000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
+            max_position_size=Money(Decimal("20000")),
             max_portfolio_risk=Decimal("0.2"),
             max_leverage=Decimal("2.0"),
         )
@@ -42,12 +42,12 @@ class TestRiskCalculator:
         pos = Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("150.00"),
-            current_price=Decimal("155.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
+            current_price=Price(Decimal("155.00")),
             opened_at=datetime.now(UTC),
         )
-        pos.realized_pnl = Decimal("200.00")  # Some realized P&L
+        pos.realized_pnl = Money(Decimal("200.00"))  # Some realized P&L
         return pos
 
     @pytest.fixture
@@ -56,13 +56,13 @@ class TestRiskCalculator:
         pos = Position(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("0"),
-            average_entry_price=Decimal("200.00"),
-            current_price=Decimal("210.00"),
+            quantity=Quantity(Decimal("0")),
+            average_entry_price=Price(Decimal("200.00")),
+            current_price=Price(Decimal("210.00")),
             opened_at=datetime.now(UTC),
             closed_at=datetime.now(UTC),  # Mark as closed at creation time
         )
-        pos.realized_pnl = Decimal("1000.00")
+        pos.realized_pnl = Money(Decimal("1000.00"))
         return pos
 
     # Test calculate_position_risk
@@ -73,29 +73,29 @@ class TestRiskCalculator:
 
         metrics = calculator.calculate_position_risk(position, current_price)
 
-        assert metrics["position_value"] == Decimal("16000.00")  # 100 * 160
-        assert metrics["unrealized_pnl"] == Decimal("1000.00")  # (160 - 150) * 100
-        assert metrics["realized_pnl"] == Decimal("200.00")
-        assert metrics["total_pnl"] == Decimal("1200.00")  # 200 + 1000
+        assert metrics["position_value"] == Money(Decimal("16000.00"))  # 100 * 160
+        assert metrics["unrealized_pnl"] == Money(Decimal("1000.00"))  # (160 - 150) * 100
+        assert metrics["realized_pnl"] == Money(Decimal("200.00"))
+        assert metrics["total_pnl"] == Money(Decimal("1200.00"))  # 200 + 1000
         assert abs(metrics["return_pct"] - Decimal("8.00")) < Decimal("0.1")  # 1200 / 15000 * 100
-        assert metrics["risk_amount"] == Decimal("0")  # No stop loss
+        assert metrics["risk_amount"] == Money(Decimal("0"))  # No stop loss
 
     def test_calculate_position_risk_with_stop_loss(self, calculator):
         """Test risk calculation with stop loss"""
         position = Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("150.00"),
-            current_price=Decimal("155.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
+            current_price=Price(Decimal("155.00")),
             opened_at=datetime.now(UTC),
         )
-        position.stop_loss_price = Decimal("145.00")
+        position.stop_loss_price = Price(Decimal("145.00"))
 
         current_price = Price(Decimal("155.00"))
         metrics = calculator.calculate_position_risk(position, current_price)
 
-        assert metrics["risk_amount"] == Decimal("1000.00")  # (155 - 145) * 100
+        assert metrics["risk_amount"] == Money(Decimal("1000.00"))  # (155 - 145) * 100
 
     def test_calculate_position_risk_closed_position(self, calculator, closed_position):
         """Test risk calculation for a closed position"""
@@ -103,31 +103,31 @@ class TestRiskCalculator:
 
         metrics = calculator.calculate_position_risk(closed_position, current_price)
 
-        assert metrics["position_value"] == Decimal("0")
-        assert metrics["unrealized_pnl"] == Decimal("0")
-        assert metrics["realized_pnl"] == Decimal("1000.00")
-        assert metrics["total_pnl"] == Decimal("1000.00")
+        assert metrics["position_value"] == Money(Decimal("0"))
+        assert metrics["unrealized_pnl"] == Money(Decimal("0"))
+        assert metrics["realized_pnl"] == Money(Decimal("1000.00"))
+        assert metrics["total_pnl"] == Money(Decimal("1000.00"))
         assert metrics["return_pct"] == Decimal("0")
-        assert metrics["risk_amount"] == Decimal("0")
+        assert metrics["risk_amount"] == Money(Decimal("0"))
 
     def test_calculate_position_risk_short_position(self, calculator):
         """Test risk calculation for a short position"""
         position = Position(
             id=uuid4(),
             symbol="TSLA",
-            quantity=Decimal("-50"),  # Short position
-            average_entry_price=Decimal("800.00"),
-            current_price=Decimal("750.00"),
+            quantity=Quantity(Decimal("-50")),  # Short position
+            average_entry_price=Price(Decimal("800.00")),
+            current_price=Price(Decimal("750.00")),
             opened_at=datetime.now(UTC),
         )
-        position.stop_loss_price = Decimal("850.00")
+        position.stop_loss_price = Price(Decimal("850.00"))
 
         current_price = Price(Decimal("750.00"))
         metrics = calculator.calculate_position_risk(position, current_price)
 
-        assert metrics["position_value"] == Decimal("37500.00")  # abs(-50) * 750
-        assert metrics["unrealized_pnl"] == Decimal("2500.00")  # (800 - 750) * 50
-        assert metrics["risk_amount"] == Decimal("5000.00")  # abs(750 - 850) * 50
+        assert metrics["position_value"] == Money(Decimal("37500.00"))  # abs(-50) * 750
+        assert metrics["unrealized_pnl"] == Money(Decimal("2500.00"))  # (800 - 750) * 50
+        assert metrics["risk_amount"] == Money(Decimal("5000.00"))  # abs(750 - 850) * 50
 
     # Test calculate_portfolio_var
 
@@ -192,13 +192,13 @@ class TestRiskCalculator:
     def test_calculate_max_drawdown_normal_case(self, calculator):
         """Test max drawdown calculation with normal portfolio history"""
         history = [
-            Decimal("100000"),
-            Decimal("110000"),
-            Decimal("105000"),
-            Decimal("95000"),
-            Decimal("100000"),
-            Decimal("90000"),
-            Decimal("95000"),
+            Money(Decimal("100000")),
+            Money(Decimal("110000")),
+            Money(Decimal("105000")),
+            Money(Decimal("95000")),
+            Money(Decimal("100000")),
+            Money(Decimal("90000")),
+            Money(Decimal("95000")),
         ]
 
         drawdown = calculator.calculate_max_drawdown(history)
@@ -209,7 +209,12 @@ class TestRiskCalculator:
 
     def test_calculate_max_drawdown_no_drawdown(self, calculator):
         """Test max drawdown when portfolio only increases"""
-        history = [Decimal("100000"), Decimal("110000"), Decimal("120000"), Decimal("130000")]
+        history = [
+            Money(Decimal("100000")),
+            Money(Decimal("110000")),
+            Money(Decimal("120000")),
+            Money(Decimal("130000")),
+        ]
 
         drawdown = calculator.calculate_max_drawdown(history)
         assert drawdown == Decimal("0")
@@ -221,12 +226,12 @@ class TestRiskCalculator:
 
     def test_calculate_max_drawdown_insufficient_data(self, calculator):
         """Test max drawdown with insufficient data points"""
-        drawdown = calculator.calculate_max_drawdown([Decimal("100000")])
+        drawdown = calculator.calculate_max_drawdown([Money(Decimal("100000"))])
         assert drawdown == Decimal("0")
 
     def test_calculate_max_drawdown_complete_loss(self, calculator):
         """Test max drawdown with complete loss"""
-        history = [Decimal("100000"), Decimal("50000"), Decimal("0")]
+        history = [Money(Decimal("100000")), Money(Decimal("50000")), Money(Decimal("0"))]
 
         drawdown = calculator.calculate_max_drawdown(history)
         assert drawdown == Decimal("100")  # 100% drawdown
@@ -234,11 +239,11 @@ class TestRiskCalculator:
     def test_calculate_max_drawdown_with_recovery(self, calculator):
         """Test max drawdown with recovery"""
         history = [
-            Decimal("100000"),
-            Decimal("80000"),  # 20% drawdown
-            Decimal("90000"),  # Recovery
-            Decimal("70000"),  # 30% drawdown from 100000
-            Decimal("110000"),  # Full recovery and new high
+            Money(Decimal("100000")),
+            Money(Decimal("80000")),  # 20% drawdown
+            Money(Decimal("90000")),  # Recovery
+            Money(Decimal("70000")),  # 30% drawdown from 100000
+            Money(Decimal("110000")),  # Full recovery and new high
         ]
 
         drawdown = calculator.calculate_max_drawdown(history)
@@ -309,10 +314,10 @@ class TestRiskCalculator:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),
+            quantity=Quantity(Decimal("50")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -326,10 +331,10 @@ class TestRiskCalculator:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("200"),
+            quantity=Quantity(Decimal("200")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),  # 200 * 150 = 30000 > 20000 max
+            limit_price=Price(Decimal("150.00")),  # 200 * 150 = 30000 > 20000 max
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -342,9 +347,9 @@ class TestRiskCalculator:
         """Test risk limits when order exceeds leverage limit"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("10000"),  # Low cash
-            max_position_size=Decimal("50000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("10000")),  # Low cash
+            max_position_size=Money(Decimal("50000")),
             max_leverage=Decimal("1.5"),
         )
 
@@ -352,9 +357,9 @@ class TestRiskCalculator:
         position = Position(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("200.00"),
-            current_price=Decimal("200.00"),
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("200.00")),
+            current_price=Price(Decimal("200.00")),
             opened_at=datetime.now(UTC),
         )
         portfolio.positions["MSFT"] = position
@@ -362,10 +367,10 @@ class TestRiskCalculator:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),  # 100 * 100 = 10000
+            limit_price=Price(Decimal("100.00")),  # 100 * 100 = 10000
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -380,10 +385,10 @@ class TestRiskCalculator:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),  # 100 * 150 = 15000, > 20% of 50000
+            limit_price=Price(Decimal("150.00")),  # 100 * 150 = 15000, > 20% of 50000
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -398,7 +403,7 @@ class TestRiskCalculator:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("10"),
+            quantity=Quantity(Decimal("10")),
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             status=OrderStatus.PENDING,
@@ -412,19 +417,19 @@ class TestRiskCalculator:
         """Test risk limits with zero cash balance"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("0"),
-            max_position_size=Decimal("20000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("0")),
+            max_position_size=Money(Decimal("20000")),
             max_leverage=Decimal("2.0"),
         )
 
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -489,8 +494,8 @@ class TestRiskCalculator:
     def test_calculate_kelly_criterion_normal(self, calculator):
         """Test Kelly criterion with normal inputs"""
         win_prob = Decimal("0.6")
-        win_amount = Decimal("100")
-        loss_amount = Decimal("50")
+        win_amount = Money(Decimal("100"))
+        loss_amount = Money(Decimal("50"))
 
         kelly = calculator.calculate_kelly_criterion(win_prob, win_amount, loss_amount)
 
@@ -500,8 +505,8 @@ class TestRiskCalculator:
     def test_calculate_kelly_criterion_low_edge(self, calculator):
         """Test Kelly criterion with low edge"""
         win_prob = Decimal("0.55")
-        win_amount = Decimal("100")
-        loss_amount = Decimal("100")
+        win_amount = Money(Decimal("100"))
+        loss_amount = Money(Decimal("100"))
 
         kelly = calculator.calculate_kelly_criterion(win_prob, win_amount, loss_amount)
 
@@ -511,8 +516,8 @@ class TestRiskCalculator:
     def test_calculate_kelly_criterion_negative_edge(self, calculator):
         """Test Kelly criterion with negative edge"""
         win_prob = Decimal("0.4")
-        win_amount = Decimal("100")
-        loss_amount = Decimal("100")
+        win_amount = Money(Decimal("100"))
+        loss_amount = Money(Decimal("100"))
 
         kelly = calculator.calculate_kelly_criterion(win_prob, win_amount, loss_amount)
 
@@ -522,27 +527,37 @@ class TestRiskCalculator:
     def test_calculate_kelly_criterion_invalid_probability(self, calculator):
         """Test Kelly criterion with invalid probability"""
         with pytest.raises(ValueError, match="Win probability must be between 0 and 1"):
-            calculator.calculate_kelly_criterion(Decimal("0"), Decimal("100"), Decimal("50"))
+            calculator.calculate_kelly_criterion(
+                Decimal("0"), Money(Decimal("100")), Money(Decimal("50"))
+            )
 
         with pytest.raises(ValueError, match="Win probability must be between 0 and 1"):
-            calculator.calculate_kelly_criterion(Decimal("1"), Decimal("100"), Decimal("50"))
+            calculator.calculate_kelly_criterion(
+                Decimal("1"), Money(Decimal("100")), Money(Decimal("50"))
+            )
 
         with pytest.raises(ValueError, match="Win probability must be between 0 and 1"):
-            calculator.calculate_kelly_criterion(Decimal("-0.1"), Decimal("100"), Decimal("50"))
+            calculator.calculate_kelly_criterion(
+                Decimal("-0.1"), Money(Decimal("100")), Money(Decimal("50"))
+            )
 
     def test_calculate_kelly_criterion_invalid_amounts(self, calculator):
         """Test Kelly criterion with invalid amounts"""
         with pytest.raises(ValueError, match="Win and loss amounts must be positive"):
-            calculator.calculate_kelly_criterion(Decimal("0.6"), Decimal("0"), Decimal("50"))
+            calculator.calculate_kelly_criterion(
+                Decimal("0.6"), Money(Decimal("0")), Money(Decimal("50"))
+            )
 
         with pytest.raises(ValueError, match="Win and loss amounts must be positive"):
-            calculator.calculate_kelly_criterion(Decimal("0.6"), Decimal("100"), Decimal("-50"))
+            calculator.calculate_kelly_criterion(
+                Decimal("0.6"), Money(Decimal("100")), Money(Decimal("-50"))
+            )
 
     def test_calculate_kelly_criterion_high_edge_capped(self, calculator):
         """Test Kelly criterion caps at 25%"""
         win_prob = Decimal("0.8")
-        win_amount = Decimal("200")
-        loss_amount = Decimal("50")
+        win_amount = Money(Decimal("200"))
+        loss_amount = Money(Decimal("50"))
 
         kelly = calculator.calculate_kelly_criterion(win_prob, win_amount, loss_amount)
 
@@ -708,7 +723,12 @@ class TestRiskCalculatorEdgeCases:
 
     def test_max_drawdown_single_value_peak(self, calculator):
         """Test max drawdown when first value is the peak"""
-        history = [Decimal("100000"), Decimal("90000"), Decimal("85000"), Decimal("87000")]
+        history = [
+            Money(Decimal("100000")),
+            Money(Decimal("90000")),
+            Money(Decimal("85000")),
+            Money(Decimal("87000")),
+        ]
 
         drawdown = calculator.calculate_max_drawdown(history)
         # Max drawdown from 100000 to 85000 = 15%
@@ -740,18 +760,18 @@ class TestRiskCalculatorEdgeCases:
         """Test risk limits when max_leverage is 1 (no leverage)"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("50000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
             max_leverage=Decimal("1"),  # No leverage allowed
         )
 
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),
+            limit_price=Price(Decimal("100.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -784,9 +804,9 @@ class TestRiskCalculatorIntegration:
         """Create a portfolio with multiple positions"""
         portfolio = Portfolio(
             name="Integration Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("30000"),
-            max_position_size=Decimal("25000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("30000")),
+            max_position_size=Money(Decimal("25000")),
             max_leverage=Decimal("3.0"),
         )
 
@@ -795,25 +815,25 @@ class TestRiskCalculatorIntegration:
             Position(
                 id=uuid4(),
                 symbol="AAPL",
-                quantity=Decimal("100"),
-                average_entry_price=Decimal("150.00"),
-                current_price=Decimal("160.00"),
+                quantity=Quantity(Decimal("100")),
+                average_entry_price=Price(Decimal("150.00")),
+                current_price=Price(Decimal("160.00")),
                 opened_at=datetime.now(UTC),
             ),
             Position(
                 id=uuid4(),
                 symbol="GOOGL",
-                quantity=Decimal("50"),
-                average_entry_price=Decimal("2800.00"),
-                current_price=Decimal("2750.00"),
+                quantity=Quantity(Decimal("50")),
+                average_entry_price=Price(Decimal("2800.00")),
+                current_price=Price(Decimal("2750.00")),
                 opened_at=datetime.now(UTC),
             ),
             Position(
                 id=uuid4(),
                 symbol="TSLA",
-                quantity=Decimal("-30"),  # Short
-                average_entry_price=Decimal("900.00"),
-                current_price=Decimal("850.00"),
+                quantity=Quantity(Decimal("-30")),  # Short
+                average_entry_price=Price(Decimal("900.00")),
+                current_price=Price(Decimal("850.00")),
                 opened_at=datetime.now(UTC),
             ),
         ]
@@ -855,13 +875,13 @@ class TestRiskCalculatorIntegration:
         position = Position(
             id=uuid4(),
             symbol="NVDA",
-            quantity=Decimal("50"),
-            average_entry_price=Decimal("500.00"),
-            current_price=Decimal("500.00"),
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("500.00")),
+            current_price=Price(Decimal("500.00")),
             opened_at=datetime.now(UTC),
         )
-        position.stop_loss_price = Decimal("475.00")
-        position.take_profit_price = Decimal("550.00")
+        position.stop_loss_price = Price(Decimal("475.00"))
+        position.take_profit_price = Price(Decimal("550.00"))
 
         # Initial risk assessment
         initial_price = Price(Decimal("500.00"))
@@ -870,23 +890,23 @@ class TestRiskCalculatorIntegration:
         assert initial_metrics["risk_amount"] == Decimal("1250")  # (500-475)*50
 
         # Price moves up
-        position.current_price = Decimal("525.00")
+        position.current_price = Price(Decimal("525.00"))
         up_price = Price(Decimal("525.00"))
         up_metrics = calculator.calculate_position_risk(position, up_price)
         assert up_metrics["unrealized_pnl"] == Decimal("1250")  # (525-500)*50
         assert up_metrics["risk_amount"] == Decimal("2500")  # (525-475)*50
 
         # Price moves down
-        position.current_price = Decimal("490.00")
+        position.current_price = Price(Decimal("490.00"))
         down_price = Price(Decimal("490.00"))
         down_metrics = calculator.calculate_position_risk(position, down_price)
         assert down_metrics["unrealized_pnl"] == Decimal("-500")  # (490-500)*50
         assert down_metrics["risk_amount"] == Decimal("750")  # (490-475)*50
 
         # Close position
-        position.quantity = Decimal("0")
+        position.quantity = Quantity(Decimal("0"))
         position.closed_at = datetime.now(UTC)
-        position.realized_pnl = Decimal("-500")
+        position.realized_pnl = Money(Decimal("-500"))
 
         close_metrics = calculator.calculate_position_risk(position, down_price)
         assert close_metrics["total_pnl"] == Decimal("-500")
@@ -905,9 +925,9 @@ class TestRiskCalculatorCoverageGaps:
         """Test that specifically triggers line 400 - leverage exceeded message"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("10000"),
-            max_position_size=Decimal("50000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("10000")),
+            max_position_size=Money(Decimal("50000")),
             max_leverage=Decimal("2.0"),
         )
 
@@ -915,9 +935,9 @@ class TestRiskCalculatorCoverageGaps:
         position1 = Position(
             id=uuid4(),
             symbol="MSFT",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("100.00"),
-            current_price=Decimal("100.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("100.00")),
+            current_price=Price(Decimal("100.00")),
             opened_at=datetime.now(UTC),
         )
         portfolio.positions["MSFT"] = position1
@@ -926,10 +946,10 @@ class TestRiskCalculatorCoverageGaps:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("150"),
+            quantity=Quantity(Decimal("150")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),
+            limit_price=Price(Decimal("100.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -957,9 +977,9 @@ class TestRiskCalculatorCoverageGaps:
         """Test that specifically triggers line 414 - concentration limit exceeded"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("100000"),
-            max_position_size=Decimal("50000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("100000")),
+            max_position_size=Money(Decimal("50000")),
             max_leverage=Decimal("10.0"),  # High leverage to pass that check
         )
 
@@ -967,10 +987,10 @@ class TestRiskCalculatorCoverageGaps:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("250"),
+            quantity=Quantity(Decimal("250")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),  # 250 * 100 = 25000, which is 25% of 100000
+            limit_price=Price(Decimal("100.00")),  # 250 * 100 = 25000, which is 25% of 100000
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -1012,9 +1032,9 @@ class TestRiskCalculatorCoverageGaps:
         """Test risk limits with complex portfolio state"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("50000"),
-            cash_balance=Decimal("10000"),
-            max_position_size=Decimal("20000"),
+            initial_capital=Money(Decimal("50000")),
+            cash_balance=Money(Decimal("10000")),
+            max_position_size=Money(Decimal("20000")),
             max_leverage=Decimal("3.0"),
         )
 
@@ -1023,17 +1043,17 @@ class TestRiskCalculatorCoverageGaps:
             Position(
                 id=uuid4(),
                 symbol="MSFT",
-                quantity=Decimal("50"),
-                average_entry_price=Decimal("200.00"),
-                current_price=Decimal("200.00"),
+                quantity=Quantity(Decimal("50")),
+                average_entry_price=Price(Decimal("200.00")),
+                current_price=Price(Decimal("200.00")),
                 opened_at=datetime.now(UTC),
             ),
             Position(
                 id=uuid4(),
                 symbol="GOOGL",
-                quantity=Decimal("20"),
-                average_entry_price=Decimal("500.00"),
-                current_price=Decimal("500.00"),
+                quantity=Quantity(Decimal("20")),
+                average_entry_price=Price(Decimal("500.00")),
+                current_price=Price(Decimal("500.00")),
                 opened_at=datetime.now(UTC),
             ),
         ]
@@ -1045,10 +1065,10 @@ class TestRiskCalculatorCoverageGaps:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -1092,9 +1112,9 @@ class TestRiskCalculatorCoverageGaps:
         position = Position(
             id=uuid4(),
             symbol="GME",
-            quantity=Decimal("-100"),  # Short position
-            average_entry_price=Decimal("50.00"),
-            current_price=Decimal("45.00"),
+            quantity=Quantity(Decimal("-100")),  # Short position
+            average_entry_price=Price(Decimal("50.00")),
+            current_price=Price(Decimal("45.00")),
             opened_at=datetime.now(UTC),
         )
         position.stop_loss_price = Decimal("55.00")  # Stop loss above entry for short
@@ -1118,10 +1138,10 @@ class TestRiskCalculatorCoverageGaps:
     def test_max_drawdown_with_zero_max_value(self, calculator):
         """Test max drawdown when max value becomes zero"""
         history = [
-            Decimal("10000"),
-            Decimal("5000"),
-            Decimal("0"),  # Portfolio goes to zero
-            Decimal("1000"),  # Some recovery
+            Money(Decimal("10000")),
+            Money(Decimal("5000")),
+            Money(Decimal("0")),  # Portfolio goes to zero
+            Money(Decimal("1000")),  # Some recovery
         ]
 
         drawdown = calculator.calculate_max_drawdown(history)
@@ -1159,9 +1179,9 @@ class TestRiskCalculatorCoverageGaps:
         """Test market order that exceeds risk limits"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("10000"),
-            cash_balance=Decimal("5000"),
-            max_position_size=Decimal("1000"),  # Very low limit
+            initial_capital=Money(Decimal("10000")),
+            cash_balance=Money(Decimal("5000")),
+            max_position_size=Money(Decimal("1000")),  # Very low limit
             max_leverage=Decimal("1.5"),
         )
 
@@ -1169,7 +1189,7 @@ class TestRiskCalculatorCoverageGaps:
         order = Order(
             id=uuid4(),
             symbol="SPY",
-            quantity=Decimal("50"),  # 50 * 100 (estimated) = 5000 > 1000 max
+            quantity=Quantity(Decimal("50")),  # 50 * 100 (estimated) = 5000 > 1000 max
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,  # No limit price
             status=OrderStatus.PENDING,
@@ -1185,9 +1205,9 @@ class TestRiskCalculatorCoverageGaps:
         """Test that leverage check is skipped when max_leverage is 1 (line 388->406)"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("50000"),
-            max_position_size=Decimal("10000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
+            max_position_size=Money(Decimal("10000")),
             max_leverage=Decimal("1.0"),  # No leverage allowed, skip leverage check
         )
 
@@ -1195,10 +1215,10 @@ class TestRiskCalculatorCoverageGaps:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("10"),
+            quantity=Quantity(Decimal("10")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),
+            limit_price=Price(Decimal("100.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -1224,10 +1244,10 @@ class TestRiskCalculatorCoverageGaps:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),
+            limit_price=Price(Decimal("100.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -1326,9 +1346,9 @@ class TestRiskCalculatorComprehensive:
         position = Position(
             id=uuid4(),
             symbol="ZERO",
-            quantity=Decimal("0"),
-            average_entry_price=Decimal("100.00"),
-            current_price=Decimal("100.00"),
+            quantity=Quantity(Decimal("0")),
+            average_entry_price=Price(Decimal("100.00")),
+            current_price=Price(Decimal("100.00")),
             opened_at=datetime.now(UTC),
         )
         position.stop_loss_price = Decimal("95.00")
@@ -1344,9 +1364,9 @@ class TestRiskCalculatorComprehensive:
         position = Position(
             id=uuid4(),
             symbol="FRAC",
-            quantity=Decimal("12.345"),  # Fractional shares
-            average_entry_price=Decimal("100.00"),
-            current_price=Decimal("105.00"),
+            quantity=Quantity(Decimal("12.345")),  # Fractional shares
+            average_entry_price=Price(Decimal("100.00")),
+            current_price=Price(Decimal("105.00")),
             opened_at=datetime.now(UTC),
         )
         position.stop_loss_price = Decimal("95.00")
@@ -1396,12 +1416,12 @@ class TestRiskCalculatorComprehensive:
     def test_max_drawdown_with_volatile_history(self, calculator):
         """Test max drawdown with highly volatile portfolio history"""
         history = [
-            Decimal("100000"),
-            Decimal("150000"),  # +50%
-            Decimal("75000"),  # -50% from peak (150k to 75k = 50% drawdown)
-            Decimal("200000"),  # Recovery and new peak
-            Decimal("50000"),  # -75% from new peak
-            Decimal("100000"),  # Partial recovery
+            Money(Decimal("100000")),
+            Money(Decimal("150000")),  # +50%
+            Money(Decimal("75000")),  # -50% from peak (150k to 75k = 50% drawdown)
+            Money(Decimal("200000")),  # Recovery and new peak
+            Money(Decimal("50000")),  # -75% from new peak
+            Money(Decimal("100000")),  # Partial recovery
         ]
 
         drawdown = calculator.calculate_max_drawdown(history)
@@ -1411,12 +1431,12 @@ class TestRiskCalculatorComprehensive:
     def test_max_drawdown_with_all_negative_values(self, calculator):
         """Test max drawdown when portfolio is always declining"""
         history = [
-            Decimal("100000"),
-            Decimal("90000"),
-            Decimal("80000"),
-            Decimal("70000"),
-            Decimal("60000"),
-            Decimal("50000"),
+            Money(Decimal("100000")),
+            Money(Decimal("90000")),
+            Money(Decimal("80000")),
+            Money(Decimal("70000")),
+            Money(Decimal("60000")),
+            Money(Decimal("50000")),
         ]
 
         drawdown = calculator.calculate_max_drawdown(history)
@@ -1447,9 +1467,9 @@ class TestRiskCalculatorComprehensive:
         """Test risk limits with very small portfolio value"""
         portfolio = Portfolio(
             name="Small Portfolio",
-            initial_capital=Decimal("1000"),
-            cash_balance=Decimal("500"),
-            max_position_size=Decimal("200"),
+            initial_capital=Money(Decimal("1000")),
+            cash_balance=Money(Decimal("500")),
+            max_position_size=Money(Decimal("200")),
             max_leverage=Decimal("2.0"),
         )
 
@@ -1457,10 +1477,10 @@ class TestRiskCalculatorComprehensive:
         order = Order(
             id=uuid4(),
             symbol="PENNY",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("1.50"),  # $150 total, within $200 max position size
+            limit_price=Price(Decimal("1.50")),  # $150 total, within $200 max position size
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -1481,9 +1501,9 @@ class TestRiskCalculatorComprehensive:
         """Test risk limits with sell orders"""
         portfolio = Portfolio(
             name="Test Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("50000"),
-            max_position_size=Decimal("20000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("50000")),
+            max_position_size=Money(Decimal("20000")),
             max_leverage=Decimal("2.0"),
         )
 
@@ -1491,9 +1511,9 @@ class TestRiskCalculatorComprehensive:
         position = Position(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("150.00"),
-            current_price=Decimal("160.00"),
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("150.00")),
+            current_price=Price(Decimal("160.00")),
             opened_at=datetime.now(UTC),
         )
         portfolio.positions["AAPL"] = position
@@ -1502,10 +1522,10 @@ class TestRiskCalculatorComprehensive:
         order = Order(
             id=uuid4(),
             symbol="AAPL",
-            quantity=Decimal("50"),  # Positive quantity for order
+            quantity=Quantity(Decimal("50")),  # Positive quantity for order
             side=OrderSide.SELL,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("160.00"),
+            limit_price=Price(Decimal("160.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )
@@ -1601,7 +1621,7 @@ class TestRiskCalculatorComprehensive:
     def test_max_drawdown_with_exact_min_data_points(self, calculator):
         """Test max drawdown with exactly MIN_DATA_POINTS_FOR_STATS values"""
         # Assuming MIN_DATA_POINTS_FOR_STATS is 2
-        history = [Decimal("100000"), Decimal("90000")]
+        history = [Money(Decimal("100000")), Money(Decimal("90000"))]
 
         drawdown = calculator.calculate_max_drawdown(history)
         assert drawdown == Decimal("10")  # 10% drawdown
@@ -1643,9 +1663,9 @@ class TestRiskCalculatorComprehensive:
         position = Position(
             id=uuid4(),
             symbol="EXTREME",
-            quantity=Decimal("1"),
-            average_entry_price=Decimal("0.0001"),  # Very low price
-            current_price=Decimal("10000.00"),  # Extreme gain
+            quantity=Quantity(Decimal("1")),
+            average_entry_price=Price(Decimal("0.0001")),  # Very low price
+            current_price=Price(Decimal("10000.00")),  # Extreme gain
             opened_at=datetime.now(UTC),
         )
         position.stop_loss_price = Decimal("0.00005")
@@ -1661,19 +1681,19 @@ class TestRiskCalculatorComprehensive:
         """Test risk limits when portfolio has negative cash (margin call scenario)"""
         portfolio = Portfolio(
             name="Margin Call Portfolio",
-            initial_capital=Decimal("100000"),
-            cash_balance=Decimal("-5000"),  # Negative cash
-            max_position_size=Decimal("20000"),
+            initial_capital=Money(Decimal("100000")),
+            cash_balance=Money(Decimal("-5000")),  # Negative cash
+            max_position_size=Money(Decimal("20000")),
             max_leverage=Decimal("3.0"),
         )
 
         order = Order(
             id=uuid4(),
             symbol="RISKY",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("100.00"),
+            limit_price=Price(Decimal("100.00")),
             status=OrderStatus.PENDING,
             created_at=datetime.now(UTC),
         )

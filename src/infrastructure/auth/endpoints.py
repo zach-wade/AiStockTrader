@@ -156,15 +156,34 @@ class UserProfileResponse(BaseModel):
 
 def get_db() -> Generator[Session, None, None]:
     """Get database session."""
-    # This should be replaced with actual database session management
-    from infrastructure.database.connection import DatabaseConnection
+    # TODO: This should be injected from application layer
+    # For now, create a session factory based on environment
+    import os
 
-    db_conn = DatabaseConnection()
-    session = db_conn.get_session()
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    # Get database URL from environment or use SQLite for development
+    database_url = os.getenv("DATABASE_URL", "sqlite:///./auth.db")
+
+    # Create engine and session factory
+    engine = create_engine(
+        database_url,
+        connect_args={"check_same_thread": False} if database_url.startswith("sqlite") else {},
+    )
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    # Ensure tables exist
+    from .models import Base
+
+    Base.metadata.create_all(bind=engine)
+
+    # Create and yield session
+    db = SessionLocal()
     try:
-        yield session
+        yield db
     finally:
-        session.close()
+        db.close()
 
 
 def get_jwt_service() -> JWTService:

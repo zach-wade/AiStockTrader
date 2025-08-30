@@ -15,6 +15,7 @@ from src.domain.services.commission_calculator import ICommissionCalculator
 from src.domain.services.order_validator import OrderConstraints, OrderValidator, ValidationResult
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
+from src.domain.value_objects.quantity import Quantity
 
 
 class TestValidationResult:
@@ -28,8 +29,8 @@ class TestValidationResult:
 
         assert result.is_valid is True
         assert result.error_message is None
-        assert result.required_capital == Decimal("1000")
-        assert result.estimated_commission == Decimal("10")
+        assert result.required_capital == Money(Decimal("1000"))
+        assert result.estimated_commission == Money(Decimal("10"))
 
     def test_success_factory_without_capital(self):
         """Test creating successful result without capital info"""
@@ -76,8 +77,8 @@ class TestOrderConstraints:
         )
 
         assert constraints.max_position_size == 1000
-        assert constraints.max_order_value == Decimal("50000")
-        assert constraints.min_order_value == Decimal("10")
+        assert constraints.max_order_value == Money(Decimal("50000"))
+        assert constraints.min_order_value == Money(Decimal("10"))
         assert constraints.max_portfolio_concentration == Decimal("0.15")
         assert constraints.require_margin_for_shorts is False
         assert constraints.short_margin_requirement == Decimal("2.0")
@@ -118,7 +119,7 @@ class TestOrderValidatorInitialization:
         """Test initialization with custom constraints"""
         calculator = Mock(spec=ICommissionCalculator)
         constraints = OrderConstraints(
-            max_position_size=500, max_order_value=Money(Decimal("25000"))
+            max_position_size=Quantity(500), max_order_value=Money(Decimal("25000"))
         )
         validator = OrderValidator(calculator, constraints)
 
@@ -143,7 +144,9 @@ class TestOrderParameterValidation:
 
     def test_validate_pending_order_status(self, validator):
         """Test validation passes for pending orders"""
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         order.status = OrderStatus.PENDING
 
         result = validator._validate_order_parameters(order)
@@ -151,7 +154,9 @@ class TestOrderParameterValidation:
 
     def test_validate_non_pending_order_status(self, validator):
         """Test validation fails for non-pending orders"""
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
 
         # Test various non-pending statuses
         for status in [OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED]:
@@ -162,7 +167,9 @@ class TestOrderParameterValidation:
 
     def test_validate_positive_quantity(self, validator):
         """Test validation passes for positive quantity"""
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
 
         result = validator._validate_order_parameters(order)
         assert result.is_valid is True
@@ -203,10 +210,10 @@ class TestOrderParameterValidation:
         """Test validation passes for limit order with valid price"""
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
 
         result = validator._validate_order_parameters(order)
@@ -216,7 +223,7 @@ class TestOrderParameterValidation:
         """Test validation fails for limit order without price"""
         order = Mock(spec=Order)
         order.symbol = "AAPL"
-        order.quantity = 100
+        order.quantity = Quantity(100)
         order.side = OrderSide.BUY
         order.order_type = OrderType.LIMIT
         order.status = OrderStatus.PENDING
@@ -231,7 +238,7 @@ class TestOrderParameterValidation:
         """Test validation fails for limit order with zero price"""
         order = Mock(spec=Order)
         order.symbol = "AAPL"
-        order.quantity = 100
+        order.quantity = Quantity(100)
         order.side = OrderSide.BUY
         order.order_type = OrderType.LIMIT
         order.status = OrderStatus.PENDING
@@ -246,10 +253,10 @@ class TestOrderParameterValidation:
         """Test validation passes for stop order with valid price"""
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.SELL,
             order_type=OrderType.STOP,
-            stop_price=Decimal("140.00"),
+            stop_price=Price(Decimal("140.00")),
         )
 
         result = validator._validate_order_parameters(order)
@@ -259,7 +266,7 @@ class TestOrderParameterValidation:
         """Test validation fails for stop order without price"""
         order = Mock(spec=Order)
         order.symbol = "AAPL"
-        order.quantity = 100
+        order.quantity = Quantity(100)
         order.side = OrderSide.SELL
         order.order_type = OrderType.STOP
         order.status = OrderStatus.PENDING
@@ -274,11 +281,11 @@ class TestOrderParameterValidation:
         """Test validation for stop-limit order"""
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.SELL,
             order_type=OrderType.STOP_LIMIT,
-            stop_price=Decimal("140.00"),
-            limit_price=Decimal("139.00"),
+            stop_price=Price(Decimal("140.00")),
+            limit_price=Price(Decimal("139.00")),
         )
 
         result = validator._validate_order_parameters(order)
@@ -302,43 +309,47 @@ class TestCapitalCalculation:
 
     def test_calculate_capital_for_market_buy(self, validator, mock_calculator):
         """Test capital calculation for market buy order"""
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
         capital, commission = validator._calculate_required_capital(order, current_price)
 
         # 100 shares * $150 + $5 commission = $15,005
-        assert capital == Decimal("15005.00")
-        assert commission == Decimal("5.00")
+        assert capital == Money(Decimal("15005.00"))
+        assert commission == Money(Decimal("5.00"))
         mock_calculator.calculate.assert_called_once()
 
     def test_calculate_capital_for_limit_buy(self, validator, mock_calculator):
         """Test capital calculation for limit buy order"""
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("145.00"),
+            limit_price=Price(Decimal("145.00")),
         )
         current_price = Price(Decimal("150.00"))
 
         capital, commission = validator._calculate_required_capital(order, current_price)
 
         # Uses limit price: 100 shares * $145 + $5 commission = $14,505
-        assert capital == Decimal("14505.00")
-        assert commission == Decimal("5.00")
+        assert capital == Money(Decimal("14505.00"))
+        assert commission == Money(Decimal("5.00"))
 
     def test_calculate_capital_for_sell_order(self, validator, mock_calculator):
         """Test capital calculation for sell order"""
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
         capital, commission = validator._calculate_required_capital(order, current_price)
 
         # For sells, only commission is required
-        assert capital == Decimal("5.00")
-        assert commission == Decimal("5.00")
+        assert capital == Money(Decimal("5.00"))
+        assert commission == Money(Decimal("5.00"))
 
 
 class TestPortfolioConstraints:
@@ -362,7 +373,9 @@ class TestPortfolioConstraints:
     def test_sufficient_funds_for_buy(self, validator):
         """Test validation passes with sufficient funds"""
         portfolio = Portfolio(cash_balance=Decimal("20000"))
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         required_capital = Money(Decimal("15000"))
         current_price = Price(Decimal("150.00"))
 
@@ -374,7 +387,9 @@ class TestPortfolioConstraints:
     def test_insufficient_funds_for_buy(self, validator):
         """Test validation fails with insufficient funds"""
         portfolio = Portfolio(cash_balance=Decimal("10000"))
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         required_capital = Money(Decimal("15000"))
         current_price = Price(Decimal("150.00"))
 
@@ -391,7 +406,7 @@ class TestPortfolioConstraints:
         portfolio = Portfolio(cash_balance=Decimal("20000"))
         order = Order(
             symbol="AAPL",
-            quantity=1,  # Only 1 share
+            quantity=Quantity(1),  # Only 1 share
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
@@ -407,7 +422,9 @@ class TestPortfolioConstraints:
     def test_order_above_maximum_value(self, validator):
         """Test validation fails for order above maximum value"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
-        order = Order(symbol="AAPL", quantity=400, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(400), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         required_capital = Money(Decimal("60005"))
         current_price = Price(Decimal("150.00"))  # 400 * 150 = $60,000
 
@@ -420,7 +437,9 @@ class TestPortfolioConstraints:
     def test_sell_order_no_funds_check(self, validator):
         """Test sell order doesn't check funds"""
         portfolio = Portfolio(cash_balance=Decimal("0"))  # No cash
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         required_capital = Money(Decimal("5"))  # Just commission
         current_price = Price(Decimal("150.00"))
 
@@ -445,102 +464,114 @@ class TestPositionLimits:
     def validator(self, mock_calculator):
         """Create OrderValidator instance"""
         constraints = OrderConstraints(
-            max_position_size=500, max_portfolio_concentration=Decimal("0.25")
+            max_position_size=Quantity(500), max_portfolio_concentration=Decimal("0.25")
         )
         return OrderValidator(mock_calculator, constraints)
 
-    def test_within_position_size_limit(self, validator):
+    async def test_within_position_size_limit(self, validator):
         """Test validation passes within position size limit"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
-        result = validator._validate_position_limits(order, portfolio, current_price)
+        result = await validator._validate_position_limits(order, portfolio, current_price)
         assert result.is_valid is True
 
-    def test_exceeds_position_size_limit(self, validator):
+    async def test_exceeds_position_size_limit(self, validator):
         """Test validation fails when exceeding position size limit"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
         order = Order(
             symbol="AAPL",
-            quantity=600,  # Exceeds 500 limit
+            quantity=Quantity(600),  # Exceeds 500 limit
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator._validate_position_limits(order, portfolio, current_price)
+        result = await validator._validate_position_limits(order, portfolio, current_price)
         assert result.is_valid is False
         assert "Position size 600 exceeds maximum 500" in result.error_message
 
-    def test_adding_to_existing_position(self, validator):
+    async def test_adding_to_existing_position(self, validator):
         """Test validation when adding to existing position"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
         # Existing position of 300 shares
-        position = Position(symbol="AAPL", quantity=300, average_entry_price=Decimal("140.00"))
+        position = Position(
+            symbol="AAPL", quantity=Quantity(300), average_entry_price=Price(Decimal("140.00"))
+        )
         portfolio.positions["AAPL"] = position
 
         order = Order(
             symbol="AAPL",
-            quantity=250,  # Would make total 550, exceeding 500 limit
+            quantity=Quantity(250),  # Would make total 550, exceeding 500 limit
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator._validate_position_limits(order, portfolio, current_price)
+        result = await validator._validate_position_limits(order, portfolio, current_price)
         assert result.is_valid is False
         assert "Position size 550 exceeds maximum 500" in result.error_message
 
-    def test_reducing_position_with_sell(self, validator):
+    async def test_reducing_position_with_sell(self, validator):
         """Test selling reduces position (always valid for size)"""
         portfolio = Portfolio(cash_balance=Decimal("400000"))  # Larger cash balance
         # Large existing position
         position = Position(
             symbol="AAPL",
-            quantity=Decimal("600"),  # Already over limit
-            average_entry_price=Decimal("140.00"),
+            quantity=Quantity(Decimal("600")),  # Already over limit
+            average_entry_price=Price(Decimal("140.00")),
         )
         portfolio.positions["AAPL"] = position
 
-        order = Order(symbol="AAPL", quantity=200, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(200), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
-        result = validator._validate_position_limits(order, portfolio, current_price)
+        result = await validator._validate_position_limits(order, portfolio, current_price)
         # Should pass as we're reducing the position to 400
         assert result.is_valid is True
 
-    def test_concentration_within_limit(self, validator):
+    async def test_concentration_within_limit(self, validator):
         """Test validation passes within concentration limit"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
         # Add some existing positions
         portfolio.positions["MSFT"] = Position(
             symbol="MSFT",
-            quantity=Decimal("100"),
-            average_entry_price=Decimal("200.00"),  # $20k position
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("200.00")),  # $20k position
         )
         # Total portfolio value: $100k cash + $20k MSFT = $120k
 
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("200.00"))  # $20k position
 
-        result = validator._validate_position_limits(order, portfolio, current_price)
+        result = await validator._validate_position_limits(order, portfolio, current_price)
         # $20k / $120k = 16.7% < 25% limit
         assert result.is_valid is True
 
-    def test_concentration_exceeds_limit(self, validator):
+    async def test_concentration_exceeds_limit(self, validator):
         """Test validation fails when exceeding concentration limit"""
         portfolio = Portfolio(cash_balance=Decimal("10000"))
         # Small portfolio
         portfolio.positions["MSFT"] = Position(
-            symbol="MSFT", quantity=Decimal("10"), average_entry_price=Decimal("300.00")
+            symbol="MSFT",
+            quantity=Quantity(Decimal("10")),
+            average_entry_price=Price(Decimal("300.00")),
         )
         # Total portfolio value: $10k cash + $3k MSFT = $13k
 
-        order = Order(symbol="AAPL", quantity=30, side=OrderSide.BUY, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(30), side=OrderSide.BUY, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))  # $4.5k position
 
-        result = validator._validate_position_limits(order, portfolio, current_price)
+        result = await validator._validate_position_limits(order, portfolio, current_price)
         # $4.5k / $13k = 34.6% > 25% limit
         assert result.is_valid is False
         assert "Position would represent" in result.error_message
@@ -576,13 +607,15 @@ class TestShortSelling:
         """Test selling existing position (not a short sale)"""
         portfolio = Portfolio(cash_balance=Decimal("1000"))
         position = Position(
-            symbol="AAPL", quantity=Decimal("100"), average_entry_price=Decimal("140.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("100")),
+            average_entry_price=Price(Decimal("140.00")),
         )
         portfolio.positions["AAPL"] = position
 
         order = Order(
             symbol="AAPL",
-            quantity=50,  # Selling less than owned
+            quantity=Quantity(50),  # Selling less than owned
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
@@ -595,13 +628,15 @@ class TestShortSelling:
         """Test selling more than owned requires margin"""
         portfolio = Portfolio(cash_balance=Decimal("5000"))
         position = Position(
-            symbol="AAPL", quantity=Decimal("50"), average_entry_price=Decimal("140.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("50")),
+            average_entry_price=Price(Decimal("140.00")),
         )
         portfolio.positions["AAPL"] = position
 
         order = Order(
             symbol="AAPL",
-            quantity=100,  # Selling 100, but only own 50
+            quantity=Quantity(100),  # Selling 100, but only own 50
             side=OrderSide.SELL,
             order_type=OrderType.MARKET,
         )
@@ -618,7 +653,9 @@ class TestShortSelling:
         """Test pure short sale (no existing position) requires margin"""
         portfolio = Portfolio(cash_balance=Decimal("10000"))
 
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
         # Shorting 100 shares at $150 = $15,000 * 1.5 = $22,500 margin required
@@ -631,7 +668,9 @@ class TestShortSelling:
         """Test short sale passes with sufficient margin"""
         portfolio = Portfolio(cash_balance=Decimal("25000"))
 
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
         # Shorting 100 shares at $150 = $15,000 * 1.5 = $22,500 margin required
@@ -642,7 +681,9 @@ class TestShortSelling:
         """Test short sale when margin not required"""
         portfolio = Portfolio(cash_balance=Decimal("100"))  # Very little cash
 
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
         # Should pass as margin is not required
@@ -669,10 +710,10 @@ class TestOrderModification:
         """Test can modify order in PENDING status"""
         original = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
         original.status = OrderStatus.PENDING
 
@@ -685,10 +726,10 @@ class TestOrderModification:
         """Test can modify order in PARTIALLY_FILLED status"""
         original = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
         original.status = OrderStatus.PARTIALLY_FILLED
         original.filled_quantity = 30
@@ -702,7 +743,7 @@ class TestOrderModification:
     def test_cannot_modify_filled_order(self, validator):
         """Test cannot modify FILLED order"""
         original = Order(
-            symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
         )
         original.status = OrderStatus.FILLED
 
@@ -713,7 +754,7 @@ class TestOrderModification:
     def test_cannot_modify_cancelled_order(self, validator):
         """Test cannot modify CANCELLED order"""
         original = Order(
-            symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
         )
         original.status = OrderStatus.CANCELLED
 
@@ -724,7 +765,7 @@ class TestOrderModification:
     def test_cannot_modify_rejected_order(self, validator):
         """Test cannot modify REJECTED order"""
         original = Order(
-            symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
         )
         original.status = OrderStatus.REJECTED
 
@@ -735,7 +776,7 @@ class TestOrderModification:
     def test_new_quantity_must_be_positive(self, validator):
         """Test new quantity must be positive"""
         original = Order(
-            symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
         )
         original.status = OrderStatus.PENDING
 
@@ -750,7 +791,7 @@ class TestOrderModification:
     def test_cannot_reduce_below_filled_quantity(self, validator):
         """Test cannot reduce quantity below filled amount"""
         original = Order(
-            symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
         )
         original.status = OrderStatus.PARTIALLY_FILLED
         original.filled_quantity = 60
@@ -763,10 +804,10 @@ class TestOrderModification:
         """Test new limit price must be positive"""
         original = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
         original.status = OrderStatus.PENDING
 
@@ -778,10 +819,10 @@ class TestOrderModification:
         """Test new stop price must be positive"""
         original = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.SELL,
             order_type=OrderType.STOP,
-            stop_price=Decimal("140.00"),
+            stop_price=Price(Decimal("140.00")),
         )
         original.status = OrderStatus.PENDING
 
@@ -793,11 +834,11 @@ class TestOrderModification:
         """Test can modify multiple parameters at once"""
         original = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.STOP_LIMIT,
-            stop_price=Decimal("145.00"),
-            limit_price=Decimal("146.00"),
+            stop_price=Price(Decimal("145.00")),
+            limit_price=Price(Decimal("146.00")),
         )
         original.status = OrderStatus.PENDING
 
@@ -812,7 +853,7 @@ class TestOrderModification:
     def test_modify_without_changes(self, validator):
         """Test modification with no changes is valid"""
         original = Order(
-            symbol="AAPL", quantity=100, side=OrderSide.BUY, order_type=OrderType.MARKET
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.BUY, order_type=OrderType.MARKET
         )
         original.status = OrderStatus.PENDING
 
@@ -834,54 +875,58 @@ class TestCompleteOrderValidation:
     def validator(self, mock_calculator):
         """Create OrderValidator instance"""
         constraints = OrderConstraints(
-            max_position_size=1000,
+            max_position_size=Quantity(1000),
             max_order_value=Money(Decimal("100000")),
             min_order_value=Money(Decimal("100")),
             max_portfolio_concentration=Decimal("0.30"),
         )
         return OrderValidator(mock_calculator, constraints)
 
-    def test_valid_buy_order_complete_flow(self, validator, mock_calculator):
+    async def test_valid_buy_order_complete_flow(self, validator, mock_calculator):
         """Test complete validation flow for valid buy order"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
         current_price = Price(Decimal("151.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is True
         assert result.error_message is None
-        assert result.required_capital == Decimal("15005.00")  # 100*150 + 5
-        assert result.estimated_commission == Decimal("5.00")
+        assert result.required_capital == Money(Decimal("15005.00"))  # 100*150 + 5
+        assert result.estimated_commission == Money(Decimal("5.00"))
 
         # Verify commission calculator was called
         mock_calculator.calculate.assert_called()
 
-    def test_valid_sell_order_complete_flow(self, validator):
+    async def test_valid_sell_order_complete_flow(self, validator):
         """Test complete validation flow for valid sell order"""
         portfolio = Portfolio(cash_balance=Decimal("100000"))
         position = Position(
-            symbol="AAPL", quantity=Decimal("200"), average_entry_price=Decimal("140.00")
+            symbol="AAPL",
+            quantity=Quantity(Decimal("200")),
+            average_entry_price=Price(Decimal("140.00")),
         )
         portfolio.positions["AAPL"] = position
 
-        order = Order(symbol="AAPL", quantity=100, side=OrderSide.SELL, order_type=OrderType.MARKET)
+        order = Order(
+            symbol="AAPL", quantity=Quantity(100), side=OrderSide.SELL, order_type=OrderType.MARKET
+        )
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is True
         assert result.error_message is None
-        assert result.required_capital == Decimal("5.00")  # Just commission for sells
-        assert result.estimated_commission == Decimal("5.00")
+        assert result.required_capital == Money(Decimal("5.00"))  # Just commission for sells
+        assert result.estimated_commission == Money(Decimal("5.00"))
 
-    def test_invalid_order_parameter_short_circuit(self, validator):
+    async def test_invalid_order_parameter_short_circuit(self, validator):
         """Test validation short-circuits on parameter failure"""
         portfolio = Portfolio(cash_balance=Decimal("50000"))
         # Create a mock order with invalid quantity
@@ -896,44 +941,44 @@ class TestCompleteOrderValidation:
         order.filled_quantity = 0
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is False
         assert "Order quantity must be positive" in result.error_message
         assert result.required_capital is None
         assert result.estimated_commission is None
 
-    def test_insufficient_funds_failure(self, validator):
+    async def test_insufficient_funds_failure(self, validator):
         """Test validation fails on insufficient funds"""
         portfolio = Portfolio(cash_balance=Decimal("1000"))  # Not enough
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),
+            limit_price=Price(Decimal("150.00")),
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is False
         assert "Insufficient funds" in result.error_message
         assert "Required: $15005.00" in result.error_message
         assert "Available: $1000.00" in result.error_message
 
-    def test_position_limit_failure(self, validator):
+    async def test_position_limit_failure(self, validator):
         """Test validation fails on position limit"""
         portfolio = Portfolio(cash_balance=Decimal("300000"))
         order = Order(
             symbol="AAPL",
-            quantity=1500,  # Exceeds max_position_size of 1000
+            quantity=Quantity(1500),  # Exceeds max_position_size of 1000
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is False
         # The validation may fail on funds first, so check for any validation failure
@@ -943,71 +988,71 @@ class TestCompleteOrderValidation:
             or "Insufficient funds" in result.error_message
         )
 
-    def test_short_sale_margin_failure(self, validator):
+    async def test_short_sale_margin_failure(self, validator):
         """Test validation fails on short sale margin requirement"""
         portfolio = Portfolio(cash_balance=Decimal("5000"))
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.SELL,  # Short sale
             order_type=OrderType.MARKET,
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is False
         assert "Insufficient margin" in result.error_message
 
-    def test_stop_limit_order_validation(self, validator):
+    async def test_stop_limit_order_validation(self, validator):
         """Test validation of stop-limit order"""
         portfolio = Portfolio(cash_balance=Decimal("50000"))
         order = Order(
             symbol="AAPL",
-            quantity=100,
+            quantity=Quantity(100),
             side=OrderSide.BUY,
             order_type=OrderType.STOP_LIMIT,
-            stop_price=Decimal("155.00"),
-            limit_price=Decimal("156.00"),
+            stop_price=Price(Decimal("155.00")),
+            limit_price=Price(Decimal("156.00")),
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is True
         # Should use limit price for capital calculation
-        assert result.required_capital == Decimal("15605.00")  # 100*156 + 5
+        assert result.required_capital == Money(Decimal("15605.00"))  # 100*156 + 5
 
-    def test_order_below_minimum_value(self, validator):
+    async def test_order_below_minimum_value(self, validator):
         """Test order below minimum value fails"""
         portfolio = Portfolio(cash_balance=Decimal("50000"))
         order = Order(
             symbol="AAPL",
-            quantity=1,  # Very small order
+            quantity=Quantity(1),  # Very small order
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("50.00"),  # $50 total, below $100 minimum
+            limit_price=Price(Decimal("50.00")),  # $50 total, below $100 minimum
         )
         current_price = Price(Decimal("50.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is False
         assert "Order value $50.00 below minimum $100.00" in result.error_message
 
-    def test_order_above_maximum_value(self, validator):
+    async def test_order_above_maximum_value(self, validator):
         """Test order above maximum value fails"""
         portfolio = Portfolio(cash_balance=Decimal("500000"))
         order = Order(
             symbol="AAPL",
-            quantity=1000,
+            quantity=Quantity(1000),
             side=OrderSide.BUY,
             order_type=OrderType.LIMIT,
-            limit_price=Decimal("150.00"),  # $150,000 total, above $100k max
+            limit_price=Price(Decimal("150.00")),  # $150,000 total, above $100k max
         )
         current_price = Price(Decimal("150.00"))
 
-        result = validator.validate_order(order, portfolio, current_price)
+        result = await validator.validate_order(order, portfolio, current_price)
 
         assert result.is_valid is False
         assert "Order value $150000.00 exceeds maximum $100000.00" in result.error_message

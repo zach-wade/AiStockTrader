@@ -19,8 +19,12 @@ class TestPositionOpening:
     """Test position opening operations."""
 
     def test_open_position_success(self):
-        """Test successful position opening."""
-        portfolio = Portfolio(cash_balance=Money(Decimal("100000")))
+        """Test successful position opening via portfolio entity."""
+        portfolio = Portfolio(
+            cash_balance=Money(Decimal("100000")),
+            max_position_size=Money(Decimal("20000")),  # Increase limit to allow test
+            max_portfolio_risk=Decimal("0.20"),  # Increase risk limit to 20%
+        )
 
         request = PositionRequest(
             symbol="AAPL",
@@ -30,7 +34,8 @@ class TestPositionOpening:
             strategy="momentum",
         )
 
-        position = PortfolioPositionManager.open_position(portfolio, request)
+        # Basic position opening is handled by Portfolio entity
+        position = portfolio.open_position(request)
 
         # Verify position creation
         assert position.symbol == "AAPL"
@@ -50,13 +55,19 @@ class TestPositionOpening:
 
     def test_open_position_uses_portfolio_strategy(self):
         """Test opening position uses portfolio strategy when not specified."""
-        portfolio = Portfolio(cash_balance=Money(Decimal("100000")), strategy="value_investing")
+        portfolio = Portfolio(
+            cash_balance=Money(Decimal("100000")),
+            strategy="value_investing",
+            max_position_size=Money(Decimal("20000")),
+            max_portfolio_risk=Decimal("0.20"),
+        )
 
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
 
-        position = PortfolioPositionManager.open_position(portfolio, request)
+        # Use portfolio entity for basic position opening
+        position = portfolio.open_position(request)
         assert position.strategy == "value_investing"
 
     def test_open_position_validation_failure(self):
@@ -70,17 +81,21 @@ class TestPositionOpening:
         )
 
         with pytest.raises(ValueError, match="Cannot open position"):
-            PortfolioPositionManager.open_position(portfolio, request)
+            portfolio.open_position(request)
 
     def test_open_position_already_exists(self):
         """Test opening position when symbol already exists."""
-        portfolio = Portfolio(cash_balance=Money(Decimal("100000")))
+        portfolio = Portfolio(
+            cash_balance=Money(Decimal("100000")),
+            max_position_size=Money(Decimal("20000")),
+            max_portfolio_risk=Decimal("0.20"),
+        )
 
         # First position
         request1 = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("50")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request1)
+        portfolio.open_position(request1)
 
         # Try to open another for same symbol
         request2 = PositionRequest(
@@ -88,7 +103,7 @@ class TestPositionOpening:
         )
 
         with pytest.raises(ValueError, match="Position already exists for AAPL"):
-            PortfolioPositionManager.open_position(portfolio, request2)
+            portfolio.open_position(request2)
 
     def test_open_position_insufficient_cash(self):
         """Test opening position with insufficient cash."""
@@ -102,7 +117,7 @@ class TestPositionOpening:
         )
 
         with pytest.raises(ValueError, match="Insufficient cash"):
-            PortfolioPositionManager.open_position(portfolio, request)
+            portfolio.open_position(request)
 
     def test_open_position_handles_value_objects(self):
         """Test opening position correctly handles value object attributes."""
@@ -115,7 +130,7 @@ class TestPositionOpening:
             commission=Money(Decimal("7.50")),
         )
 
-        position = PortfolioPositionManager.open_position(portfolio, request)
+        position = portfolio.open_position(request)
 
         # Verify value object attributes are handled correctly
         assert isinstance(position.quantity, Quantity)
@@ -138,7 +153,7 @@ class TestPositionClosing:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
 
         # Close at profit
         realized_pnl = PortfolioPositionManager.close_position(
@@ -172,7 +187,7 @@ class TestPositionClosing:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
 
         # Close at loss
         realized_pnl = PortfolioPositionManager.close_position(
@@ -196,7 +211,7 @@ class TestPositionClosing:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
 
         # Close at entry price with commission
         realized_pnl = PortfolioPositionManager.close_position(
@@ -219,7 +234,7 @@ class TestPositionClosing:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
 
         # Close at same price with no commission
         realized_pnl = PortfolioPositionManager.close_position(
@@ -246,7 +261,7 @@ class TestPositionClosing:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
         PortfolioPositionManager.close_position(portfolio, "AAPL", Price(Decimal("160")))
 
         # Try to close again
@@ -261,7 +276,7 @@ class TestPositionClosing:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("-100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
 
         # Cover at profit (price went down)
         realized_pnl = PortfolioPositionManager.close_position(
@@ -285,7 +300,7 @@ class TestPriceUpdating:
         request = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request)
+        portfolio.open_position(request)
 
         original_version = portfolio.version
 
@@ -487,14 +502,14 @@ class TestComplexScenarios:
         request1 = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("100")), entry_price=Price(Decimal("150"))
         )
-        PortfolioPositionManager.open_position(portfolio, request1)
+        portfolio.open_position(request1)
         PortfolioPositionManager.close_position(portfolio, "AAPL", Price(Decimal("160")))
 
         # Should be able to open new position for same symbol
         request2 = PositionRequest(
             symbol="AAPL", quantity=Quantity(Decimal("50")), entry_price=Price(Decimal("170"))
         )
-        new_position = PortfolioPositionManager.open_position(portfolio, request2)
+        new_position = portfolio.open_position(request2)
 
         # Should be new position object
         old_position = portfolio.positions["AAPL"]
@@ -543,7 +558,7 @@ class TestComplexScenarios:
             symbol="BRK.A", quantity=Quantity(Decimal("0.5")), entry_price=Price(Decimal("500000"))
         )
 
-        position = PortfolioPositionManager.open_position(portfolio, request)
+        position = portfolio.open_position(request)
 
         assert position.quantity.value == Decimal("0.5")
         assert position.average_entry_price.value == Decimal("500000")
@@ -563,7 +578,7 @@ class TestComplexScenarios:
             commission=Money(Decimal("3.141593")),
         )
 
-        position = PortfolioPositionManager.open_position(portfolio, request)
+        position = portfolio.open_position(request)
 
         # Verify precision is maintained
         position_cost = Decimal("123.456789") * Decimal("98.765432")

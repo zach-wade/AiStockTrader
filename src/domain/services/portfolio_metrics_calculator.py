@@ -6,7 +6,7 @@ Extracted from Portfolio entity to follow Single Responsibility Principle.
 """
 
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..value_objects import Money
 from ..value_objects.converter import ValueObjectConverter
@@ -131,6 +131,19 @@ class PortfolioMetricsCalculator:
         return ((current_value.amount - initial_capital_amount) / initial_capital_amount) * Decimal(
             "100"
         )
+
+    @staticmethod
+    def get_total_return(portfolio: "Portfolio") -> Decimal:
+        """Calculate portfolio total return as a ratio (not percentage).
+
+        Args:
+            portfolio: The portfolio to analyze
+
+        Returns:
+            Total return as ratio
+        """
+        return_pct = PortfolioMetricsCalculator.get_return_percentage(portfolio)
+        return return_pct / Decimal("100")
 
     @staticmethod
     def get_win_rate(portfolio: "Portfolio") -> Decimal | None:
@@ -384,3 +397,60 @@ class PortfolioMetricsCalculator:
                 max_drawdown = max(max_drawdown, drawdown)
 
         return max_drawdown * Decimal("100")  # Return as percentage
+
+    @staticmethod
+    def portfolio_to_dict(portfolio: "Portfolio") -> dict[str, Any]:
+        """Convert portfolio to dictionary for serialization.
+
+        Args:
+            portfolio: The portfolio to serialize
+
+        Returns:
+            Dictionary representation of portfolio
+        """
+        total_trades = portfolio.winning_trades + portfolio.losing_trades
+        win_rate = None
+        if total_trades > 0:
+            win_rate = portfolio.winning_trades / total_trades * 100
+
+        return {
+            "id": str(portfolio.id),
+            "name": portfolio.name,
+            "cash_balance": float(portfolio.cash_balance.amount),
+            "total_value": float(portfolio.get_total_value().amount),
+            "positions_value": float(portfolio.get_positions_value().amount),
+            "unrealized_pnl": float(portfolio.get_unrealized_pnl().amount),
+            "realized_pnl": float(portfolio.total_realized_pnl.amount),
+            "total_pnl": float(portfolio.get_total_pnl().amount),
+            "return_pct": float(portfolio.get_return_percentage()),
+            "open_positions": len(portfolio.get_open_positions()),
+            "total_trades": portfolio.trades_count,
+            "winning_trades": portfolio.winning_trades,
+            "losing_trades": portfolio.losing_trades,
+            "win_rate": win_rate,
+            "commission_paid": float(portfolio.total_commission_paid.amount),
+        }
+
+    @staticmethod
+    def portfolio_to_string(portfolio: "Portfolio") -> str:
+        """String representation of the portfolio.
+
+        Args:
+            portfolio: The portfolio to represent as string
+
+        Returns:
+            String representation
+        """
+        total_value = portfolio.get_total_value()
+        total_pnl = portfolio.get_total_pnl()
+        return_pct = portfolio.get_return_percentage()
+        open_positions = len(portfolio.get_open_positions())
+
+        return (
+            f"{portfolio.name} - "
+            f"Value=${total_value.amount:,.2f} | "
+            f"Cash=${portfolio.cash_balance.amount:,.2f} | "
+            f"Positions={open_positions} | "
+            f"P&L=${total_pnl.amount:,.2f} | "
+            f"Return={return_pct:.2f}%"
+        )
