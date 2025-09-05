@@ -14,8 +14,7 @@ from collections.abc import Callable
 from decimal import Decimal
 from typing import Any, TypeVar
 
-from src.domain.services.trading_validation_service import TradingValidationService
-from src.domain.services.validation_service import ValidationService
+from src.domain.services.domain_validation_service import DomainValidationService
 from src.infrastructure.security.input_sanitizer import InputSanitizer, SanitizationError
 from src.infrastructure.security.input_validation import InputValidator
 
@@ -212,73 +211,111 @@ class SecurityValidator:
 
     @classmethod
     def check_sql_injection(cls, value: str) -> bool:
-        """Delegate SQL injection validation to domain service."""
-        return ValidationService.validate_sql_injection(value)
+        """Basic SQL injection check - for comprehensive validation use DomainValidationService."""
+        # Basic check for common SQL injection patterns
+        dangerous_patterns = ["union", "select", "insert", "delete", "drop", "update", "--", ";"]
+        value_lower = value.lower()
+        return not any(pattern in value_lower for pattern in dangerous_patterns)
 
     @classmethod
     def check_xss(cls, value: str) -> bool:
-        """Delegate XSS validation to domain service."""
-        return ValidationService.validate_xss(value)
+        """Basic XSS check - for comprehensive validation use DomainValidationService."""
+        # Basic check for common XSS patterns
+        dangerous_patterns = ["<script", "</script", "javascript:", "onload=", "onerror="]
+        value_lower = value.lower()
+        return not any(pattern in value_lower for pattern in dangerous_patterns)
 
     @classmethod
     def check_trading_symbol(cls, symbol: str) -> bool:
         """
-        Validate trading symbol format - delegates to domain service.
+        Validate trading symbol format - basic check.
 
-        This method is kept for backward compatibility but delegates
-        all business logic to the domain service.
+        For comprehensive validation use DomainValidationService.
         """
-        return TradingValidationService.validate_trading_symbol(symbol)
+        if not symbol or not isinstance(symbol, str):
+            return False
+        # Basic symbol validation: 1-10 alphanumeric characters, uppercase
+        return symbol.isalnum() and symbol.isupper() and 1 <= len(symbol) <= 10
 
     @classmethod
     def check_currency_code(cls, currency: str) -> bool:
         """
-        Validate ISO currency code format - delegates to domain service.
+        Validate ISO currency code format - basic check.
 
-        This method is kept for backward compatibility but delegates
-        all business logic to the domain service.
+        For comprehensive validation use DomainValidationService.
         """
-        return TradingValidationService.validate_currency_code(currency)
+        if not currency or not isinstance(currency, str):
+            return False
+        # Basic ISO 4217 currency code validation: 3 uppercase letters
+        return currency.isalpha() and currency.isupper() and len(currency) == 3
 
     @classmethod
     def check_price(cls, price: str | float | Decimal) -> bool:
         """
-        Validate price/monetary amount - delegates to domain service.
+        Validate price/monetary amount - basic check.
 
-        This method is kept for backward compatibility but delegates
-        all business logic to the domain service.
+        For comprehensive validation use DomainValidationService.
         """
-        return TradingValidationService.validate_price(price)
+        try:
+            if isinstance(price, str):
+                price_val = Decimal(price)
+            elif isinstance(price, (int, float)):
+                price_val = Decimal(str(price))
+            else:
+                price_val = price
+            return price_val >= Decimal("0")
+        except (ValueError, TypeError, ArithmeticError):
+            return False
 
     @classmethod
     def check_quantity(cls, quantity: str | int | float) -> bool:
         """
-        Validate trading quantity - delegates to domain service.
+        Validate trading quantity - basic check.
 
-        This method is kept for backward compatibility but delegates
-        all business logic to the domain service.
+        For comprehensive validation use DomainValidationService.
         """
-        return TradingValidationService.validate_quantity(quantity)
+        try:
+            if isinstance(quantity, str):
+                qty_val = Decimal(quantity)
+                return qty_val > Decimal("0")
+            else:  # int or float
+                qty_val = Decimal(str(quantity))
+                return qty_val > Decimal("0")
+        except (ValueError, TypeError, ArithmeticError):
+            return False
 
     @classmethod
     def check_ip_address(cls, ip: str) -> bool:
-        """Delegate IP address validation to domain service."""
-        return ValidationService.validate_ip_address(ip)
+        """Basic IP address validation - for comprehensive validation use DomainValidationService."""
+        import re
+
+        ipv4_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+        return bool(re.match(ipv4_pattern, ip)) if isinstance(ip, str) else False
 
     @classmethod
     def check_url(cls, url: str) -> bool:
-        """Delegate URL validation to domain service."""
-        return ValidationService.validate_url(url)
+        """Basic URL validation - for comprehensive validation use DomainValidationService."""
+        result = DomainValidationService.validate_url(url)
+        return result.is_valid
 
     @classmethod
     def check_email(cls, email: str) -> bool:
-        """Delegate email validation to domain service."""
-        return ValidationService.validate_email(email)
+        """Basic email validation - for comprehensive validation use DomainValidationService."""
+        import re
+
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        return bool(re.match(email_pattern, email)) if isinstance(email, str) else False
 
     @classmethod
     def check_json_structure(cls, json_str: str, max_depth: int = 10) -> bool:
-        """Delegate JSON validation to domain service."""
-        return ValidationService.validate_json_structure(json_str, max_depth)
+        """Basic JSON structure validation - for comprehensive validation use DomainValidationService."""
+        import json
+
+        try:
+            json.loads(json_str)
+            return True
+        except (json.JSONDecodeError, TypeError):
+            return False
 
 
 class SchemaValidator:
@@ -286,8 +323,14 @@ class SchemaValidator:
 
     @classmethod
     def check_schema(cls, data: dict[str, Any], schema: dict[str, Any]) -> list[str]:
-        """Delegate schema validation to domain service."""
-        return ValidationService.validate_schema(data, schema)
+        """Basic schema validation - for comprehensive validation use DomainValidationService."""
+        errors = []
+        # Basic schema validation - check required fields
+        required_fields = schema.get("required", [])
+        for field in required_fields:
+            if field not in data:
+                errors.append(f"Missing required field: {field}")
+        return errors
 
 
 class TradingInputValidator:
@@ -296,32 +339,51 @@ class TradingInputValidator:
     @classmethod
     def check_order(cls, order_data: dict[str, Any]) -> list[str]:
         """
-        Validate trading order data using domain service.
+        Basic order data validation - for comprehensive validation use DomainValidationService.
 
-        This method delegates all business logic validation to the domain service.
-        The infrastructure layer only handles the delegation.
+        This method provides basic validation. For full business logic validation
+        use the DomainValidationService directly.
         """
-        return TradingValidationService.validate_order(order_data)
+        errors = []
+        required_fields = ["symbol", "quantity", "side", "order_type"]
+        for field in required_fields:
+            if field not in order_data:
+                errors.append(f"Missing required field: {field}")
+        return errors
 
     @classmethod
     def check_portfolio_data(cls, portfolio_data: dict[str, Any]) -> list[str]:
         """
-        Validate portfolio data structure using domain service.
+        Basic portfolio data validation - for comprehensive validation use DomainValidationService.
 
-        This method delegates all business logic validation to the domain service.
-        The infrastructure layer only handles the delegation.
+        This method provides basic validation. For full business logic validation
+        use the DomainValidationService directly.
         """
-        return TradingValidationService.validate_portfolio_data(portfolio_data)
+        errors = []
+        required_fields = ["id", "name", "initial_balance"]
+        for field in required_fields:
+            if field not in portfolio_data:
+                errors.append(f"Missing required field: {field}")
+        return errors
 
     @classmethod
     def get_order_schema(cls) -> dict[str, Any]:
         """
-        Get order validation schema from domain service.
+        Get basic order validation schema.
 
         Returns:
-            Order schema definition from the domain service
+            Basic order schema definition
         """
-        return TradingValidationService.get_order_schema()
+        return {
+            "type": "object",
+            "required": ["symbol", "quantity", "side", "order_type"],
+            "properties": {
+                "symbol": {"type": "string"},
+                "quantity": {"type": "number", "minimum": 0},
+                "side": {"type": "string", "enum": ["buy", "sell"]},
+                "order_type": {"type": "string", "enum": ["market", "limit", "stop", "stop_limit"]},
+            },
+        }
 
 
 def check_and_sanitize(
@@ -362,9 +424,15 @@ def security_check(field_name: str, validation_type: str = "string") -> Callable
         if value is None:
             return value
 
-        # Delegate validation to domain service
+        # Basic validation - for comprehensive validation use DomainValidationService
         str_value = str(value)
-        is_valid = ValidationService.validate_field(str_value, validation_type)
+        # Simple validation based on type
+        is_valid = True
+        if (
+            validation_type == "numeric"
+            and not str_value.replace(".", "").replace("-", "").isdigit()
+        ):
+            is_valid = False
 
         if not is_valid:
             raise ValidationError(f"Validation failed for {field_name} of type {validation_type}")

@@ -6,8 +6,11 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, ClassVar, Self
 
+from .arithmetic_mixin import ArithmeticMixin
+from .base import ComparableValueObject
 
-class Price:
+
+class Price(ComparableValueObject, ArithmeticMixin):
     """Immutable value object representing a trading price."""
 
     # Common tick sizes for different markets
@@ -60,6 +63,15 @@ class Price:
     def value(self) -> Decimal:
         """Get the decimal value."""
         return self._value
+
+    @property
+    def amount(self) -> Decimal:
+        """Get the decimal value (alias for ArithmeticMixin compatibility)."""
+        return self._value
+
+    def _create_new(self, amount: Decimal) -> Self:
+        """Create a new Price instance with the given amount."""
+        return type(self)(amount, self._tick_size, self._market_type)
 
     @property
     def tick_size(self) -> Decimal:
@@ -218,36 +230,12 @@ class Price:
             return False
         return self._value == other._value
 
-    def __lt__(self, other: Price | Decimal | int | float) -> bool:
+    def __lt__(self, other: object) -> bool:
         """Check if less than another Price or numeric value."""
         if isinstance(other, Price):
             return self._value < other._value
         if isinstance(other, (Decimal, int, float)):
             return self._value < Decimal(str(other))
-        raise TypeError(f"Cannot compare Price and {type(other)}")
-
-    def __le__(self, other: Price | Decimal | int | float) -> bool:
-        """Check if less than or equal to another Price or numeric value."""
-        if isinstance(other, Price):
-            return self._value <= other._value
-        if isinstance(other, (Decimal, int, float)):
-            return self._value <= Decimal(str(other))
-        raise TypeError(f"Cannot compare Price and {type(other)}")
-
-    def __gt__(self, other: Price | Decimal | int | float) -> bool:
-        """Check if greater than another Price or numeric value."""
-        if isinstance(other, Price):
-            return self._value > other._value
-        if isinstance(other, (Decimal, int, float)):
-            return self._value > Decimal(str(other))
-        raise TypeError(f"Cannot compare Price and {type(other)}")
-
-    def __ge__(self, other: Price | Decimal | int | float) -> bool:
-        """Check if greater than or equal to another Price or numeric value."""
-        if isinstance(other, Price):
-            return self._value >= other._value
-        if isinstance(other, (Decimal, int, float)):
-            return self._value >= Decimal(str(other))
         raise TypeError(f"Cannot compare Price and {type(other)}")
 
     def __hash__(self) -> int:
@@ -283,17 +271,31 @@ class Price:
         """Reverse subtract for numeric value - Price."""
         return type(self)(Decimal(str(other)) - self._value, tick_size=self._tick_size)
 
-    def __mul__(self, other: Decimal | int | float) -> Self:
-        """Multiply by a numeric value."""
-        return self.multiply(other)
+    def __mul__(self, other: object) -> object:
+        """Multiply by numeric value (returns Price) or Quantity (returns Money)."""
+        from .money import Money
+        from .quantity import Quantity
 
-    def __rmul__(self, other: Decimal | int | float) -> Self:
-        """Reverse multiply for numeric value * Price."""
-        return self.multiply(other)
+        if isinstance(other, Quantity):
+            # Price * Quantity = Money
+            return Money(self._value * other.value, "USD")
+        elif isinstance(other, (Decimal, int, float)):
+            # Price * numeric = Price
+            return self.multiply(other)
+        else:
+            return NotImplemented
 
-    def __truediv__(self, other: Decimal | int | float) -> Self:
-        """Divide by a numeric value."""
-        return self.divide(other)
+    def __rmul__(self, other: object) -> object:
+        """Reverse multiply for Quantity * Price or numeric * Price."""
+        return self.__mul__(other)
+
+    def __truediv__(self, other: object) -> object:
+        """Divide by a numeric value or another Price."""
+        if isinstance(other, Price):
+            return self._value / other._value
+        if isinstance(other, (Decimal, int, float)):
+            return self.divide(other)
+        raise TypeError(f"Cannot divide Price by {type(other)}")
 
     @classmethod
     def from_bid_ask(cls, bid: Decimal | float, ask: Decimal | float, **kwargs: Any) -> Self:

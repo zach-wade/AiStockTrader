@@ -24,8 +24,8 @@ import psutil
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 
-# Import from domain service
-from src.domain.services.threshold_policy_service import (
+# Import from infrastructure monitoring service (was moved)
+from src.infrastructure.monitoring.threshold_policy_service import (
     ThresholdBreachEvent,
     ThresholdComparison,
     ThresholdPolicy,

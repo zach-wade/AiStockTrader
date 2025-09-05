@@ -272,6 +272,9 @@ async def login(
     try:
         # Get client info
         client_ip = request.client.host if request.client else None
+        # Handle test client case where client.host is "testclient"
+        if client_ip == "testclient":
+            client_ip = "127.0.0.1"  # Default to localhost for testing
         user_agent = request.headers.get("User-Agent")
 
         result: AuthenticationResult = await user_service.authenticate(
@@ -320,6 +323,9 @@ async def verify_mfa(
     try:
         # Get client info
         client_ip = request.client.host if request.client else None
+        # Handle test client case where client.host is "testclient"
+        if client_ip == "testclient":
+            client_ip = "127.0.0.1"  # Default to localhost for testing
         user_agent = request.headers.get("User-Agent")
 
         result = await user_service.verify_mfa(

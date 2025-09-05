@@ -14,7 +14,10 @@ from typing import Any
 
 # Local imports
 from src.application.interfaces.exceptions import RepositoryError
-from src.domain.services.validation_service import DatabaseIdentifierValidator, ValidationError
+from src.domain.services.domain_validation_service import (
+    DatabaseIdentifierValidator,
+    ValidationError,
+)
 
 from .adapter import PostgreSQLAdapter
 

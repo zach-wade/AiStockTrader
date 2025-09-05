@@ -365,8 +365,10 @@ class RiskEvent(AuditEvent):
         if not self.resource_id and self.risk_type:
             self.resource_id = f"risk_{self.risk_type}_{uuid.uuid4().hex[:8]}"
 
-        # Risk events are always high importance
-        self.severity = EventSeverity.HIGH
+        # Risk events are at least high importance (but can be critical)
+        # Don't override if it's already CRITICAL
+        if self.severity != EventSeverity.CRITICAL:
+            self.severity = EventSeverity.HIGH
 
         # Critical for significant risk breaches
         if self.risk_level == "critical" or (

@@ -14,9 +14,9 @@ import pytest_asyncio
 from src.application.interfaces.exceptions import ConcurrencyError, PortfolioNotFoundError
 from src.domain.entities.portfolio import Portfolio
 from src.domain.exceptions import DeadlockException, OptimisticLockException, StaleDataException
-from src.domain.services.concurrency_service import ConcurrencyService
 from src.infrastructure.database.adapter import PostgreSQLAdapter
 from src.infrastructure.repositories.portfolio_repository import PostgreSQLPortfolioRepository
+from src.infrastructure.resilience.concurrency_service import ConcurrencyService
 
 
 class TestPortfolioRepositoryConcurrency:

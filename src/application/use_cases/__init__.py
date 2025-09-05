@@ -26,10 +26,11 @@ from .order_execution import (
 
 # Portfolio management use cases
 from .portfolio import (
+    CalculatePortfolioMetricsUseCase,
     ClosePositionUseCase,
-    GetPortfolioUseCase,
-    GetPositionsUseCase,
-    UpdatePortfolioUseCase,
+    OpenPositionUseCase,
+    UpdatePositionUseCase,
+    ValidatePortfolioUseCase,
 )
 
 # Risk management use cases
@@ -56,10 +57,11 @@ __all__ = [
     "ProcessPendingOrdersUseCase",
     "CheckOrderTriggerUseCase",
     # Portfolio use cases
-    "GetPortfolioUseCase",
-    "UpdatePortfolioUseCase",
-    "GetPositionsUseCase",
+    "OpenPositionUseCase",
     "ClosePositionUseCase",
+    "UpdatePositionUseCase",
+    "CalculatePortfolioMetricsUseCase",
+    "ValidatePortfolioUseCase",
     # Risk management use cases
     "CalculateRiskUseCase",
     "ValidateOrderRiskUseCase",

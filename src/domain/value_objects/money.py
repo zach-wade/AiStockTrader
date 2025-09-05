@@ -5,9 +5,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Self
 
 from ..constants import CURRENCY_CODE_LENGTH
+from .arithmetic_mixin import ArithmeticMixin
+from .base import ComparableValueObject
 
 
-class Money:
+class Money(ComparableValueObject, ArithmeticMixin):
     """Immutable value object representing money with currency and precision."""
 
     def __init__(self, amount: Decimal | float | int | str, currency: str = "USD") -> None:
@@ -38,6 +40,10 @@ class Money:
     def currency(self) -> str:
         """Get the currency code."""
         return self._currency
+
+    def _create_new(self, amount: Decimal) -> Self:
+        """Create a new Money instance with the given amount and same currency."""
+        return type(self)(amount, self._currency)
 
     def add(self, other: Self) -> Self:
         """Add two money values.
@@ -166,7 +172,7 @@ class Money:
             return False
         return self._amount == other._amount and self._currency == other._currency
 
-    def __lt__(self, other: Self | Decimal | int | float) -> bool:
+    def __lt__(self, other: object) -> bool:
         """Check if less than another Money instance or numeric value."""
         if isinstance(other, Money):
             if self._currency != other._currency:
@@ -174,36 +180,6 @@ class Money:
             return self._amount < other._amount
         if isinstance(other, (Decimal, int, float)):
             return self._amount < Decimal(str(other))
-        raise TypeError(f"Cannot compare Money and {type(other)}")
-
-    def __le__(self, other: Self | Decimal | int | float) -> bool:
-        """Check if less than or equal to another Money instance or numeric value."""
-        if isinstance(other, Money):
-            if self._currency != other._currency:
-                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
-            return self._amount <= other._amount
-        if isinstance(other, (Decimal, int, float)):
-            return self._amount <= Decimal(str(other))
-        raise TypeError(f"Cannot compare Money and {type(other)}")
-
-    def __gt__(self, other: Self | Decimal | int | float) -> bool:
-        """Check if greater than another Money instance or numeric value."""
-        if isinstance(other, Money):
-            if self._currency != other._currency:
-                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
-            return self._amount > other._amount
-        if isinstance(other, (Decimal, int, float)):
-            return self._amount > Decimal(str(other))
-        raise TypeError(f"Cannot compare Money and {type(other)}")
-
-    def __ge__(self, other: Self | Decimal | int | float) -> bool:
-        """Check if greater than or equal to another Money instance or numeric value."""
-        if isinstance(other, Money):
-            if self._currency != other._currency:
-                raise ValueError(f"Cannot compare {self._currency} and {other._currency}")
-            return self._amount >= other._amount
-        if isinstance(other, (Decimal, int, float)):
-            return self._amount >= Decimal(str(other))
         raise TypeError(f"Cannot compare Money and {type(other)}")
 
     def __neg__(self) -> Self:
@@ -327,7 +303,7 @@ class Money:
         """
         return self.__sub__(other)
 
-    def __truediv__(self, other: Self | Decimal | float | int) -> Self | Decimal:
+    def __truediv__(self, other: object) -> object:
         """Division operator (/).
 
         Args:
@@ -377,7 +353,7 @@ class Money:
             return other / self._amount
         raise TypeError(f"Cannot divide {type(other)} by Money")
 
-    def __mul__(self, other: Decimal | float | int) -> Self:
+    def __mul__(self, other: object) -> object:
         """Multiplication operator (*).
 
         Args:
@@ -392,7 +368,7 @@ class Money:
             other = Decimal(str(other))
         return type(self)(self._amount * other, self._currency)
 
-    def __rmul__(self, other: Decimal | float | int) -> Self:
+    def __rmul__(self, other: object) -> object:
         """Right-side multiplication (when Money is on the right).
 
         Args:

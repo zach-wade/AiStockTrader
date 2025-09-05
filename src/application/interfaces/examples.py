@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 # Local imports
 from src.domain.entities.order import Order, OrderRequest, OrderSide, OrderStatus
 from src.domain.entities.position import Position
+from src.domain.services.portfolio_calculator import PortfolioCalculator
 from src.domain.value_objects.money import Money
 from src.domain.value_objects.price import Price
 from src.domain.value_objects.quantity import Quantity
@@ -163,7 +164,7 @@ class TradingService:
             )
 
             return {
-                "portfolio": portfolio.to_dict(),
+                "portfolio": PortfolioCalculator.portfolio_to_dict(portfolio),
                 "active_positions": [
                     {
                         "symbol": pos.symbol,
@@ -186,11 +187,15 @@ class TradingService:
                     for order in recent_orders
                 ],
                 "summary": {
-                    "total_value": float(portfolio.get_total_value().amount),
+                    "total_value": float(PortfolioCalculator.get_total_value(portfolio).amount),
                     "cash_balance": float(portfolio.cash_balance.amount),
-                    "unrealized_pnl": float(portfolio.get_unrealized_pnl().amount),
-                    "total_pnl": float(portfolio.get_total_pnl().amount),
-                    "return_percentage": float(portfolio.get_return_percentage()),
+                    "unrealized_pnl": float(
+                        PortfolioCalculator.get_unrealized_pnl(portfolio).amount
+                    ),
+                    "total_pnl": float(PortfolioCalculator.get_total_pnl(portfolio).amount),
+                    "return_percentage": float(
+                        PortfolioCalculator.get_return_percentage(portfolio)
+                    ),
                 },
             }
 

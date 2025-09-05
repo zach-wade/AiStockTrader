@@ -245,10 +245,10 @@ class TestServiceFactoryCommissionCalculator:
         validator = ServiceFactory.create_domain_validator()
 
         assert validator is not None
-        assert hasattr(validator, "validate_symbol")
-        assert hasattr(validator, "validate_price")
-        assert hasattr(validator, "validate_quantity")
-        assert hasattr(validator, "validate_decimal")
+        assert hasattr(validator, "validate_order")
+        assert hasattr(validator, "validate_portfolio")
+        assert hasattr(validator, "validate_position")
+        assert hasattr(validator, "validate_trading_request")
 
     def test_create_risk_calculator(self):
         """Test creating risk calculator."""

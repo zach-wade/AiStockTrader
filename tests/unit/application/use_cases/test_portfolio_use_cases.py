@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.application.use_cases.portfolio import (
+from src.application.use_cases.portfolio_legacy import (
     ClosePositionRequest,
     ClosePositionUseCase,
     GetPortfolioRequest,

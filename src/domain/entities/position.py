@@ -61,6 +61,9 @@ class Position:
     # Timestamps
     opened_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     closed_at: datetime | None = None
+    entry_time: datetime = field(default_factory=lambda: datetime.now(UTC))
+    exit_time: datetime | None = None
+    exit_price: Price | None = None
 
     # Metadata
     strategy: str | None = None
@@ -246,21 +249,30 @@ class Position:
         quantity_value = ValueObjectConverter.extract_value(self.quantity)
         return quantity_value == 0 or self.closed_at is not None
 
+    def is_open(self) -> bool:
+        """Check if position is open"""
+        return not self.is_closed()
+
+    @property
+    def side(self) -> PositionSide:
+        """Get the position side (LONG or SHORT)"""
+        if self.is_long():
+            return PositionSide.LONG
+        elif self.is_short():
+            return PositionSide.SHORT
+        else:
+            # Closed position - return LONG by default for compatibility
+            return PositionSide.LONG
+
     def get_unrealized_pnl(self) -> Money | None:
         """Calculate unrealized P&L based on current price"""
         if self.is_closed() or self.current_price is None:
             return None
 
-        # Extract values from both Price objects and raw Decimals
-        current_value = (
-            self.current_price.value if hasattr(self.current_price, "value") else self.current_price
-        )
-        entry_value = (
-            self.average_entry_price.value
-            if hasattr(self.average_entry_price, "value")
-            else self.average_entry_price
-        )
-        quantity_value = self.quantity.value if hasattr(self.quantity, "value") else self.quantity
+        # Extract decimal values from domain objects
+        current_value = self.current_price.value
+        entry_value = self.average_entry_price.value
+        quantity_value = self.quantity.value
 
         if self.is_long():
             return Money(quantity_value * (current_value - entry_value))
@@ -309,15 +321,9 @@ class Position:
         if self.stop_loss_price is None or self.current_price is None:
             return False
 
-        # Extract values from both Price objects and raw Decimals
-        current_value = (
-            self.current_price.value if hasattr(self.current_price, "value") else self.current_price
-        )
-        stop_loss_value = (
-            self.stop_loss_price.value
-            if hasattr(self.stop_loss_price, "value")
-            else self.stop_loss_price
-        )
+        # Extract decimal values from Price objects
+        current_value = self.current_price.value
+        stop_loss_value = self.stop_loss_price.value
 
         if self.is_long():
             return current_value <= stop_loss_value
@@ -329,15 +335,9 @@ class Position:
         if self.take_profit_price is None or self.current_price is None:
             return False
 
-        # Extract values from both Price objects and raw Decimals
-        current_value = (
-            self.current_price.value if hasattr(self.current_price, "value") else self.current_price
-        )
-        take_profit_value = (
-            self.take_profit_price.value
-            if hasattr(self.take_profit_price, "value")
-            else self.take_profit_price
-        )
+        # Extract decimal values from Price objects
+        current_value = self.current_price.value
+        take_profit_value = self.take_profit_price.value
 
         if self.is_long():
             return current_value >= take_profit_value
@@ -405,3 +405,13 @@ class Position:
             f"Position({self.symbol}: {direction} {display_quantity} @ {self.average_entry_price}"
             f" - {status}{pnl_str})"
         )
+
+    def mark_as_closed(self, exit_price: Price) -> None:
+        """Mark position as closed with exit details.
+
+        Args:
+            exit_price: The exit price for closing the position
+        """
+        self.exit_price = exit_price
+        self.exit_time = datetime.now(UTC)
+        self.closed_at = datetime.now(UTC)

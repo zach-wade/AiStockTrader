@@ -350,7 +350,15 @@ class RBACService:
         Returns:
             API key information including the key (only shown once)
         """
-        user = self.db.query(User).filter_by(id=user_id).first()
+        # Convert string user_id to UUID if necessary
+        from uuid import UUID
+
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except ValueError:
+            raise ValueError("Invalid user ID format")
+
+        user = self.db.query(User).filter(User.id == user_uuid).first()
         if not user:
             raise ValueError("User not found")
 
@@ -375,7 +383,7 @@ class RBACService:
 
         # Create API key record
         api_key = APIKey(
-            user_id=user_id,
+            user_id=user_uuid,
             key_hash=key_hash,
             name=name,
             last_four=last_four,
@@ -460,7 +468,19 @@ class RBACService:
 
     async def list_user_api_keys(self, user_id: str) -> list[dict[str, Any]]:
         """List all API keys for a user."""
-        api_keys = self.db.query(APIKey).filter_by(user_id=user_id, is_active=True).all()
+        # Convert string user_id to UUID if necessary
+        from uuid import UUID
+
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except ValueError:
+            raise ValueError("Invalid user ID format")
+
+        api_keys = (
+            self.db.query(APIKey)
+            .filter(APIKey.user_id == user_uuid, APIKey.is_active == True)
+            .all()
+        )
 
         return [
             {
@@ -489,7 +509,18 @@ class RBACService:
         Returns:
             True if revoked
         """
-        api_key = self.db.query(APIKey).filter_by(id=key_id, user_id=user_id).first()
+        # Convert string user_id to UUID if necessary
+        from uuid import UUID
+
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+            key_uuid = UUID(key_id) if isinstance(key_id, str) else key_id
+        except ValueError:
+            raise ValueError("Invalid user ID or key ID format")
+
+        api_key = (
+            self.db.query(APIKey).filter(APIKey.id == key_uuid, APIKey.user_id == user_uuid).first()
+        )
 
         if not api_key:
             raise ValueError("API key not found")

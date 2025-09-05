@@ -62,9 +62,7 @@ class RiskLimitValidator:
             Decimal("100")
         )  # Use estimate if market order
         can_open, reason = portfolio.can_open_position(
-            symbol=new_order.symbol,
-            quantity=new_order.quantity,
-            price=estimated_price,
+            new_order.symbol, new_order.quantity, estimated_price
         )
 
         if not can_open:

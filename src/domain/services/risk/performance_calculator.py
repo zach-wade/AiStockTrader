@@ -137,12 +137,16 @@ class PerformanceCalculator:
 
         portfolio_var_calculator = PortfolioVaRCalculator()
 
-        metrics = {
+        # Get values first to avoid multiple calls
+        avg_win = portfolio.get_average_win()
+        avg_loss = portfolio.get_average_loss()
+
+        metrics: dict[str, Decimal | Money | None] = {
             "total_return": portfolio.get_return_percentage(),
             "win_rate": portfolio.get_win_rate(),
             "profit_factor": portfolio.get_profit_factor(),
-            "average_win": portfolio.get_average_win(),
-            "average_loss": portfolio.get_average_loss(),
+            "average_win": avg_win if avg_win is not None else None,
+            "average_loss": avg_loss if avg_loss is not None else None,
             "max_drawdown": portfolio_var_calculator.calculate_max_drawdown(
                 [portfolio.get_total_value()]
             ),
@@ -151,28 +155,65 @@ class PerformanceCalculator:
 
         # Calculate risk-adjusted return (Calmar ratio)
         if metrics["total_return"] and metrics["max_drawdown"]:
-            if metrics["max_drawdown"] > 0:
-                metrics["calmar_ratio"] = metrics["total_return"] / metrics["max_drawdown"]
+            max_dd = metrics["max_drawdown"]
+            # Handle both Decimal and Money types for max_drawdown
+            if isinstance(max_dd, Money):
+                dd_value = max_dd.amount
+            else:
+                dd_value = max_dd  # Decimal
+
+            if dd_value and dd_value > 0:
+                result = metrics["total_return"] / dd_value
+                metrics["calmar_ratio"] = (
+                    result if isinstance(result, (Decimal, type(None))) else Decimal(str(result))
+                )
             else:
                 metrics["calmar_ratio"] = None
         else:
             metrics["calmar_ratio"] = None
 
         # Calculate expectancy
-        avg_win = metrics["average_win"]
-        avg_loss = metrics["average_loss"]
+        avg_win_metric = metrics["average_win"]
+        avg_loss_metric = metrics["average_loss"]
         if (
             metrics["win_rate"] is not None
-            and avg_win is not None
-            and avg_loss is not None
-            and isinstance(avg_win, Money)
-            and isinstance(avg_loss, Money)
+            and avg_win_metric is not None
+            and avg_loss_metric is not None
             and isinstance(metrics["win_rate"], Decimal)
         ):
+            # Handle both Money and Decimal types for average win/loss
+            # Check for valid types first
+            if isinstance(avg_win_metric, Money):
+                avg_win_value = avg_win_metric.amount
+                is_money = True
+            elif isinstance(avg_win_metric, Decimal):
+                avg_win_value = avg_win_metric
+                is_money = False
+            else:
+                # Invalid type, set expectancy to None
+                metrics["expectancy"] = None
+                return metrics
+
+            if isinstance(avg_loss_metric, Money):
+                avg_loss_value = abs(avg_loss_metric.amount)
+                is_money = True
+            elif isinstance(avg_loss_metric, Decimal):
+                avg_loss_value = abs(avg_loss_metric)
+                is_money = is_money or False
+            else:
+                # Invalid type, set expectancy to None
+                metrics["expectancy"] = None
+                return metrics
+
             win_rate = metrics["win_rate"] / Decimal("100")
             loss_rate = 1 - win_rate
-            expectancy_amount = (win_rate * avg_win.amount) - (loss_rate * avg_loss.amount)
-            metrics["expectancy"] = Money(expectancy_amount)
+            expectancy_amount = (win_rate * avg_win_value) - (loss_rate * avg_loss_value)
+
+            # Return Money if any input was Money, otherwise Decimal
+            if is_money:
+                metrics["expectancy"] = Money(expectancy_amount)
+            else:
+                metrics["expectancy"] = expectancy_amount
         else:
             metrics["expectancy"] = None
 

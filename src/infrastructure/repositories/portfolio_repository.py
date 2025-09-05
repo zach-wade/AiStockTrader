@@ -23,8 +23,8 @@ from src.application.interfaces.repositories import IPortfolioRepository
 from src.domain.entities.portfolio import Portfolio
 from src.domain.entities.position import Position
 from src.domain.exceptions import DeadlockException, OptimisticLockException, StaleDataException
-from src.domain.services.concurrency_service import ConcurrencyService
 from src.infrastructure.database.adapter import PostgreSQLAdapter, Row
+from src.infrastructure.resilience.concurrency_service import ConcurrencyService
 
 logger = logging.getLogger(__name__)
 
@@ -489,11 +489,7 @@ class PostgreSQLPortfolioRepository(IPortfolioRepository):
 
         # Use the concurrency service for retry logic
         try:
-            return await self.concurrency_service.async_retry_on_version_conflict(
-                _do_update,
-                entity_type="Portfolio",
-                entity_id=portfolio.id,
-            )
+            return await self.concurrency_service.async_retry_on_version_conflict(_do_update)
         except OptimisticLockException:
             raise
         except (PortfolioNotFoundError, StaleDataException):

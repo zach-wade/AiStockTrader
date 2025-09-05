@@ -60,7 +60,7 @@ from decimal import Decimal
 from typing import Protocol
 
 from ..entities.order import Order, OrderSide
-from ..entities.portfolio import Portfolio, PositionRequest
+from ..entities.portfolio import Portfolio
 from ..entities.position import Position
 from ..value_objects.money import Money
 from ..value_objects.price import Price
@@ -453,13 +453,31 @@ class OrderProcessor:
             This method uses the portfolio's open_position method which handles
             validation and state management.
         """
-        request = PositionRequest(
-            symbol=symbol,
-            quantity=quantity,
-            entry_price=price,
-            commission=commission,
+        # Note: In the new architecture, position opening should be handled by
+        # the application service layer, not directly on the portfolio entity.
+        # This method needs to be refactored to use PortfolioService.
+        from ..entities.position import Position
+
+        position = Position(
+            symbol=symbol, quantity=quantity, average_entry_price=price, current_price=price
         )
-        portfolio.open_position(request)
+
+        # Calculate total cost
+        from ..value_objects import Money
+
+        position_cost = Money(quantity.value * price.value)
+        total_cost = position_cost + commission
+
+        # Update portfolio state
+        # Thread safety should be handled at application layer
+        # Deduct cash
+        portfolio.cash_balance = portfolio.cash_balance - total_cost
+
+        # Add or update position
+        portfolio.positions[symbol] = position
+
+        # Update commission tracking
+        portfolio.total_commission_paid = portfolio.total_commission_paid + commission
 
     def calculate_fill_price(
         self, order: Order, market_price: Price, slippage_model: object | None = None
@@ -511,9 +529,9 @@ class OrderProcessor:
         if order.limit_price:
             is_buy = order.side == OrderSide.BUY
             price_favorable = (
-                market_price.value <= order.limit_price
+                market_price.value <= order.limit_price.value
                 if is_buy
-                else market_price.value >= order.limit_price
+                else market_price.value >= order.limit_price.value
             )
 
             if price_favorable:
@@ -529,9 +547,9 @@ class OrderProcessor:
         if order.stop_price:
             is_buy = order.side == OrderSide.BUY
             stop_triggered = (
-                market_price.value >= order.stop_price
+                market_price.value >= order.stop_price.value
                 if is_buy
-                else market_price.value <= order.stop_price
+                else market_price.value <= order.stop_price.value
             )
 
             if stop_triggered:
@@ -596,17 +614,17 @@ class OrderProcessor:
         # Check limit orders
         if order.limit_price:
             return (
-                market_price.value <= order.limit_price
+                market_price.value <= order.limit_price.value
                 if is_buy
-                else market_price.value >= order.limit_price
+                else market_price.value >= order.limit_price.value
             )
 
         # Check stop orders
         if order.stop_price:
             return (
-                market_price.value >= order.stop_price
+                market_price.value >= order.stop_price.value
                 if is_buy
-                else market_price.value <= order.stop_price
+                else market_price.value <= order.stop_price.value
             )
 
         return False

@@ -268,7 +268,16 @@ class TestAuditDecorator:
         ):
             return {"string": string_val, "decimal": decimal_val, "dict": dict_val}
 
-        result = test_function()
+        result = test_function(
+            string_val="test",
+            int_val=42,
+            float_val=3.14,
+            bool_val=True,
+            decimal_val=Decimal("123.45"),
+            none_val=None,
+            dict_val={"key": "value"},
+            list_val=[1, 2, 3],
+        )
 
         # Function should execute
         assert result["string"] == "test"
@@ -305,7 +314,14 @@ class TestOrderAuditDecorator:
         ):
             return {"order_id": order_id, "status": "pending"}
 
-        result = create_order()
+        result = create_order(
+            order_id="order_123",
+            symbol="AAPL",
+            side="buy",
+            quantity=Decimal("100"),
+            price=Decimal("150.00"),
+            order_type="limit",
+        )
 
         assert result["order_id"] == "order_123"
 
@@ -428,7 +444,7 @@ class TestPositionAuditDecorator:
         def open_position(position_id="pos_123", symbol="TSLA", quantity=Decimal("25")):
             return {"position_id": position_id, "status": "open"}
 
-        result = open_position()
+        result = open_position(position_id="pos_123", symbol="TSLA", quantity=Decimal("25"))
 
         assert result["position_id"] == "pos_123"
 
@@ -457,7 +473,9 @@ class TestRiskAuditDecorator:
         ):
             return {"status": "within_limit"}
 
-        result = check_var_limit()
+        result = check_var_limit(
+            risk_type="var_limit", threshold=Decimal("50000"), current_value=Decimal("45000")
+        )
 
         assert result["status"] == "within_limit"
 

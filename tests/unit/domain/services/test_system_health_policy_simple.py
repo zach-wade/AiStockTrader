@@ -2,7 +2,7 @@
 Tests for SystemHealthPolicy - testing only existing methods.
 """
 
-from src.domain.services.system_health_policy import (
+from src.infrastructure.monitoring.system_health_policy import (
     ComponentHealth,
     ComponentType,
     HealthScore,

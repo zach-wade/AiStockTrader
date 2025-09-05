@@ -1,15 +1,13 @@
 """
-Application Services - Thread-safe wrappers for domain entities
+Application Services - Business logic orchestration
 
-This module contains application services that provide thread-safe operations
-for domain entities, maintaining the separation between domain logic and
-infrastructure concerns.
+This module contains application services that orchestrate business logic
+across domain entities and services. Thread safety concerns are handled
+at the infrastructure layer.
 """
 
-from .thread_safe_portfolio_service import ThreadSafePortfolioService
-from .thread_safe_position_service import ThreadSafePositionService
+from .portfolio_service import PortfolioService
 
 __all__ = [
-    "ThreadSafePortfolioService",
-    "ThreadSafePositionService",
+    "PortfolioService",
 ]

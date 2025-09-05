@@ -11,8 +11,11 @@ from decimal import Decimal
 from typing import Any
 
 from src.application.interfaces.broker import IBroker
-from src.domain.services.broker_configuration_service import BrokerConfigurationService, BrokerType
 from src.domain.services.trading_calendar import Exchange
+from src.infrastructure.brokers.broker_configuration_service import (
+    BrokerConfigurationService,
+    BrokerType,
+)
 
 from .alpaca_broker import AlpacaBroker
 from .paper_broker import PaperBroker
@@ -157,4 +160,5 @@ class BrokerFactory:
         """
         # Delegate to domain service
         broker_enum = self.config_service.determine_broker_type(broker_type)
-        return self.config_service.get_default_config(broker_enum)
+        config = self.config_service.get_default_config(broker_enum)
+        return dict(config)

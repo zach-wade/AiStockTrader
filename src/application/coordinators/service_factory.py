@@ -23,7 +23,7 @@ from src.domain.services import (
     SlippageConfig,
     TradingCalendar,
 )
-from src.domain.services.validation_service import DomainValidator
+from src.domain.services.domain_validation_service import DomainValidationService
 
 logger = logging.getLogger(__name__)
 
@@ -178,14 +178,14 @@ class ServiceFactory:
         return TradingCalendar(time_service, exchange)
 
     @staticmethod
-    def create_domain_validator() -> DomainValidator:
+    def create_domain_validator() -> DomainValidationService:
         """
         Create a domain validator.
 
         Returns:
             Configured domain validator
         """
-        return DomainValidator()
+        return DomainValidationService()
 
     @staticmethod
     def create_risk_calculator(risk_limits: dict[str, Any] | None = None) -> Any:

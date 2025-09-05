@@ -180,10 +180,16 @@ class EnvironmentSecretProvider(ISecretProvider):
         return False
 
     def check_format(self, key: str, value: str) -> bool:
-        """Delegate format checking to domain service."""
-        from src.domain.services.secrets_validation_service import SecretsValidationService
-
-        return SecretsValidationService.validate_secret_format(key, value)
+        """Basic format checking for secrets."""
+        if not key or not value:
+            return False
+        # Basic validation: key should be non-empty string, value should be non-empty
+        return (
+            isinstance(key, str)
+            and isinstance(value, str)
+            and len(key.strip()) > 0
+            and len(value.strip()) > 0
+        )
 
 
 class AWSSecretsManagerProvider(ISecretProvider):
@@ -289,10 +295,16 @@ class AWSSecretsManagerProvider(ISecretProvider):
             return False
 
     def check_format(self, key: str, value: str) -> bool:
-        """Delegate format checking to domain service."""
-        from src.domain.services.secrets_validation_service import SecretsValidationService
-
-        return SecretsValidationService.validate_secret_format(key, value)
+        """Basic format checking for secrets."""
+        if not key or not value:
+            return False
+        # Basic validation: key should be non-empty string, value should be non-empty
+        return (
+            isinstance(key, str)
+            and isinstance(value, str)
+            and len(key.strip()) > 0
+            and len(value.strip()) > 0
+        )
 
 
 class SecretEncryption:
@@ -516,34 +528,27 @@ class SecretsManager:
 
     def get_database_config(self) -> dict[str, Any]:
         """Get database configuration from secrets - simple retrieval."""
-        from src.domain.services.secrets_validation_service import SecretsValidationService
-
-        # Simple retrieval of secrets
+        # Simple retrieval of secrets with basic defaults
         config = {
-            "host": self.get_secret("DB_HOST", required=False),
-            "port": self.get_secret("DB_PORT", required=False),
-            "database": self.get_secret("DB_NAME", required=False),
+            "host": self.get_secret("DB_HOST", required=False) or "localhost",
+            "port": self.get_secret("DB_PORT", required=False) or "5432",
+            "database": self.get_secret("DB_NAME", required=False) or "trading_db",
             "user": self.get_secret("DB_USER", required=True),
             "password": self.get_secret("DB_PASSWORD", required=True),
         }
-
-        # Use domain service for applying defaults and validation
-        return SecretsValidationService.apply_defaults_to_database_config(config)
+        return config
 
     def get_broker_config(self) -> dict[str, Any]:
         """Get broker configuration from secrets - simple retrieval."""
-        from src.domain.services.secrets_validation_service import SecretsValidationService
-
-        # Simple retrieval of secrets
+        # Simple retrieval of secrets with basic defaults
         config = {
             "alpaca_api_key": self.get_secret("ALPACA_API_KEY", required=False),
             "alpaca_api_secret": self.get_secret("ALPACA_API_SECRET", required=False),
-            "alpaca_base_url": self.get_secret("ALPACA_BASE_URL", required=False),
+            "alpaca_base_url": self.get_secret("ALPACA_BASE_URL", required=False)
+            or "https://paper-api.alpaca.markets",
             "polygon_api_key": self.get_secret("POLYGON_API_KEY", required=False),
         }
-
-        # Use domain service for applying defaults
-        return SecretsValidationService.apply_defaults_to_broker_config("alpaca", config)
+        return config
 
     def set_secret(self, key: str, value: str, encrypt: bool = True) -> bool:
         """
@@ -618,10 +623,11 @@ class SecretsManager:
                 logger.error(f"Failed to auto-rotate secret '{key}': {e}")
 
     def _is_encrypted_secret(self, key: str) -> bool:
-        """Check if a secret should be encrypted using domain service."""
-        from src.domain.services.secrets_validation_service import SecretsValidationService
-
-        return SecretsValidationService.should_encrypt_secret(key)
+        """Check if a secret should be encrypted - basic check."""
+        # Basic logic: encrypt sensitive secrets
+        sensitive_keys = ["password", "secret", "key", "token", "api_key"]
+        key_lower = key.lower()
+        return any(sensitive_key in key_lower for sensitive_key in sensitive_keys)
 
     def get_rate_limit_status(self, key: str) -> dict[str, int]:
         """Get rate limit status for a key."""
@@ -666,13 +672,11 @@ class SecretsManager:
         Raises:
             SecretNotFoundError: If any required secret is missing
         """
-        from src.domain.services.secrets_validation_service import SecretsValidationService
-
         # Get all secrets
         secrets = {key: self.get_secret(key, required=False, decrypt=True) for key in required_keys}
 
-        # Delegate to domain service for validation
-        missing = SecretsValidationService.validate_required_secrets(secrets, required_keys)
+        # Basic validation - check for missing secrets
+        missing = [key for key, value in secrets.items() if value is None or value == ""]
 
         if missing:
             raise SecretNotFoundError(f"Missing required secrets: {', '.join(missing)}")

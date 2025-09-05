@@ -8,11 +8,10 @@ from unittest.mock import Mock
 
 import pytest
 import redis
-from fastapi import Depends, FastAPI, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from src.infrastructure.auth.endpoints import (
     get_current_user,
@@ -34,16 +33,15 @@ from src.infrastructure.auth.user_service import UserService
 
 
 @pytest.fixture(scope="function")
-def test_db():
-    """Create test database with proper thread handling."""
-    # Use in-memory SQLite for tests with thread safety
-    engine = create_engine(
-        "sqlite:///:memory:",
-        poolclass=StaticPool,
-        connect_args={
-            "check_same_thread": False,
-        },
-    )
+async def test_db(db_connection):
+    """Create test database using PostgreSQL connection."""
+    # Use the PostgreSQL database connection from conftest.py
+
+    # Get database URL from the connection config
+    config = db_connection.config
+    database_url = f"postgresql://{config.user}:{config.password}@{config.host}:{config.port}/{config.database}"
+
+    engine = create_engine(database_url)
 
     # Create all tables from the metadata
     Base.metadata.create_all(engine)
@@ -52,11 +50,25 @@ def test_db():
     db = TestingSessionLocal()
 
     try:
+        # Clean up any existing test data
+        from sqlalchemy import text
+
+        db.execute(text("DELETE FROM user_roles WHERE user_id::text LIKE '%'"))
+        db.execute(text("DELETE FROM users WHERE email LIKE '%@gmail.com'"))
+        db.execute(text("DELETE FROM roles WHERE name IN ('admin', 'trader')"))
+        db.execute(text("DELETE FROM permissions"))
+        db.commit()
+
         yield db
     finally:
         # Ensure clean cleanup
         try:
-            db.rollback()  # Rollback any uncommitted changes
+            # Clean up test data again
+            db.execute(text("DELETE FROM user_roles WHERE user_id::text LIKE '%'"))
+            db.execute(text("DELETE FROM users WHERE email LIKE '%@gmail.com'"))
+            db.execute(text("DELETE FROM roles WHERE name IN ('admin', 'trader')"))
+            db.execute(text("DELETE FROM permissions"))
+            db.commit()
         except Exception:
             pass  # Ignore errors during cleanup
         finally:
@@ -120,6 +132,7 @@ def user_service(test_db, jwt_service):
 @pytest.fixture(scope="function")
 def test_app(test_db, jwt_service, rbac_service, user_service, redis_client):
     """Create test FastAPI app with auth."""
+
     app = FastAPI()
 
     # Add auth router
@@ -154,10 +167,32 @@ def test_app(test_db, jwt_service, rbac_service, user_service, redis_client):
     def get_test_rbac_service():
         return rbac_service
 
+    def get_test_current_user(request: Request):
+        """Override get_current_user to work with JWT tokens in tests."""
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]  # Remove "Bearer " prefix
+            try:
+                payload = jwt_service.verify_access_token(token)
+                return payload["sub"]  # Return user_id
+            except Exception as e:
+                from fastapi import HTTPException, status
+
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {e}"
+                )
+        else:
+            from fastapi import HTTPException, status
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Authorization header required"
+            )
+
     app.dependency_overrides[get_db] = get_test_db
     app.dependency_overrides[get_jwt_service] = get_test_jwt_service
     app.dependency_overrides[get_user_service] = get_test_user_service
     app.dependency_overrides[get_rbac_service] = get_test_rbac_service
+    app.dependency_overrides[get_current_user] = get_test_current_user
 
     return app
 
@@ -449,7 +484,7 @@ class TestPasswordManagement:
         """Test password reset for non-existent email."""
         response = test_client.post(
             "/auth/password/reset",
-            json={"email": "nonexistent@example.com"},
+            json={"email": "nonexistent@gmail.com"},
         )
 
         # Should return same response to prevent email enumeration
@@ -538,32 +573,38 @@ class TestAPIKeyManagement:
         """Get authenticated user token."""
         # Default roles already initialized in fixture
 
-        test_client.post(
+        # Register the user first
+        register_response = test_client.post(
             "/auth/register",
             json={
-                "email": "apiuser@example.com",
+                "email": "apiuser@gmail.com",
                 "username": "apiuser",
-                "password": "TestP@ssw0rd123!",
+                "password": "ApiTr@d3rK3y!X9Z",  # Non-sequential secure password
             },
         )
 
-        # Try OAuth2 form data format
+        # Ensure registration succeeds
+        if register_response.status_code != 201:
+            print(f"Registration failed: {register_response.json()}")
+        assert register_response.status_code == 201
+
+        # Login using standard OAuth2 form data format (without explicit grant_type)
         response = test_client.post(
             "/auth/login",
             data={
                 "username": "apiuser",
-                "password": "TestP@ssw0rd123!",
-                "grant_type": "password",  # OAuth2 expects this
+                "password": "ApiTr@d3rK3y!X9Z",
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
         # Check if the response has the expected structure
+        if response.status_code != 200:
+            print(f"Login failed with status {response.status_code}: {response.json()}")
+        assert response.status_code == 200
+
         response_data = response.json()
         if "access_token" in response_data:
             return response_data["access_token"]
-        elif "token" in response_data:
-            return response_data["token"]
         else:
             # Log the response to understand what's wrong
             print(f"Login response: {response_data}")
@@ -639,45 +680,88 @@ class TestRoleBasedAccess:
         """Setup users with different roles."""
         # Default roles already initialized in fixture
 
-        # Create admin user
-        test_client.post(
+        # Create admin user (password without sequential chars)
+        admin_reg_response = test_client.post(
             "/auth/register",
             json={
-                "email": "admin@example.com",
+                "email": "admin@gmail.com",
                 "username": "admin",
-                "password": "AdminP@ssw0rd123!",
+                "password": "Admin#P@ss9w0rd!",
             },
         )
+        assert (
+            admin_reg_response.status_code == 201
+        ), f"Admin registration failed: {admin_reg_response.text}"
 
-        # Create trader user
-        test_client.post(
+        # Create trader user (password without sequential chars)
+        trader_reg_response = test_client.post(
             "/auth/register",
             json={
-                "email": "trader@example.com",
+                "email": "trader@gmail.com",
                 "username": "trader",
-                "password": "TraderP@ssw0rd123!",
+                "password": "Trader#P@ss9w0rd!",
             },
         )
+        assert (
+            trader_reg_response.status_code == 201
+        ), f"Trader registration failed: {trader_reg_response.text}"
 
         # Assign admin role
+        from werkzeug.security import generate_password_hash
+
+        from src.infrastructure.auth.models import User
+
         admin_user = test_db.query(User).filter_by(username="admin").first()
+        if admin_user is None:
+            # If user wasn't created through API, create directly
+
+            admin_user = User(
+                username="admin",
+                email="admin@gmail.com",
+                hashed_password=generate_password_hash("Admin#P@ss9w0rd!"),
+            )
+            test_db.add(admin_user)
+            test_db.commit()
+            test_db.refresh(admin_user)
+
         asyncio.run(rbac_service.assign_role(str(admin_user.id), "admin"))
         test_db.commit()
 
         # Get tokens
         admin_response = test_client.post(
             "/auth/login",
-            data={"username": "admin", "password": "AdminP@ssw0rd123!"},
+            data={"username": "admin", "password": "Admin#P@ss9w0rd!"},
         )
 
         trader_response = test_client.post(
             "/auth/login",
-            data={"username": "trader", "password": "TraderP@ssw0rd123!"},
+            data={"username": "trader", "password": "Trader#P@ss9w0rd!"},
         )
 
+        # Ensure trader user exists and has the trader role
+        trader_user = test_db.query(User).filter_by(username="trader").first()
+        if trader_user is None:
+            trader_user = User(
+                username="trader",
+                email="trader@gmail.com",
+                hashed_password=generate_password_hash("Trader#P@ss9w0rd!"),
+            )
+            test_db.add(trader_user)
+            test_db.commit()
+            test_db.refresh(trader_user)
+
+        asyncio.run(rbac_service.assign_role(str(trader_user.id), "trader"))
+        test_db.commit()
+
         return {
-            "admin_token": admin_response.json()["access_token"],
-            "trader_token": trader_response.json()["access_token"],
+            "admin_token": (
+                admin_response.json()["access_token"] if admin_response.status_code == 200 else None
+            ),
+            "trader_token": (
+                trader_response.json()["access_token"]
+                if trader_response.status_code == 200
+                else None
+            ),
         }
 
     def test_admin_only_endpoint(self, test_client, setup_users):

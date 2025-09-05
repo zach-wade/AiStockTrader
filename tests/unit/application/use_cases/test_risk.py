@@ -565,10 +565,11 @@ class TestValidateOrderRiskUseCase:
         """Create sample portfolio."""
         portfolio = Mock()
         portfolio.id = uuid4()
-        portfolio.cash_balance = Decimal("50000")
+        portfolio.cash_balance = Money(Decimal("50000"))
         portfolio.get_total_value = Mock(return_value=Decimal("65500"))
         portfolio.get_total_value_sync = Mock(return_value=Decimal("65500"))
-        portfolio.get_total_value_sync = Mock(return_value=Decimal("65500"))
+        portfolio.get_open_positions = Mock(return_value=[])
+        portfolio.get_closed_positions = Mock(return_value=[])
         return portfolio
 
     @pytest.mark.asyncio
@@ -644,8 +645,12 @@ class TestValidateOrderRiskUseCase:
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = sample_portfolio
         mock_risk_calculator.check_risk_limits.return_value = (True, None)
 
-        # Execute
-        response = await use_case.execute(request)
+        # Mock PortfolioCalculator to return the expected portfolio value
+        with patch("src.application.use_cases.risk.PortfolioCalculator") as mock_calc:
+            mock_calc.get_total_value.return_value = Money(Decimal("65500"))
+
+            # Execute
+            response = await use_case.execute(request)
 
         # Assert
         assert response.success is True
@@ -823,8 +828,8 @@ class TestGetRiskMetricsUseCase:
         """Create sample portfolio with multiple positions."""
         portfolio = Mock()
         portfolio.id = uuid4()
-        portfolio.cash_balance = Decimal("30000")
-        portfolio.total_realized_pnl = Decimal("5000")
+        portfolio.cash_balance = Money(Decimal("30000"))
+        portfolio.total_realized_pnl = Money(Decimal("5000"))
         portfolio.initial_capital = Money(Decimal("100000"))
 
         # Mock portfolio methods
@@ -832,6 +837,7 @@ class TestGetRiskMetricsUseCase:
         portfolio.get_total_value_sync = Mock(return_value=Decimal("175500"))
         portfolio.get_positions_value = Mock(return_value=Decimal("145500"))
         portfolio.get_open_positions = Mock(return_value=[Mock(), Mock()])
+        portfolio.get_closed_positions = Mock(return_value=[])
         portfolio.get_unrealized_pnl = Mock(return_value=Decimal("10500"))
         portfolio.get_total_return = Mock(return_value=Decimal("0.755"))
 
@@ -848,8 +854,15 @@ class TestGetRiskMetricsUseCase:
             sample_portfolio_with_positions
         )
 
-        # Execute
-        response = await use_case.execute(request)
+        # Mock PortfolioCalculator methods
+        with patch("src.application.use_cases.risk.PortfolioCalculator") as mock_calc:
+            mock_calc.get_total_value.return_value = Money(Decimal("175500"))
+            mock_calc.get_positions_value.return_value = Money(Decimal("145500"))
+            mock_calc.get_unrealized_pnl.return_value = Money(Decimal("10500"))
+            mock_calc.get_total_return.return_value = Decimal("0.755")
+
+            # Execute
+            response = await use_case.execute(request)
 
         # Assert
         assert response.success is True
@@ -923,14 +936,22 @@ class TestGetRiskMetricsUseCase:
         leveraged_portfolio.get_total_value_sync = Mock(return_value=Money(Decimal("860000")))
         leveraged_portfolio.get_positions_value = Mock(return_value=Money(Decimal("850000")))
         leveraged_portfolio.get_open_positions = Mock(return_value=[Mock()])
+        leveraged_portfolio.get_closed_positions = Mock(return_value=[])
         leveraged_portfolio.get_unrealized_pnl = Mock(return_value=Money(Decimal("50000")))
         leveraged_portfolio.get_total_return = Mock(return_value=Money(Decimal("7.6")))
 
         request = GetRiskMetricsRequest(portfolio_id=leveraged_portfolio.id)
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = leveraged_portfolio
 
-        # Execute
-        response = await use_case.execute(request)
+        # Mock PortfolioCalculator methods
+        with patch("src.application.use_cases.risk.PortfolioCalculator") as mock_calc:
+            mock_calc.get_total_value.return_value = Money(Decimal("860000"))
+            mock_calc.get_positions_value.return_value = Money(Decimal("850000"))
+            mock_calc.get_unrealized_pnl.return_value = Money(Decimal("50000"))
+            mock_calc.get_total_return.return_value = Decimal("7.6")
+
+            # Execute
+            response = await use_case.execute(request)
 
         # Assert
         assert response.success is True
@@ -959,20 +980,28 @@ class TestGetRiskMetricsUseCase:
         # Setup
         portfolio = Mock()
         portfolio.id = uuid4()
-        portfolio.cash_balance = Decimal("0")
-        portfolio.total_realized_pnl = Decimal("1000")
+        portfolio.cash_balance = Money(Decimal("0"))
+        portfolio.total_realized_pnl = Money(Decimal("1000"))
         portfolio.get_total_value = Mock(return_value=Decimal("41000"))
         portfolio.get_total_value_sync = Mock(return_value=Decimal("41000"))
         portfolio.get_positions_value = Mock(return_value=Decimal("41000"))
         portfolio.get_open_positions = Mock(return_value=[Mock()])
+        portfolio.get_closed_positions = Mock(return_value=[])
         portfolio.get_unrealized_pnl = Mock(return_value=Decimal("1000"))
         portfolio.get_total_return = Mock(return_value=Decimal("0.025"))
 
         request = GetRiskMetricsRequest(portfolio_id=portfolio.id)
         mock_unit_of_work.portfolios.get_portfolio_by_id.return_value = portfolio
 
-        # Execute
-        response = await use_case.execute(request)
+        # Mock PortfolioCalculator methods
+        with patch("src.application.use_cases.risk.PortfolioCalculator") as mock_calc:
+            mock_calc.get_total_value.return_value = Money(Decimal("41000"))
+            mock_calc.get_positions_value.return_value = Money(Decimal("41000"))
+            mock_calc.get_unrealized_pnl.return_value = Money(Decimal("1000"))
+            mock_calc.get_total_return.return_value = Decimal("0.025")
+
+            # Execute
+            response = await use_case.execute(request)
 
         # Assert
         assert response.success is True

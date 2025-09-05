@@ -21,7 +21,7 @@ from src.application.coordinators.broker_coordinator import BrokerCoordinator
 from src.application.interfaces.broker import IBroker
 from src.application.interfaces.repositories import IOrderRepository, IPortfolioRepository
 from src.application.interfaces.unit_of_work import IUnitOfWork
-from src.application.use_cases import GetMarketDataUseCase, GetPortfolioUseCase, PlaceOrderUseCase
+from src.application.use_cases import GetMarketDataUseCase, PlaceOrderUseCase
 from src.domain.services import OrderValidator, RiskCalculator, TradingCalendar
 from src.infrastructure.container import (
     ContainerConfig,

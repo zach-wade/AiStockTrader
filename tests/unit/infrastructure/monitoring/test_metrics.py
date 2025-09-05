@@ -11,7 +11,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.domain.services.threshold_policy_service import ThresholdBreachEvent, ThresholdComparison
 from src.infrastructure.monitoring.metrics import (
     CustomMetric,
     MetricSnapshot,
@@ -23,6 +22,10 @@ from src.infrastructure.monitoring.metrics import (
     get_trading_metrics,
     initialize_trading_metrics,
     track_trading_metric,
+)
+from src.infrastructure.monitoring.threshold_policy_service import (
+    ThresholdBreachEvent,
+    ThresholdComparison,
 )
 
 
@@ -663,9 +666,9 @@ class TestTradingMetrics:
         assert metrics._thresholds[0] == threshold
 
         # Should also add to domain service
-        policies = metrics._threshold_policy_service._policies
-        assert len(policies) == 1
-        assert policies[0].metric_name == "cpu_usage"
+        policies = metrics._threshold_policy_service.policies
+        assert "cpu_usage" in policies
+        assert policies["cpu_usage"].metric_name == "cpu_usage"
 
     @patch("time.time")
     def test_check_thresholds(self, mock_time):

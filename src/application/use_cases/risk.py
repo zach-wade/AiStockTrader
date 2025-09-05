@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from src.application.interfaces.unit_of_work import IUnitOfWork
+from src.domain.services.portfolio_calculator import PortfolioCalculator
 from src.domain.services.risk_calculator import RiskCalculator
 from src.domain.value_objects.converter import ValueObjectConverter
 from src.domain.value_objects.price import Price
@@ -137,7 +138,10 @@ class CalculateRiskUseCase(TransactionalUseCase[CalculateRiskRequest, CalculateR
         if request.include_drawdown:
             # Simplified - would need equity curve
             drawdown = self.risk_calculator.calculate_max_drawdown(
-                portfolio_history=[portfolio.initial_capital, portfolio.get_total_value()]
+                portfolio_history=[
+                    portfolio.initial_capital,
+                    PortfolioCalculator.get_total_value(portfolio),
+                ]
             )
             response.max_drawdown = drawdown
 
@@ -196,7 +200,9 @@ class ValidateOrderRiskUseCase(
         # Calculate risk metrics
         quantity_value = ValueObjectConverter.extract_value(order.quantity)
         position_value = quantity_value * ValueObjectConverter.extract_value(current_price)
-        portfolio_value = ValueObjectConverter.extract_amount(portfolio.get_total_value())
+        portfolio_value = ValueObjectConverter.extract_amount(
+            PortfolioCalculator.get_total_value(portfolio)
+        )
         cash_balance_value = ValueObjectConverter.extract_amount(portfolio.cash_balance)
 
         risk_metrics = {
@@ -245,7 +251,7 @@ class GetRiskMetricsUseCase(TransactionalUseCase[GetRiskMetricsRequest, GetRiskM
             )
 
         # Calculate current metrics
-        portfolio_value = portfolio.get_total_value()
+        portfolio_value = PortfolioCalculator.get_total_value(portfolio)
         positions_value = portfolio.get_positions_value()
         cash_balance = portfolio.cash_balance
 
@@ -271,7 +277,9 @@ class GetRiskMetricsUseCase(TransactionalUseCase[GetRiskMetricsRequest, GetRiskM
                 else 0
             ),
             "unrealized_pnl": float(
-                ValueObjectConverter.extract_amount(portfolio.get_unrealized_pnl())
+                ValueObjectConverter.extract_amount(
+                    PortfolioCalculator.get_unrealized_pnl(portfolio)
+                )
             ),
             "realized_pnl": float(
                 ValueObjectConverter.extract_amount(portfolio.total_realized_pnl)

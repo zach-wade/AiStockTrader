@@ -54,7 +54,7 @@ class TestIndexPerformance:
             symbol = symbols[i % len(symbols)]
             order_data.append(
                 {
-                    "order_id": str(uuid.uuid4()),
+                    "id": str(uuid.uuid4()),
                     "symbol": symbol,
                     "side": "buy" if i % 2 == 0 else "sell",
                     "order_type": "limit",
@@ -64,7 +64,7 @@ class TestIndexPerformance:
                     "quantity": Decimal("100.0"),
                     "limit_price": Decimal(f"{100 + (i % 50)}.00"),
                     "broker_order_id": f"BROKER_{i}",
-                    "timestamp": datetime.now(UTC) - timedelta(hours=i % 24),
+                    "created_at": datetime.now(UTC) - timedelta(hours=i % 24),
                     "time_in_force": "day",
                 }
             )
@@ -79,14 +79,14 @@ class TestIndexPerformance:
             entry_price = Decimal(f"{100 + (i % 50)}.00")
             position_data.append(
                 {
-                    "position_id": str(uuid.uuid4()),
+                    "id": str(uuid.uuid4()),
                     "symbol": symbol,
-                    "status": "open" if i % 3 != 0 else "closed",
-                    "quantity": float((i % 1000) + 1) * (1 if i % 2 == 0 else -1),
-                    "entry_price": float(entry_price),
-                    "entry_timestamp": datetime.now(UTC) - timedelta(days=i % 30),
-                    "realized_pnl": float((i % 100) - 50) if i % 3 == 0 else None,
-                    "unrealized_pnl": float((i % 100) - 50) if i % 3 != 0 else None,
+                    "quantity": Decimal(str((i % 1000) + 1) * (1 if i % 2 == 0 else -1)),
+                    "average_entry_price": entry_price,
+                    "current_price": entry_price + Decimal("1.00"),
+                    "opened_at": datetime.now(UTC) - timedelta(days=i % 30),
+                    "closed_at": datetime.now(UTC) if i % 3 == 0 else None,
+                    "realized_pnl": Decimal(str((i % 100) - 50)) if i % 3 == 0 else Decimal("0"),
                 }
             )
 
@@ -127,7 +127,7 @@ class TestIndexPerformance:
         for order in order_data:
             values.append(
                 (
-                    order["order_id"],
+                    order["id"],
                     order["symbol"],
                     order["side"],
                     order["order_type"],
@@ -135,7 +135,7 @@ class TestIndexPerformance:
                     order["quantity"],
                     order["limit_price"],
                     order["broker_order_id"],
-                    order["timestamp"],
+                    order["created_at"],
                     order["time_in_force"],
                 )
             )
@@ -146,8 +146,8 @@ class TestIndexPerformance:
                 await cursor.executemany(
                     """
                     INSERT INTO orders (
-                        order_id, symbol, side, order_type, status, quantity, limit_price,
-                        broker_order_id, timestamp, time_in_force
+                        id, symbol, side, order_type, status, quantity, limit_price,
+                        broker_order_id, created_at, time_in_force
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     values,
@@ -159,12 +159,12 @@ class TestIndexPerformance:
         for position in position_data:
             values.append(
                 (
-                    position["position_id"],
+                    position["id"],
                     position["symbol"],
                     position["status"],
                     position["quantity"],
                     position["entry_price"],
-                    position["entry_timestamp"],
+                    position["entry_time"],
                     position.get("realized_pnl"),
                     position.get("unrealized_pnl"),
                 )
@@ -175,7 +175,7 @@ class TestIndexPerformance:
                 await cursor.executemany(
                     """
                     INSERT INTO positions (
-                        position_id, symbol, status, quantity, entry_price, entry_timestamp,
+                        id, symbol, status, quantity, entry_price, entry_time,
                         realized_pnl, unrealized_pnl
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,

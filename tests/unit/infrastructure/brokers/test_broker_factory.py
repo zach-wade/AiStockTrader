@@ -16,8 +16,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.domain.services.broker_configuration_service import BrokerType
 from src.domain.services.trading_calendar import Exchange
+from src.infrastructure.brokers.broker_configuration_service import BrokerType
 from src.infrastructure.brokers.broker_factory import BrokerFactory
 
 

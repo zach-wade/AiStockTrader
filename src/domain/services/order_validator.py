@@ -50,8 +50,10 @@ Note:
     real-time risk monitoring would be handled by separate services.
 """
 
+import re
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from ..entities.order import Order, OrderSide, OrderStatus, OrderType
 from ..entities.portfolio import Portfolio
@@ -307,17 +309,17 @@ class OrderValidator:
             return ValidationResult.failure(f"Cannot submit order with status {order.status}")
 
         # Check quantity
-        if order.quantity <= 0:
+        if order.quantity.value <= 0:
             return ValidationResult.failure("Order quantity must be positive")
 
         # Check limit price for limit orders
         if order.order_type == OrderType.LIMIT:
-            if order.limit_price is None or order.limit_price <= 0:
+            if order.limit_price is None or order.limit_price.value <= 0:
                 return ValidationResult.failure("Limit orders must have a positive limit price")
 
         # Check stop price for stop orders
         if order.order_type in [OrderType.STOP, OrderType.STOP_LIMIT]:
-            if order.stop_price is None or order.stop_price <= 0:
+            if order.stop_price is None or order.stop_price.value <= 0:
                 return ValidationResult.failure("Stop orders must have a positive stop price")
 
         return ValidationResult.success()
@@ -389,10 +391,10 @@ class OrderValidator:
         """
         # Check buying power for buy orders
         if order.side == OrderSide.BUY:
-            if required_capital.amount > portfolio.cash_balance:
+            if required_capital.amount > portfolio.cash_balance.amount:
                 return ValidationResult.failure(
                     f"Insufficient funds. Required: ${required_capital.amount:.2f}, "
-                    f"Available: ${portfolio.cash_balance:.2f}"
+                    f"Available: ${portfolio.cash_balance.amount:.2f}"
                 )
 
         # Check min/max order value
@@ -449,27 +451,38 @@ class OrderValidator:
             else:
                 new_quantity = current_position.quantity - order.quantity
         else:
-            new_quantity = order.quantity if order.side == OrderSide.BUY else -order.quantity
+            # For SELL orders without position, treat as a short position
+            new_quantity = order.quantity
 
         # Check max position size
         if self.constraints.max_position_size:
-            if abs(new_quantity) > self.constraints.max_position_size.value:
+            # Extract numeric value from new_quantity - it's always a Quantity object
+            new_quantity_value = abs(new_quantity.value)
+
+            if new_quantity_value > self.constraints.max_position_size:
                 return ValidationResult.failure(
-                    f"Position size {abs(new_quantity)} exceeds maximum "
-                    f"{self.constraints.max_position_size.value}"
+                    f"Position size {new_quantity_value} exceeds maximum "
+                    f"{self.constraints.max_position_size}"
                 )
 
-        # Check portfolio concentration
-        new_position_value = abs(new_quantity) * current_price.value
-        total_portfolio_value = portfolio.get_total_value()
+        # Check portfolio concentration - only for BUY orders or when increasing position
+        # SELL orders reduce concentration so they shouldn't be limited by this check
+        if order.side == OrderSide.BUY:
+            # Extract numeric value from new_quantity - it's always a Quantity object
+            new_quantity_value = abs(new_quantity.value)
+            new_position_value = new_quantity_value * current_price.value
+            # Use PortfolioCalculator to get total value
+            from .portfolio_calculator import PortfolioCalculator
 
-        if total_portfolio_value > 0:
-            concentration = new_position_value / total_portfolio_value
-            if concentration > self.constraints.max_portfolio_concentration:
-                return ValidationResult.failure(
-                    f"Position would represent {concentration*100:.1f}% of portfolio, "
-                    f"exceeds maximum {self.constraints.max_portfolio_concentration*100:.1f}%"
-                )
+            total_portfolio_value = PortfolioCalculator.get_total_value(portfolio)
+
+            if total_portfolio_value.amount > 0:
+                concentration = new_position_value / total_portfolio_value
+                if concentration > self.constraints.max_portfolio_concentration:
+                    return ValidationResult.failure(
+                        f"Position would represent {concentration*100:.1f}% of portfolio, "
+                        f"exceeds maximum {self.constraints.max_portfolio_concentration*100:.1f}%"
+                    )
 
         return ValidationResult.success()
 
@@ -502,20 +515,20 @@ class OrderValidator:
                 break
 
         # If no position or short position, this is a short sale
-        if not current_position or current_position.quantity < order.quantity:
-            shares_to_short = order.quantity
+        if not current_position or current_position.quantity.value < order.quantity.value:
+            shares_to_short = order.quantity.value
             if current_position:
-                shares_to_short = order.quantity - current_position.quantity
+                shares_to_short = order.quantity.value - current_position.quantity.value
 
             if shares_to_short > 0 and self.constraints.require_margin_for_shorts:
                 # Calculate margin requirement
                 short_value = shares_to_short * current_price.value
                 margin_required = short_value * self.constraints.short_margin_requirement
 
-                if margin_required > portfolio.cash_balance:
+                if margin_required > portfolio.cash_balance.amount:
                     return ValidationResult.failure(
                         f"Insufficient margin for short sale. Required: ${margin_required:.2f}, "
-                        f"Available: ${portfolio.cash_balance:.2f}"
+                        f"Available: ${portfolio.cash_balance.amount:.2f}"
                     )
 
         return ValidationResult.success()
@@ -571,7 +584,7 @@ class OrderValidator:
                 return ValidationResult.failure("Modified quantity must be positive")
 
             # Cannot reduce below filled quantity
-            if new_quantity.value < original_order.filled_quantity:
+            if new_quantity.value < original_order.filled_quantity.value:
                 return ValidationResult.failure(
                     f"Cannot reduce quantity below filled amount "
                     f"({original_order.filled_quantity})"
@@ -586,3 +599,98 @@ class OrderValidator:
             return ValidationResult.failure("Modified stop price must be positive")
 
         return ValidationResult.success()
+
+    # Trading Validation Methods (consolidated from TradingValidationService)
+    @staticmethod
+    def validate_symbol_format(symbol: str) -> bool:
+        """Validate trading symbol format according to business rules."""
+        if not symbol or len(symbol) > 10:
+            return False
+        pattern = r"^[A-Z]{1,10}$"
+        return re.match(pattern, symbol.upper()) is not None
+
+    @staticmethod
+    def validate_currency_code(currency: str) -> bool:
+        """Validate ISO currency code format."""
+        if not currency or len(currency) != 3:
+            return False
+        pattern = r"^[A-Z]{3}$"
+        return re.match(pattern, currency.upper()) is not None
+
+    @staticmethod
+    def validate_price_range(price: Price) -> bool:
+        """Validate price is within acceptable trading range."""
+        min_price = Decimal("0.01")
+        max_price = Decimal("1000000")
+        return min_price <= price.value <= max_price
+
+    @staticmethod
+    def validate_quantity_range(quantity: Quantity) -> bool:
+        """Validate quantity is within acceptable trading range."""
+        min_qty = Decimal("0.01")
+        max_qty = Decimal("1000000")
+        return min_qty <= abs(quantity.value) <= max_qty
+
+    def validate_trading_order_data(self, order_data: dict[str, Any]) -> list[str]:
+        """
+        Validate complete trading order data according to business rules.
+
+        Args:
+            order_data: Dictionary containing order data
+
+        Returns:
+            List of validation error messages, empty if valid
+        """
+        errors = []
+
+        # Validate required fields
+        required_fields = ["symbol", "quantity", "order_type", "side"]
+        for field in required_fields:
+            if field not in order_data:
+                errors.append(f"Required field '{field}' is missing")
+
+        # Validate symbol format
+        if "symbol" in order_data:
+            if not self.validate_symbol_format(order_data["symbol"]):
+                errors.append("Invalid trading symbol format")
+
+        # Validate quantity
+        if "quantity" in order_data:
+            try:
+                qty = Quantity(Decimal(str(order_data["quantity"])))
+                if not self.validate_quantity_range(qty):
+                    errors.append("Invalid quantity: must be between 0.01 and 1,000,000")
+            except (ValueError, TypeError):
+                errors.append("Invalid quantity format")
+
+        # Validate order type and side
+        valid_types = {"market", "limit", "stop", "stop_limit"}
+        valid_sides = {"buy", "sell"}
+
+        if "order_type" in order_data:
+            if order_data["order_type"].lower() not in valid_types:
+                errors.append(f"Invalid order type: must be one of {valid_types}")
+
+            # Validate price requirements for order types
+            if order_data["order_type"].lower() in ["limit", "stop_limit"]:
+                if "price" not in order_data:
+                    errors.append("Price is required for limit and stop limit orders")
+                else:
+                    try:
+                        price = Price(Decimal(str(order_data["price"])))
+                        if not self.validate_price_range(price):
+                            errors.append("Invalid price: must be between $0.01 and $1,000,000")
+                    except (ValueError, TypeError):
+                        errors.append("Invalid price format")
+
+        if "side" in order_data:
+            if order_data["side"].lower() not in valid_sides:
+                errors.append(f"Invalid order side: must be one of {valid_sides}")
+
+        # Validate optional time in force
+        if "time_in_force" in order_data:
+            valid_tif = {"day", "gtc", "ioc", "fok"}
+            if order_data["time_in_force"].lower() not in valid_tif:
+                errors.append(f"Invalid time in force: must be one of {valid_tif}")
+
+        return errors

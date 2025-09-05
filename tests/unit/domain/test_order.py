@@ -1,8 +1,11 @@
 """
-Unit tests for Order entity
+Comprehensive test suite for Order entity - achieving full coverage.
+Tests all methods, state transitions, edge cases, and business rules.
+This file consolidates tests from multiple variant files.
 """
 
 # Standard library imports
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -11,6 +14,8 @@ import pytest
 
 # Local imports
 from src.domain.entities import Order, OrderSide, OrderStatus, OrderType, TimeInForce
+from src.domain.entities.order import OrderRequest
+from src.domain.value_objects import Price, Quantity
 
 
 class TestOrderCreation:
@@ -23,7 +28,7 @@ class TestOrderCreation:
 
         request = OrderRequest(
             symbol="AAPL",
-            quantity=Decimal("100"),
+            quantity=Quantity(Decimal("100")),
             side=OrderSide.BUY,
             reason="Test order",
         )
@@ -618,3 +623,414 @@ class TestOrderEdgeCases:
 
         # Stop orders don't have a notional value until filled
         assert order.get_notional_value() is None
+
+
+class TestOrderEnums:
+    """Test order enumerations."""
+
+    def test_order_side_values(self):
+        """Test OrderSide enum values."""
+        assert OrderSide.BUY.value == "buy"
+        assert OrderSide.SELL.value == "sell"
+        assert len(OrderSide) == 2
+
+    def test_order_type_values(self):
+        """Test OrderType enum values."""
+        assert OrderType.MARKET.value == "market"
+        assert OrderType.LIMIT.value == "limit"
+        assert OrderType.STOP.value == "stop"
+        assert OrderType.STOP_LIMIT.value == "stop_limit"
+        assert len(OrderType) == 4
+
+    def test_order_status_values(self):
+        """Test OrderStatus enum values."""
+        assert OrderStatus.PENDING.value == "pending"
+        assert OrderStatus.SUBMITTED.value == "submitted"
+        assert OrderStatus.PARTIALLY_FILLED.value == "partially_filled"
+        assert OrderStatus.FILLED.value == "filled"
+        assert OrderStatus.CANCELLED.value == "cancelled"
+        assert OrderStatus.REJECTED.value == "rejected"
+        assert OrderStatus.EXPIRED.value == "expired"
+        assert len(OrderStatus) == 7
+
+    def test_time_in_force_values(self):
+        """Test TimeInForce enum values."""
+        assert TimeInForce.DAY.value == "day"
+        assert TimeInForce.GTC.value == "gtc"
+        assert TimeInForce.IOC.value == "ioc"
+        assert TimeInForce.FOK.value == "fok"
+        assert len(TimeInForce) == 4
+
+
+class TestOrderRequest:
+    """Test OrderRequest dataclass."""
+
+    def test_order_request_creation(self):
+        """Test creating an OrderRequest."""
+        request = OrderRequest(
+            symbol="AAPL",
+            quantity=Decimal("100"),
+            side=OrderSide.BUY,
+            limit_price=Price(Decimal("150.00")),
+            stop_price=Price(Decimal("145.00")),
+            time_in_force=TimeInForce.GTC,
+            reason="Test order",
+        )
+
+        assert request.symbol == "AAPL"
+        assert request.quantity == Decimal("100")
+        assert request.side == OrderSide.BUY
+        assert request.limit_price == Price(Decimal("150.00"))
+        assert request.stop_price == Price(Decimal("145.00"))
+        assert request.time_in_force == TimeInForce.GTC
+        assert request.reason == "Test order"
+
+    def test_order_request_defaults(self):
+        """Test OrderRequest default values."""
+        request = OrderRequest(symbol="MSFT", quantity=Decimal("50"), side=OrderSide.SELL)
+
+        assert request.limit_price is None
+        assert request.stop_price is None
+        assert request.time_in_force == TimeInForce.DAY
+        assert request.reason is None
+
+
+class TestOrderAdvanced:
+    """Advanced Order tests for comprehensive coverage."""
+
+    def test_order_with_all_time_in_force_values(self):
+        """Test orders with different time in force values."""
+        # DAY order
+        day_order = Order(
+            symbol="AAPL",
+            quantity=Decimal("100"),
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.DAY,
+        )
+        assert day_order.time_in_force == TimeInForce.DAY
+
+        # GTC order
+        gtc_order = Order(
+            symbol="MSFT",
+            quantity=Decimal("50"),
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.GTC,
+        )
+        assert gtc_order.time_in_force == TimeInForce.GTC
+
+        # IOC order
+        ioc_order = Order(
+            symbol="TSLA",
+            quantity=Decimal("25"),
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.IOC,
+        )
+        assert ioc_order.time_in_force == TimeInForce.IOC
+
+        # FOK order
+        fok_order = Order(
+            symbol="NVDA",
+            quantity=Decimal("10"),
+            side=OrderSide.BUY,
+            time_in_force=TimeInForce.FOK,
+        )
+        assert fok_order.time_in_force == TimeInForce.FOK
+
+    def test_order_with_ioc_time_in_force(self):
+        """Test Immediate-or-Cancel order."""
+        request = OrderRequest(
+            symbol="AMZN",
+            quantity=Decimal("150"),
+            side=OrderSide.BUY,
+            limit_price=Price(Decimal("180.00")),
+            time_in_force=TimeInForce.IOC,
+        )
+        order = Order.create_limit_order(request)
+
+        assert order.time_in_force == TimeInForce.IOC
+        order.submit("BROKER_IOC")
+
+        # Simulate partial fill then cancellation
+        order.fill(Decimal("50"), Decimal("179.90"))
+        assert order.status == OrderStatus.PARTIALLY_FILLED
+
+        # IOC orders cancel remaining quantity
+        order.cancel("IOC - unfilled portion cancelled")
+        assert order.status == OrderStatus.CANCELLED
+        assert order.tags["cancel_reason"] == "IOC - unfilled portion cancelled"
+
+    def test_order_with_fok_time_in_force(self):
+        """Test Fill-or-Kill order."""
+        request = OrderRequest(
+            symbol="GOOG",
+            quantity=Decimal("100"),
+            side=OrderSide.BUY,
+            limit_price=Price(Decimal("175.00")),
+            time_in_force=TimeInForce.FOK,
+        )
+        order = Order.create_limit_order(request)
+
+        assert order.time_in_force == TimeInForce.FOK
+        order.submit("BROKER_FOK")
+
+        # FOK orders must be filled completely or cancelled
+        order.cancel("FOK - unable to fill completely")
+        assert order.status == OrderStatus.CANCELLED
+        assert order.filled_quantity == Decimal("0")
+
+    def test_order_expired_status(self):
+        """Test order expiration handling."""
+        request = OrderRequest(
+            symbol="NFLX",
+            quantity=Decimal("75"),
+            side=OrderSide.SELL,
+            limit_price=Price(Decimal("450.00")),
+            time_in_force=TimeInForce.DAY,
+        )
+        order = Order.create_limit_order(request)
+
+        # Manually set to expired status (simulating end of day)
+        order.status = OrderStatus.EXPIRED
+
+        assert order.is_complete()
+        assert not order.is_active()
+
+    def test_partial_fills_with_custom_timestamps(self):
+        """Test partial fills with custom timestamps."""
+        request = OrderRequest(
+            symbol="META",
+            quantity=Decimal("300"),
+            side=OrderSide.BUY,
+        )
+        order = Order.create_market_order(request)
+        order.submit("BROKER_789")
+
+        # First fill with custom timestamp
+        fill_time1 = datetime(2024, 6, 15, 13, 0, 0, tzinfo=UTC)
+        order.fill(Decimal("100"), Decimal("350.00"), fill_time1)
+
+        assert order.status == OrderStatus.PARTIALLY_FILLED
+        assert order.filled_quantity == Decimal("100")
+        assert order.filled_at is None  # Not fully filled yet
+
+        # Second fill with custom timestamp
+        fill_time2 = datetime(2024, 6, 15, 13, 5, 0, tzinfo=UTC)
+        order.fill(Decimal("200"), Decimal("352.00"), fill_time2)
+
+        assert order.status == OrderStatus.FILLED
+        assert order.filled_quantity == Decimal("300")
+        assert order.filled_at == fill_time2
+
+        # Check weighted average price
+        expected_avg = (
+            Decimal("100") * Decimal("350.00") + Decimal("200") * Decimal("352.00")
+        ) / Decimal("300")
+        assert order.average_fill_price == expected_avg
+
+    def test_multiple_partial_fills_average_price(self):
+        """Test complex average price calculation with multiple fills."""
+        order = Order(symbol="AAPL", quantity=Decimal("1000"), side=OrderSide.BUY)
+        order.submit("BROKER123")
+
+        # Multiple fills at different prices
+        fills = [
+            (Decimal("100"), Decimal("150.00")),
+            (Decimal("200"), Decimal("151.00")),
+            (Decimal("300"), Decimal("149.50")),
+            (Decimal("250"), Decimal("150.50")),
+            (Decimal("150"), Decimal("151.50")),
+        ]
+
+        total_cost = Decimal("0")
+        total_qty = Decimal("0")
+
+        for qty, price in fills:
+            order.fill(qty, price)
+            total_cost += qty * price
+            total_qty += qty
+
+        expected_avg = total_cost / total_qty
+        assert order.average_fill_price == expected_avg
+        assert order.filled_quantity == Decimal("1000")
+        assert order.status == OrderStatus.FILLED
+
+    def test_order_lifecycle_complex(self):
+        """Test complete order lifecycle with all transitions."""
+        # Create pending order
+        order = Order(
+            symbol="AAPL",
+            quantity=Decimal("500"),
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            limit_price=Price(Decimal("150.00")),
+            time_in_force=TimeInForce.GTC,
+            reason="Long-term investment",
+            tags={"strategy": "value", "sector": "tech"},
+        )
+
+        assert order.is_active() is True
+        assert order.is_complete() is False
+
+        # Submit to broker
+        order.submit("ALPACA-12345")
+        assert order.broker_order_id == "ALPACA-12345"
+        assert order.status == OrderStatus.SUBMITTED
+
+        # Partial fills
+        order.fill(Decimal("100"), Decimal("149.95"))
+        assert order.status == OrderStatus.PARTIALLY_FILLED
+
+        order.fill(Decimal("150"), Decimal("149.90"))
+        assert order.status == OrderStatus.PARTIALLY_FILLED
+
+        order.fill(Decimal("200"), Decimal("150.00"))
+        assert order.status == OrderStatus.PARTIALLY_FILLED
+
+        # Calculate expected average
+        total_cost = (
+            Decimal("100") * Decimal("149.95")
+            + Decimal("150") * Decimal("149.90")
+            + Decimal("200") * Decimal("150.00")
+        )
+        expected_avg = total_cost / Decimal("450")
+        assert order.average_fill_price == expected_avg
+
+        # Final fill
+        final_time = datetime.now(UTC)
+        order.fill(Decimal("50"), Decimal("149.85"), final_time)
+        assert order.status == OrderStatus.FILLED
+        assert order.filled_at == final_time
+        assert order.is_active() is False
+        assert order.is_complete() is True
+
+    def test_order_tags_manipulation(self):
+        """Test order tags and metadata handling."""
+        order = Order(
+            symbol="AAPL",
+            quantity=Decimal("100"),
+            side=OrderSide.BUY,
+            tags={"initial": "value", "priority": 1},
+        )
+
+        # Initial tags
+        assert order.tags["initial"] == "value"
+        assert order.tags["priority"] == 1
+
+        # Add tags during lifecycle
+        order.tags["executed_by"] = "algo_trader"
+        order.tags["risk_score"] = 0.75
+
+        # Cancel with reason adds to tags
+        order.submit("BROKER123")
+        order.cancel("Risk limit exceeded")
+        assert order.tags["cancel_reason"] == "Risk limit exceeded"
+        assert order.tags["initial"] == "value"  # Original tags preserved
+
+    def test_order_timestamps_precision(self):
+        """Test that timestamps have proper precision and timezone."""
+        before = datetime.now(UTC)
+        order = Order(symbol="AAPL", quantity=Decimal("100"), side=OrderSide.BUY)
+        after = datetime.now(UTC)
+
+        # Created_at should be between before and after
+        assert before <= order.created_at <= after
+        assert order.created_at.tzinfo is not None
+
+        # Submit and check submitted_at
+        order.submit("BROKER123")
+        assert order.submitted_at is not None
+        assert order.submitted_at.tzinfo is not None
+        assert order.submitted_at >= order.created_at
+
+        # Fill and check filled_at
+        order.fill(Decimal("100"), Decimal("150.00"))
+        assert order.filled_at is not None
+        assert order.filled_at.tzinfo is not None
+        assert order.filled_at >= order.submitted_at
+
+    def test_boundary_values(self):
+        """Test with boundary values."""
+        # Very small quantity
+        order1 = Order(symbol="AAPL", quantity=Decimal("0.0001"), side=OrderSide.BUY)
+        assert order1.quantity == Decimal("0.0001")
+
+        # Very large quantity
+        order2 = Order(symbol="MSFT", quantity=Decimal("1000000000"), side=OrderSide.BUY)
+        assert order2.quantity == Decimal("1000000000")
+
+        # Very high precision price
+        order3 = Order(
+            symbol="BTC",
+            quantity=Decimal("1"),
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            limit_price=Price(Decimal("45678.123456789")),
+        )
+        assert order3.limit_price.value == Decimal("45678.123456789")
+
+        # Test fill with high precision
+        order3.submit("BROKER123")
+        order3.fill(Decimal("0.5"), Decimal("45678.987654321"))
+        order3.fill(Decimal("0.5"), Decimal("45679.111111111"))
+        expected_avg = (
+            Decimal("0.5") * Decimal("45678.987654321")
+            + Decimal("0.5") * Decimal("45679.111111111")
+        ) / Decimal("1")
+        assert order3.average_fill_price == expected_avg
+
+    def test_cancel_with_various_reasons(self):
+        """Test cancellation with different reasons and states."""
+        request = OrderRequest(
+            symbol="CANCEL",
+            quantity=Decimal("100"),
+            side=OrderSide.BUY,
+        )
+
+        # Test cancel without reason
+        order1 = Order.create_market_order(request)
+        order1.submit("BROKER_C1")
+        order1.cancel()
+        assert order1.status == OrderStatus.CANCELLED
+        assert "cancel_reason" not in order1.tags
+
+        # Test cancel with reason
+        order2 = Order.create_market_order(request)
+        order2.submit("BROKER_C2")
+        order2.cancel("User requested cancellation")
+        assert order2.status == OrderStatus.CANCELLED
+        assert order2.tags["cancel_reason"] == "User requested cancellation"
+
+        # Test cancel partially filled order
+        order3 = Order.create_market_order(request)
+        order3.submit("BROKER_C3")
+        order3.fill(Decimal("30"), Decimal("100.00"))
+        order3.cancel("Timeout")
+        assert order3.status == OrderStatus.CANCELLED
+        assert order3.filled_quantity == Decimal("30")
+        assert order3.tags["cancel_reason"] == "Timeout"
+
+    def test_reject_with_various_reasons(self):
+        """Test rejection with different reasons."""
+        request = OrderRequest(
+            symbol="REJECT",
+            quantity=Decimal("1000"),
+            side=OrderSide.BUY,
+        )
+
+        # Insufficient buying power
+        order1 = Order.create_market_order(request)
+        order1.reject("Insufficient buying power")
+        assert order1.status == OrderStatus.REJECTED
+        assert order1.tags["reject_reason"] == "Insufficient buying power"
+
+        # Symbol not tradeable
+        order2 = Order.create_market_order(request)
+        order2.reject("Symbol not tradeable")
+        assert order2.status == OrderStatus.REJECTED
+        assert order2.tags["reject_reason"] == "Symbol not tradeable"
+
+        # Market closed
+        order3 = Order.create_market_order(request)
+        order3.reject("Market closed")
+        assert order3.status == OrderStatus.REJECTED
+        assert order3.tags["reject_reason"] == "Market closed"

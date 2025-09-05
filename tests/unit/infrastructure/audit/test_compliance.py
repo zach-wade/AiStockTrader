@@ -19,7 +19,12 @@ from src.infrastructure.audit.compliance import (
     SOXComplianceChecker,
     ViolationSeverity,
 )
-from src.infrastructure.audit.config import AuditConfig
+from src.infrastructure.audit.config import (
+    AuditConfig,
+    SecurityConfig,
+    StorageBackend,
+    StorageConfig,
+)
 from src.infrastructure.audit.events import ComplianceRegulation
 from src.infrastructure.audit.exceptions import AuditComplianceError
 from src.infrastructure.audit.logger import AuditLogger

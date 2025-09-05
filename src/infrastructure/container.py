@@ -22,6 +22,7 @@ from src.application.interfaces.repositories import (
 )
 from src.application.interfaces.unit_of_work import IUnitOfWork
 from src.application.use_cases import (
+    CalculatePortfolioMetricsUseCase,
     CalculateRiskUseCase,
     CancelOrderUseCase,
     ClosePositionUseCase,
@@ -29,24 +30,23 @@ from src.application.use_cases import (
     GetLatestPriceUseCase,
     GetMarketDataUseCase,
     GetOrderStatusUseCase,
-    GetPortfolioUseCase,
-    GetPositionsUseCase,
     GetRiskMetricsUseCase,
     ModifyOrderUseCase,
+    OpenPositionUseCase,
     PlaceOrderUseCase,
-    UpdatePortfolioUseCase,
+    UpdatePositionUseCase,
     ValidateOrderRiskUseCase,
+    ValidatePortfolioUseCase,
 )
 from src.domain.services import (
     ICommissionCalculator,
     IMarketMicrostructure,
     OrderValidator,
-    PositionManager,
     RiskCalculator,
     TradingCalendar,
 )
+from src.domain.services.domain_validation_service import DomainValidationService
 from src.domain.services.market_hours_service import MarketHoursService
-from src.domain.services.validation_service import DomainValidator
 from src.infrastructure.brokers.broker_factory import BrokerFactory
 from src.infrastructure.database.adapter import PostgreSQLAdapter
 from src.infrastructure.repositories import (
@@ -187,7 +187,7 @@ class DIContainer:
             TradingCalendar, lambda: TradingCalendar(self.get(PythonTimeService))
         )
 
-        self._register_singleton(DomainValidator, lambda: services["domain_validator"])
+        self._register_singleton(DomainValidationService, lambda: services["domain_validator"])
 
         # Risk calculator
         self._register_singleton(RiskCalculator, lambda: RiskCalculator())
@@ -271,21 +271,26 @@ class DIContainer:
 
         # Portfolio Use Cases
         self._register_factory(
-            GetPortfolioUseCase,
-            lambda: GetPortfolioUseCase(
-                unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
-                risk_calculator=self.get(RiskCalculator),
-            ),
-        )
-        self._register_factory(
-            UpdatePortfolioUseCase,
-            lambda: UpdatePortfolioUseCase(
+            OpenPositionUseCase,
+            lambda: OpenPositionUseCase(
                 unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
             ),
         )
         self._register_factory(
-            GetPositionsUseCase,
-            lambda: GetPositionsUseCase(
+            UpdatePositionUseCase,
+            lambda: UpdatePositionUseCase(
+                unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
+            ),
+        )
+        self._register_factory(
+            ValidatePortfolioUseCase,
+            lambda: ValidatePortfolioUseCase(
+                unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
+            ),
+        )
+        self._register_factory(
+            CalculatePortfolioMetricsUseCase,
+            lambda: CalculatePortfolioMetricsUseCase(
                 unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
             ),
         )
@@ -293,7 +298,6 @@ class DIContainer:
             ClosePositionUseCase,
             lambda: ClosePositionUseCase(
                 unit_of_work=self.get(IUnitOfWork),  # type: ignore[type-abstract]
-                position_manager=self.get(PositionManager),
             ),
         )
 

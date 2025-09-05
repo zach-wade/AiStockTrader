@@ -15,31 +15,14 @@ from .market_microstructure import (
 )
 from .order_processor import FillDetails, OrderProcessor
 from .order_validator import OrderConstraints, OrderValidator, ValidationResult
-from .portfolio_analytics_service import (
-    PortfolioAnalyticsService,
-    PortfolioPerformanceMetrics,
-    PortfolioValue,
-    PositionInfo,
-    TradeRecord,
-)
+
+# New consolidated portfolio services
+from .portfolio_calculator import PortfolioCalculator
+from .portfolio_validator_consolidated import PortfolioValidator
 from .position_manager import PositionManager
 from .risk_calculator import RiskCalculator
 from .risk_manager import RiskManager
-from .strategy_analytics_service import (
-    StrategyAnalyticsService,
-    StrategyComparison,
-    StrategyPerformanceMetrics,
-    StrategyTradeRecord,
-)
-from .threshold_policy_service import (
-    ThresholdBreachEvent,
-    ThresholdComparison,
-    ThresholdPolicy,
-    ThresholdPolicyService,
-    ThresholdSeverity,
-)
 from .trading_calendar import Exchange, MarketHours, TradingCalendar, TradingSession
-from .trading_validation_service import TradingValidationService
 
 __all__ = [
     "PositionManager",
@@ -64,19 +47,7 @@ __all__ = [
     "TradingSession",
     "MarketHoursService",
     "MarketStatus",
-    "ThresholdPolicyService",
-    "ThresholdPolicy",
-    "ThresholdComparison",
-    "ThresholdSeverity",
-    "ThresholdBreachEvent",
-    "TradingValidationService",
-    "PortfolioAnalyticsService",
-    "PortfolioPerformanceMetrics",
-    "PortfolioValue",
-    "TradeRecord",
-    "PositionInfo",
-    "StrategyAnalyticsService",
-    "StrategyPerformanceMetrics",
-    "StrategyTradeRecord",
-    "StrategyComparison",
+    # New consolidated portfolio services
+    "PortfolioCalculator",
+    "PortfolioValidator",
 ]

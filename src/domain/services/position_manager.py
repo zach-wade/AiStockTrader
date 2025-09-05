@@ -117,7 +117,7 @@ class PositionManager:
         if order.status != OrderStatus.FILLED:
             raise ValueError(f"Cannot open position from {order.status} order")
 
-        if order.filled_quantity <= 0:
+        if order.filled_quantity.value <= 0:
             raise ValueError("Cannot open position with zero or negative quantity")
 
         # Determine entry price
@@ -180,10 +180,10 @@ class PositionManager:
             quantity_change = -order.filled_quantity
 
         # Check if adding or reducing
-        if position.is_long() and quantity_change > 0:
+        if position.is_long() and quantity_change.value > 0:
             # Adding to long
             position.add_to_position(quantity_change, price)
-        elif position.is_short() and quantity_change < 0:
+        elif position.is_short() and quantity_change.value < 0:
             # Adding to short
             position.add_to_position(quantity_change, price)
         else:
@@ -250,10 +250,10 @@ class PositionManager:
             quantity_change = -order.filled_quantity
 
         # Check if adding or reducing
-        if position.is_long() and quantity_change > 0:
+        if position.is_long() and quantity_change.value > 0:
             # Adding to long
             position.add_to_position(quantity_change, price)
-        elif position.is_short() and quantity_change < 0:
+        elif position.is_short() and quantity_change.value < 0:
             # Adding to short
             position.add_to_position(quantity_change, price)
         else:
@@ -450,15 +450,9 @@ class PositionManager:
             qty = abs(pos.quantity.value)
             total_quantity = Quantity(total_quantity.value + pos.quantity.value)
             total_cost = Money(total_cost.amount + (qty * pos.average_entry_price.value))
-            # Handle both Money and Decimal types for PnL
-            pnl_amount = (
-                pos.realized_pnl.amount if hasattr(pos.realized_pnl, "amount") else pos.realized_pnl
-            )
-            commission_amount = (
-                pos.commission_paid.amount
-                if hasattr(pos.commission_paid, "amount")
-                else pos.commission_paid
-            )
+            # Extract decimal amounts from Money objects
+            pnl_amount = pos.realized_pnl.amount
+            commission_amount = pos.commission_paid.amount
             total_pnl = Money(total_pnl.amount + pnl_amount)
             total_commission = Money(total_commission.amount + commission_amount)
 

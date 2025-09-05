@@ -95,6 +95,7 @@ class Order:
     broker_order_id: str | None = None
     filled_quantity: Quantity = Quantity(Decimal("0"))
     average_fill_price: Price | None = None
+    commission: Money | None = None
 
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -108,6 +109,41 @@ class Order:
 
     def __post_init__(self) -> None:
         """Validate order after initialization"""
+        # Convert raw Decimal values to value objects for backward compatibility
+        # Check if it's a Decimal by duck typing (has real/imag attributes but not value attribute)
+        if hasattr(self.quantity, "real") and not hasattr(self.quantity, "value"):
+            self.quantity = Quantity(self.quantity)  # type: ignore
+        if hasattr(self.filled_quantity, "real") and not hasattr(self.filled_quantity, "value"):
+            self.filled_quantity = Quantity(self.filled_quantity)  # type: ignore
+
+        # Convert raw Decimal values to Price objects if needed
+        if (
+            self.limit_price is not None
+            and hasattr(self.limit_price, "real")
+            and not hasattr(self.limit_price, "value")
+        ):
+            self.limit_price = Price(self.limit_price)  # type: ignore
+        if (
+            self.stop_price is not None
+            and hasattr(self.stop_price, "real")
+            and not hasattr(self.stop_price, "value")
+        ):
+            self.stop_price = Price(self.stop_price)  # type: ignore
+        if (
+            self.average_fill_price is not None
+            and hasattr(self.average_fill_price, "real")
+            and not hasattr(self.average_fill_price, "value")
+        ):
+            self.average_fill_price = Price(self.average_fill_price)  # type: ignore
+
+        # Convert raw Decimal to Money if needed
+        if (
+            self.commission is not None
+            and hasattr(self.commission, "real")
+            and not hasattr(self.commission, "value")
+        ):
+            self.commission = Money(self.commission)  # type: ignore
+
         self._validate()
 
     def _validate(self) -> None:
