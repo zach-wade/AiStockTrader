@@ -220,6 +220,106 @@ python performance_validation.py
 - **Integration Testing**: End-to-end financial workflows
 - **Performance Testing**: High-frequency trading scenarios
 
+## CI/CD Pipeline Strategy
+
+### Overview
+
+Our CI/CD pipeline ensures code quality and catches breaking changes before they reach production. Every code change triggers automated validation, with special focus on paper trading functionality.
+
+### Pipeline Architecture
+
+#### 1. **Quick CI** (ci-quick.yml) - 2-3 minutes
+
+**Triggers**: Every push to any branch
+**Purpose**: Fast feedback on basic functionality
+
+- Black formatting validation
+- Critical imports verification
+- Core domain tests (98% pass rate)
+- Paper trading smoke tests
+- Multi-symbol trading validation
+
+#### 2. **Progressive CI** (ci-progressive.yml) - 5-7 minutes
+
+**Triggers**: Pull requests and pushes to main/develop
+**Purpose**: Comprehensive validation
+
+- All Quick CI checks
+- Security scanning (Bandit)
+- Extended test suite
+- Integration tests for paper trading
+- Portfolio tracking validation
+- Coverage reporting
+
+#### 3. **Paper Trading Validation** (paper-trading-validation.yml) - 5 minutes
+
+**Triggers**: Changes to trading code, daily schedule
+**Purpose**: Ensure trading system integrity
+
+- Domain entity validation
+- Value object tests (Money, Price, Quantity)
+- PaperBroker implementation tests
+- P&L tracking validation
+- Multi-symbol portfolio tests
+- Edge case handling
+
+#### 4. **Full Quality Gates** (ci-full.yml) - 10-30 minutes
+
+**Triggers**: Nightly, manual dispatch
+**Purpose**: Complete system validation
+
+- Full test suite execution
+- Performance benchmarks
+- Security audit
+- Coverage analysis
+- Quality metrics reporting
+
+### Test Categories
+
+| Tier | Purpose | Pass Rate | Runtime |
+|------|---------|-----------|---------|
+| Tier 1 | Core components | 98% | < 2 min |
+| Tier 2 | Extended tests | 90% | < 5 min |
+| Tier 3 | Full suite | 48% | < 30 min |
+
+### Paper Trading Architecture Note
+
+The `PaperBroker` implementation follows a clean architecture pattern:
+
+- Orders are submitted and filled by the broker
+- Cash and position updates are delegated to use cases
+- This separation ensures business logic remains in the domain layer
+
+### Branch Protection
+
+- **main branch**: Requires Progressive CI to pass
+- **develop branch**: Requires Quick CI to pass
+- **feature branches**: Run Quick CI for fast feedback
+
+### Running Tests Locally
+
+```bash
+# Quick validation (Tier 1)
+PYTHONPATH=. pytest tests/unit/domain/value_objects/ -v
+
+# Progressive validation (Tier 2)
+PYTHONPATH=. pytest tests/unit/ -v
+
+# Full test suite
+PYTHONPATH=. pytest tests/ --cov=src --cov-report=term-missing
+
+# Paper trading test
+python test_alpaca_trading.py
+```
+
+### CI/CD Best Practices
+
+1. **Fail Fast**: Quick CI catches obvious issues in 2-3 minutes
+2. **Progressive Validation**: Each tier builds on the previous
+3. **Paper Trading Focus**: Every pipeline validates trading functionality
+4. **Known Issues Tracking**: TEST_STATUS.md documents all known failures
+5. **Continuous Improvement**: Regular updates to test coverage and fixes
+
 ## Subagent Development Pattern
 
 This project uses specialized AI subagents for parallel code review and systematic improvements:

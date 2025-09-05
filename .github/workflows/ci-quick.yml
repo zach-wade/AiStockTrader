@@ -104,7 +104,7 @@ jobs:
           try:
               from src.infrastructure.brokers.paper_broker import PaperBroker
               from src.domain.entities.order import Order, OrderSide, OrderType, OrderStatus
-              from src.domain.value_objects import Quantity
+              from src.domain.value_objects import Quantity, Money
               from uuid import uuid4
               from datetime import datetime, timezone
 
@@ -112,11 +112,9 @@ jobs:
               broker = PaperBroker(initial_capital=Decimal('10000'))
               broker.connect()
 
-              # Set market price
+              # Test 1: Market Buy Order
               broker.update_market_price('TEST', Decimal('100.00'))
-
-              # Create order
-              order = Order(
+              buy_order = Order(
                   id=uuid4(),
                   symbol='TEST',
                   quantity=Quantity(Decimal('10')),
@@ -125,19 +123,48 @@ jobs:
                   status=OrderStatus.PENDING,
                   created_at=datetime.now(timezone.utc)
               )
+              result = broker.submit_order(buy_order)
+              assert result is not None, 'Buy order should return a result'
+              print(f'✓ Buy order processed: {result.id}')
 
-              # Submit and verify
-              result = broker.submit_order(order)
-              print(f'Order submitted, status: {result.status}')
-              # PaperBroker may return different status - just verify order was processed
-              assert result is not None, 'Order submission should return a result'
-              assert result.id == order.id, 'Order ID should match'
+              # Test 2: Verify order was filled (PaperBroker doesn't update cash/positions directly)
+              # That's handled by use cases in production
+              assert result.status == OrderStatus.FILLED, f'Order should be filled, got {result.status}'
+              print(f'✓ Order filled successfully')
 
-              # Just verify order was processed - position creation may vary
-              print(f'Order processed: {result.id}')
+              # Test 3: Market Sell Order
+              sell_order = Order(
+                  id=uuid4(),
+                  symbol='TEST',
+                  quantity=Quantity(Decimal('5')),
+                  side=OrderSide.SELL,
+                  order_type=OrderType.MARKET,
+                  status=OrderStatus.PENDING,
+                  created_at=datetime.now(timezone.utc)
+              )
+              sell_result = broker.submit_order(sell_order)
+              assert sell_result is not None, 'Sell order should return a result'
+              print(f'✓ Sell order processed: {sell_result.id}')
+
+              # Test 4: Multiple Symbols
+              broker.update_market_price('AAPL', Decimal('150.00'))
+              broker.update_market_price('GOOGL', Decimal('140.00'))
+
+              aapl_order = Order(
+                  id=uuid4(),
+                  symbol='AAPL',
+                  quantity=Quantity(Decimal('5')),
+                  side=OrderSide.BUY,
+                  order_type=OrderType.MARKET,
+                  status=OrderStatus.PENDING,
+                  created_at=datetime.now(timezone.utc)
+              )
+              aapl_result = broker.submit_order(aapl_order)
+              assert aapl_result is not None, 'AAPL order should be processed'
+              print(f'✓ Multi-symbol trading works')
 
               broker.disconnect()
-              print('✅ Paper trading smoke test PASSED')
+              print('✅ All paper trading smoke tests PASSED')
               sys.exit(0)
           except Exception as e:
               print(f'❌ Smoke test failed: {e}')
