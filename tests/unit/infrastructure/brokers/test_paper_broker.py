@@ -13,6 +13,7 @@ import pytest
 
 from src.application.interfaces.broker import OrderNotFoundError
 from src.domain.entities.order import Order, OrderSide, OrderStatus, OrderType
+from src.domain.value_objects import Price, Quantity
 from src.infrastructure.brokers.paper_broker import PaperBroker
 
 
@@ -122,7 +123,8 @@ class TestPaperBrokerOrderManagement:
         assert result == sample_order
         assert sample_order.id in connected_paper_broker.state.orders
         assert sample_order.status == OrderStatus.FILLED
-        assert sample_order.average_fill_price == Decimal("150.00")
+        # Check the price value, not the Price object
+        assert sample_order.average_fill_price.value == Decimal("150.00")
 
     def test_submit_limit_order(self, connected_paper_broker, sample_limit_order):
         """Test submitting a limit order."""
@@ -193,9 +195,26 @@ class TestPaperBrokerOrderManagement:
     def test_get_open_orders(self, paper_broker):
         """Test getting list of open orders."""
         # Create multiple orders
-        order1 = Order("AAPL", OrderSide.BUY, OrderType.LIMIT, 100, limit_price=Decimal("150"))
-        order2 = Order("GOOGL", OrderSide.SELL, OrderType.LIMIT, 50, limit_price=Decimal("2500"))
-        order3 = Order("MSFT", OrderSide.BUY, OrderType.MARKET, 75)
+        order1 = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("150")),
+        )
+        order2 = Order(
+            symbol="GOOGL",
+            side=OrderSide.SELL,
+            order_type=OrderType.LIMIT,
+            quantity=Quantity(Decimal("50")),
+            limit_price=Price(Decimal("2500")),
+        )
+        order3 = Order(
+            symbol="MSFT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("75")),
+        )
 
         # Submit orders (limit orders will be pending)
         paper_broker.submit_order(order1)
@@ -227,7 +246,12 @@ class TestPaperBrokerPositionManagement:
         # Set market price and submit buy order
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
 
-        order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100)
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(order)
 
         # Get positions
@@ -235,19 +259,30 @@ class TestPaperBrokerPositionManagement:
 
         assert len(positions) == 1
         assert positions[0].symbol == "AAPL"
-        assert positions[0].quantity == 100
-        assert positions[0].average_entry_price == Decimal("150.00")
+        assert positions[0].quantity.value == Decimal("100")
+        # Check the price value, not the Price object
+        assert positions[0].average_entry_price.value == Decimal("150.00")
 
     def test_get_positions_after_sell(self, paper_broker):
         """Test position update after sell order."""
         # Set market price and submit buy order
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
-        buy_order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100)
+        buy_order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(buy_order)
 
         # Update price and sell half
         paper_broker.update_market_price("AAPL", Decimal("160.00"))
-        sell_order = Order("AAPL", OrderSide.SELL, OrderType.MARKET, 50)
+        sell_order = Order(
+            symbol="AAPL",
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("50")),
+        )
         paper_broker.submit_order(sell_order)
 
         # Get positions
@@ -255,7 +290,7 @@ class TestPaperBrokerPositionManagement:
 
         assert len(positions) == 1
         assert positions[0].symbol == "AAPL"
-        assert positions[0].quantity == 50  # Reduced quantity
+        assert positions[0].quantity.value == Decimal("50")  # Reduced quantity
 
     def test_get_position_by_symbol(self, paper_broker):
         """Test getting specific position by symbol."""
@@ -263,15 +298,29 @@ class TestPaperBrokerPositionManagement:
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
         paper_broker.update_market_price("GOOGL", Decimal("2500.00"))
 
-        paper_broker.submit_order(Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100))
-        paper_broker.submit_order(Order("GOOGL", OrderSide.BUY, OrderType.MARKET, 50))
+        paper_broker.submit_order(
+            Order(
+                symbol="AAPL",
+                side=OrderSide.BUY,
+                order_type=OrderType.MARKET,
+                quantity=Quantity(Decimal("100")),
+            )
+        )
+        paper_broker.submit_order(
+            Order(
+                symbol="GOOGL",
+                side=OrderSide.BUY,
+                order_type=OrderType.MARKET,
+                quantity=Quantity(Decimal("50")),
+            )
+        )
 
         # Get specific position
         aapl_position = paper_broker.get_position("AAPL")
 
         assert aapl_position is not None
         assert aapl_position.symbol == "AAPL"
-        assert aapl_position.quantity == 100
+        assert aapl_position.quantity.value == Decimal("100")
 
     def test_get_position_nonexistent(self, paper_broker):
         """Test getting position for symbol with no position."""
@@ -295,7 +344,12 @@ class TestPaperBrokerAccountInfo:
         """Test account info after executing trades."""
         # Execute a buy order
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
-        order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100)
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(order)
 
         # Get account info
@@ -329,7 +383,13 @@ class TestPaperBrokerMarketData:
     def test_limit_order_fill_on_price_update(self, paper_broker):
         """Test limit order fills when price crosses limit."""
         # Submit limit buy order
-        order = Order("AAPL", OrderSide.BUY, OrderType.LIMIT, 100, limit_price=Decimal("145.00"))
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=Quantity(Decimal("100")),
+            limit_price=Price(Decimal("145.00")),
+        )
         paper_broker.submit_order(order)
 
         assert order.status == OrderStatus.PENDING
@@ -378,7 +438,15 @@ class TestPaperBrokerThreadSafety:
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
 
         # Create multiple orders
-        orders = [Order("AAPL", OrderSide.BUY, OrderType.MARKET, 10) for _ in range(10)]
+        orders = [
+            Order(
+                symbol="AAPL",
+                side=OrderSide.BUY,
+                order_type=OrderType.MARKET,
+                quantity=Quantity(Decimal("10")),
+            )
+            for _ in range(10)
+        ]
 
         # Submit orders concurrently
         tasks = [paper_broker.submit_order(order) for order in orders]
@@ -391,7 +459,7 @@ class TestPaperBrokerThreadSafety:
         # Check position is correct
         positions = paper_broker.get_positions()
         assert len(positions) == 1
-        assert positions[0].quantity == 100  # 10 orders * 10 shares
+        assert positions[0].quantity.value == Decimal("100")  # 10 orders * 10 shares
 
     def test_concurrent_price_updates(self, paper_broker):
         """Test thread safety with concurrent price updates."""
@@ -429,7 +497,12 @@ class TestPaperBrokerEdgeCases:
         """Test order submission with insufficient funds."""
         # Try to buy more than we can afford
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
-        order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 10000)  # $1.5M worth
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("10000")),
+        )  # $1.5M worth
 
         result = paper_broker.submit_order(order)
 
@@ -442,17 +515,27 @@ class TestPaperBrokerEdgeCases:
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
 
         # Sell without owning
-        order = Order("AAPL", OrderSide.SELL, OrderType.MARKET, 100)
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(order)
 
         # Should create short position
         positions = paper_broker.get_positions()
         assert len(positions) == 1
-        assert positions[0].quantity == -100  # Negative for short
+        assert positions[0].quantity.value == Decimal("-100")  # Negative for short
 
     def test_zero_quantity_order(self, paper_broker):
         """Test handling of zero quantity order."""
-        order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 0)
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("0")),
+        )
 
         result = paper_broker.submit_order(order)
 
@@ -471,11 +554,16 @@ class TestPaperBrokerEdgeCases:
         paper_broker.state.slippage_bps = 10  # 0.1% slippage
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
 
-        order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100)
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(order)
 
         # Price should be slightly worse due to slippage
-        expected_price = Decimal("150.00") * Decimal("1.001")  # Buy at higher price
+        # Expected: 150.00 * 1.001 for buy at higher price
         assert order.average_fill_price >= Decimal("150.00")
 
 
@@ -530,12 +618,22 @@ class TestPaperBrokerCalculations:
         """Test calculation of realized P&L."""
         # Buy 100 shares at $150
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
-        buy_order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100)
+        buy_order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(buy_order)
 
         # Sell 100 shares at $160
         paper_broker.update_market_price("AAPL", Decimal("160.00"))
-        sell_order = Order("AAPL", OrderSide.SELL, OrderType.MARKET, 100)
+        sell_order = Order(
+            symbol="AAPL",
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(sell_order)
 
         # Check realized P&L
@@ -546,7 +644,12 @@ class TestPaperBrokerCalculations:
         """Test calculation of unrealized P&L."""
         # Buy 100 shares at $150
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
-        order = Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100)
+        order = Order(
+            symbol="AAPL",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=Quantity(Decimal("100")),
+        )
         paper_broker.submit_order(order)
 
         # Update market price
@@ -561,7 +664,14 @@ class TestPaperBrokerCalculations:
         """Test calculation of total return percentage."""
         # Execute some trades
         paper_broker.update_market_price("AAPL", Decimal("150.00"))
-        paper_broker.submit_order(Order("AAPL", OrderSide.BUY, OrderType.MARKET, 100))
+        paper_broker.submit_order(
+            Order(
+                symbol="AAPL",
+                side=OrderSide.BUY,
+                order_type=OrderType.MARKET,
+                quantity=Quantity(Decimal("100")),
+            )
+        )
 
         paper_broker.update_market_price("AAPL", Decimal("165.00"))
 
