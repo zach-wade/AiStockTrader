@@ -19,14 +19,22 @@ This document tracks the current state of the test suite and CI/CD pipeline for 
 
 ## CI/CD Pipeline Status
 
-### Active Workflows (Updated Dec 13, 2024)
+### New Workflows (December 2024) 🆕
+
+| Workflow | Status | Purpose | Runtime | Trigger |
+|----------|--------|---------|---------|---------|
+| **ci-commit.yml** | 🆕 New | Fast validation on every commit | 2-3 min | Every push |
+| **ci-pull-request.yml** | 🆕 New | Comprehensive PR validation | 5-8 min | PR to main/develop |
+| **ci-paper-trading.yml** | 🆕 New | Paper trading validation | 10-15 min | Schedule/Manual |
+
+### Legacy Workflows (Being Replaced)
 
 | Workflow | Status | Purpose | Runtime |
 |----------|--------|---------|---------|
-| **ci-quick.yml** | ✅ Honest | Only runs passing tests (no || true) | 2-3 min |
-| **ci-progressive.yml** | ✅ Honest | Broader stable tests (no || true) | 5-7 min |
-| **ci-current-state.yml** | 🆕 New | Nightly full test report (all tests) | 10-30 min |
-| **paper-trading-validation.yml** | ✅ Working | Comprehensive trading validation | 5 min |
+| **ci-quick.yml** | ✅ Active | Quick validation | 2-3 min |
+| **ci-progressive.yml** | ✅ Active | Progressive validation | 5-7 min |
+| **ci-current-state.yml** | ✅ Active | Nightly full test report | 10-30 min |
+| **paper-trading-validation.yml** | ✅ Active | Trading validation | 5 min |
 
 ### Key Changes (Dec 13, 2024)
 
@@ -140,6 +148,12 @@ This document tracks the current state of the test suite and CI/CD pipeline for 
 ## Test Commands
 
 ```bash
+# Smoke Tests (New - 1 min)
+PYTHONPATH=. pytest tests/smoke/ -v
+
+# Integration Tests (New - 3-5 min)
+PYTHONPATH=. pytest tests/integration/test_paper_trading_integration.py -v
+
 # Tier 1: Quick validation (2-3 min)
 PYTHONPATH=. pytest tests/unit/domain/value_objects/ -k "not test_less_than_or_equal and not test_quantity_can_compare_with_numbers and not test_value_object_copy_behavior" -v
 
@@ -154,6 +168,11 @@ python test_alpaca_trading.py
 
 # Coverage report
 PYTHONPATH=. pytest tests/ --cov=src --cov-report=term-missing
+
+# Trigger CI workflows manually
+gh workflow run ci-commit.yml
+gh workflow run ci-pull-request.yml
+gh workflow run ci-paper-trading.yml -f iterations=10 -f symbols="AAPL,MSFT,GOOGL"
 ```
 
 ## Next Steps (Priority Order)
