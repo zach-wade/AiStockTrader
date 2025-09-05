@@ -133,6 +133,11 @@ jobs:
           PYTHONPATH=. pytest \
             tests/unit/infrastructure/brokers/test_paper_broker.py::TestPaperBrokerInitialization \
             tests/unit/infrastructure/brokers/test_paper_broker.py::TestPaperBrokerConnection \
+            -v --tb=short
+
+          # Test the stable market order submission
+          PYTHONPATH=. pytest \
+            tests/unit/infrastructure/brokers/test_paper_broker.py \
             -k "test_submit_market_order" \
             -v --tb=short
 
