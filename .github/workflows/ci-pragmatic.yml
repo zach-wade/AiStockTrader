@@ -93,7 +93,8 @@ jobs:
               )
 
               result = broker.submit_order(order)
-              assert result.status == OrderStatus.FILLED
+              print(f'Order submitted, status: {result.status}')
+              assert result.status == OrderStatus.FILLED, f'Expected FILLED but got {result.status}'
 
               # Verify position
               positions = broker.get_positions()
