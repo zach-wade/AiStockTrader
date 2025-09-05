@@ -1,0 +1,229 @@
+---
+name: Current State Report
+
+'on':
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  full-test-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-3.12-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Check Code Formatting
+        run: |
+          echo "## Code Formatting Check" >> test_report.md
+          black --check --diff . 2>&1 | tee -a test_report.md || {
+            echo "❌ Code formatting issues found" >> test_report.md
+            echo "Run 'black .' to fix formatting" >> test_report.md
+          }
+          echo "" >> test_report.md
+
+      - name: Run MyPy Type Checking
+        continue-on-error: true
+        run: |
+          echo "## MyPy Type Checking" >> test_report.md
+          python -m mypy src --ignore-missing-imports --show-error-codes 2>&1 | tee mypy_output.txt
+          ERROR_COUNT=$(grep -c "error:" mypy_output.txt || echo "0")
+          echo "**MyPy Errors:** $ERROR_COUNT" >> test_report.md
+          echo "" >> test_report.md
+          if [ "$ERROR_COUNT" -gt 0 ]; then
+            echo "### Top 10 MyPy Errors:" >> test_report.md
+            grep "error:" mypy_output.txt | head -10 >> test_report.md
+          fi
+          echo "" >> test_report.md
+
+      - name: Run All Tests with Detailed Report
+        continue-on-error: true
+        run: |
+          echo "## Full Test Suite Results" >> test_report.md
+          echo "" >> test_report.md
+
+          # Run all tests and capture output
+          PYTHONPATH=. pytest tests/ \
+            --tb=no \
+            --co -q 2>&1 | wc -l > total_tests.txt
+
+          PYTHONPATH=. pytest tests/ \
+            --tb=short \
+            --junit-xml=test_results.xml \
+            -v 2>&1 | tee full_test_output.txt || true
+
+          # Extract summary
+          SUMMARY=$(tail -1 full_test_output.txt)
+          echo "**Summary:** $SUMMARY" >> test_report.md
+          echo "" >> test_report.md
+
+      - name: Test Category Breakdown
+        continue-on-error: true
+        run: |
+          echo "## Test Category Breakdown" >> test_report.md
+          echo "" >> test_report.md
+
+          # Value Objects
+          echo "### Value Objects" >> test_report.md
+          PYTHONPATH=. pytest tests/unit/domain/value_objects/ \
+            --tb=no -q 2>&1 | tail -1 >> test_report.md
+          echo "" >> test_report.md
+
+          # Domain Entities
+          echo "### Domain Entities" >> test_report.md
+          PYTHONPATH=. pytest tests/unit/domain/entities/ \
+            --tb=no -q 2>&1 | tail -1 >> test_report.md
+          echo "" >> test_report.md
+
+          # Domain Services
+          echo "### Domain Services" >> test_report.md
+          PYTHONPATH=. pytest tests/unit/domain/services/ \
+            --tb=no -q 2>&1 | tail -1 >> test_report.md
+          echo "" >> test_report.md
+
+          # Infrastructure
+          echo "### Infrastructure (Paper Broker)" >> test_report.md
+          PYTHONPATH=. pytest tests/unit/infrastructure/brokers/test_paper_broker.py \
+            --tb=no -q 2>&1 | tail -1 >> test_report.md
+          echo "" >> test_report.md
+
+      - name: Coverage Analysis
+        continue-on-error: true
+        run: |
+          echo "## Coverage Report" >> test_report.md
+          echo "" >> test_report.md
+
+          PYTHONPATH=. pytest tests/ \
+            --cov=src \
+            --cov-report=term \
+            --cov-report=html \
+            --cov-report=json \
+            -q 2>&1 | grep -A 100 "TOTAL" >> test_report.md || echo "Coverage calculation failed" >> test_report.md
+          echo "" >> test_report.md
+
+      - name: Known Failures Analysis
+        continue-on-error: true
+        run: |
+          echo "## Known Test Failures" >> test_report.md
+          echo "" >> test_report.md
+
+          # List tests marked with skip
+          echo "### Tests Marked Skip:" >> test_report.md
+          grep -r "@pytest.mark.skip" tests/ | wc -l | xargs -I {} echo "Count: {}" >> test_report.md
+          echo "" >> test_report.md
+
+          # Top failing test files
+          echo "### Top Failing Test Files:" >> test_report.md
+          grep "FAILED" full_test_output.txt | cut -d':' -f1 | \
+            sort | uniq -c | sort -rn | head -10 >> test_report.md || \
+            echo "No failures found" >> test_report.md
+          echo "" >> test_report.md
+
+      - name: Generate Health Score
+        run: |
+          echo "## System Health Score" >> test_report.md
+          echo "" >> test_report.md
+
+          # Calculate health metrics
+          python -c "
+          import re
+          import json
+
+          # Read test summary
+          with open('full_test_output.txt', 'r') as f:
+              content = f.read()
+              summary_match = re.search(r'(\d+) failed.*?(\d+) passed', content)
+              if summary_match:
+                  failed = int(summary_match.group(1))
+                  passed = int(summary_match.group(2))
+                  total = failed + passed
+                  pass_rate = (passed / total * 100) if total > 0 else 0
+                  print(f'**Test Pass Rate:** {pass_rate:.1f}% ({passed}/{total})')
+              else:
+                  print('**Test Pass Rate:** Unable to calculate')
+
+          # Read MyPy errors
+          with open('mypy_output.txt', 'r') as f:
+              mypy_errors = len([l for l in f if 'error:' in l])
+              print(f'**MyPy Errors:** {mypy_errors}')
+
+          # Coverage
+          try:
+              with open('coverage.json', 'r') as f:
+                  cov_data = json.load(f)
+                  coverage = cov_data.get('totals', {}).get('percent_covered', 0)
+                  print(f'**Code Coverage:** {coverage:.1f}%')
+          except:
+              print('**Code Coverage:** Not available')
+          " >> test_report.md
+
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-report-${{ github.run_id }}
+          path: |
+            test_report.md
+            test_results.xml
+            htmlcov/
+            coverage.json
+            mypy_output.txt
+            full_test_output.txt
+
+      - name: Generate GitHub Summary
+        if: always()
+        run: |
+          echo "# 📊 Test Suite Current State Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat test_report.md >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📎 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Full test report available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- HTML coverage report included" >> $GITHUB_STEP_SUMMARY
+          echo "- JUnit XML test results included" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create Issue for Tracking (if failures)
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Test Suite Report - ${date}`,
+              body: `## Automated Test Report\n\n` +
+                `The nightly test run has completed. ` +
+                `Check the [workflow run](${context.serverUrl}/` +
+                `${context.repo.owner}/${context.repo.repo}/actions/runs/` +
+                `${context.runId}) for details.\n\n` +
+                `### Action Items\n` +
+                `- [ ] Review test failures\n` +
+                `- [ ] Update TEST_STATUS.md\n` +
+                `- [ ] Prioritize fixes`,
+              labels: ['test-report', 'automated']
+            });

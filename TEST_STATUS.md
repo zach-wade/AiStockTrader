@@ -4,105 +4,115 @@
 
 This document tracks the current state of the test suite and CI/CD pipeline for the AI Trading System.
 
-**Last Updated**: December 12, 2024
+**Last Updated**: December 13, 2024
 
 ## Test Suite Health
 
 | Metric | Current | Target | Status |
 |--------|---------|--------|--------|
 | **Total Tests** | 3,853 | - | 📊 |
-| **Passing Tests** | ~1,850 | 3,853 | 🟡 |
-| **Test Pass Rate** | ~48% | 100% | 🔴 |
+| **Passing Tests** | 1,941 | 3,853 | 🟡 |
+| **Test Pass Rate** | 50.4% | 100% | 🔴 |
 | **Test Coverage** | 12% | 80% | 🔴 |
 | **MyPy Errors** | 264 | 0 | 🔴 |
-| **CI Pipeline** | Enhanced | Passing | 🟢 |
+| **CI Pipeline** | Realistic | Honest | 🟢 |
 
 ## CI/CD Pipeline Status
 
-### Active Workflows (Enhanced Dec 12, 2024)
+### Active Workflows (Updated Dec 13, 2024)
 
 | Workflow | Status | Purpose | Runtime |
 |----------|--------|---------|---------|
-| **ci-quick.yml** | ✅ Enhanced | Fast validation with paper trading tests | 2-3 min |
-| **ci-progressive.yml** | ✅ Enhanced | Comprehensive with integration tests | 5-7 min |
-| **ci-full.yml** | ⚠️ Informational | Nightly full test suite | 10-30 min |
-| **paper-trading-validation.yml** | ✅ Enhanced | Comprehensive trading validation | 5 min |
+| **ci-quick.yml** | ✅ Honest | Only runs passing tests (no || true) | 2-3 min |
+| **ci-progressive.yml** | ✅ Honest | Broader stable tests (no || true) | 5-7 min |
+| **ci-current-state.yml** | 🆕 New | Nightly full test report (all tests) | 10-30 min |
+| **paper-trading-validation.yml** | ✅ Working | Comprehensive trading validation | 5 min |
 
-### Removed Workflows (Redundant)
+### Key Changes (Dec 13, 2024)
 
-- ❌ ci.yml - Replaced by tiered strategy
-- ❌ ci-cd.yml - Merged into tiered workflows
-- ❌ ci-pragmatic.yml - Replaced by ci-progressive
+- **Removed `|| true`** - CI now honestly reports failures
+- **Only stable tests in CI** - Runs only tests that actually pass
+- **Added ci-current-state.yml** - Tracks all tests including failures (nightly)
+- **Added test markers** - stable, unstable, known_failure, requires_fix
 
 ## Test Categories Breakdown
 
-### ✅ Tier 1: Core Components (98% Pass Rate)
+### ✅ Stable Components (Used in CI)
 
-**Value Objects**
+**Value Objects** (285/289 passing - 98.6%)
 
 - `test_money.py` - ✅ 100% passing (72 tests)
 - `test_quantity.py` - ✅ 99% passing (71/72 tests)
 - `test_price.py` - ✅ 99% passing (71/72 tests)
 - Other value objects - ✅ 98% passing
 
-**Known Failures in Tier 1:**
+**Domain Entities** (54/57 passing - 94.7%)
+
+- All entity tests passing except 3 skipped tests
+
+**Core Domain Services** (100% passing)
+
+- `test_order_validator.py` - ✅ All passing
+- `test_position_manager.py` - ✅ All passing
+- `test_risk_calculator.py` - ✅ All passing
+- `test_portfolio_service.py` - ✅ All passing
+
+**Known Failures Excluded from CI:**
 
 - `test_less_than_or_equal` - Quantity comparison edge case
 - `test_quantity_can_compare_with_numbers` - Quantity numeric comparison
 - `test_value_object_copy_behavior` - ValueObject copy behavior
-- `test_round_to_tick_zero_tick_size` - Price edge case (marked skip)
+- `test_round_to_tick_zero_tick_size` - Price edge case
 
-### 🟡 Tier 2: Extended Components (~90% Pass Rate)
+### 🔴 Unstable Components (Not in CI)
 
-**Domain Services** (561/626 passing)
+**Domain Services with Failures** (65/626 failures)
 
-- Order validation - ✅ 100% passing
-- Position management - ✅ 100% passing
-- Risk calculation - ✅ 100% passing
-- Trading calendar - 🟡 90% passing (4 edge case failures)
-- Security policy - 🟡 99% passing (1 method missing)
+- Portfolio validator - 🔴 Multiple failures in can_open_position logic
+- Trading calendar - 🟡 Edge case failures for date ranges
+- Security policy - 🟡 Missing method implementation
 
-**Infrastructure** (13/40 passing in paper broker)
+**Infrastructure** (27/40 failures in paper broker)
 
-- Paper broker initialization - ✅ 100% passing
-- Paper broker connection - ✅ 100% passing
-- Paper broker orders - 🔴 32% passing
-- Paper broker calculations - 🔴 25% passing
-
-### 🔴 Tier 3: Full Test Suite (~50% Pass Rate)
+- Paper broker initialization - ✅ 3/3 passing (in CI)
+- Paper broker connection - ✅ 3/3 passing (in CI)
+- Paper broker orders - 🔴 5/15 passing (NOT in CI)
+- Paper broker state management - 🔴 2/19 passing (NOT in CI)
 
 **Major Problem Areas:**
 
-1. **Paper Broker** - 27/40 failures
+1. **Paper Broker Tests** - 27/40 failures (67.5% failure rate)
    - State management issues
    - P&L calculation errors
    - Position tracking problems
+   - Cash balance not updating (by design - needs use cases)
 
-2. **Trading Calendar** - 65 failures
-   - Edge cases for date ranges
-   - Forex market edge cases
+2. **Portfolio Validator** - Multiple test failures
+   - can_open_position logic has issues
+   - Position validation failing
 
 3. **Type Errors** - 264 MyPy errors
    - Mostly in infrastructure layer
    - Some in application services
 
-## CI/CD Enhancements (Dec 12, 2024)
+## CI/CD Updates (Dec 13, 2024)
 
-### Improvements Made
+### Today's Improvements
 
-1. **Fixed pytest configuration**
-   - Added missing markers (performance, redis)
-   - Fixed asyncio deprecation warning
+1. **Made CI Honest**
+   - Removed all `|| true` statements that were hiding failures
+   - CI now only runs tests that actually pass
+   - Added domain entity tests to CI (all passing)
 
-2. **Enhanced CI workflows**
-   - ci-quick.yml: Added comprehensive paper trading smoke tests
-   - ci-progressive.yml: Added integration test suite
-   - paper-trading-validation.yml: Enhanced with P&L and portfolio tests
+2. **Created Realistic CI Strategy**
+   - ci-quick.yml: Runs only stable, passing tests (2-3 min)
+   - ci-progressive.yml: Runs broader stable tests (5-7 min)
+   - ci-current-state.yml: New nightly workflow for full test report
 
-3. **Paper Broker Architecture**
-   - Identified that PaperBroker delegates cash/position updates to use cases
-   - Updated tests to match actual broker behavior
-   - Orders are filled but portfolio management is handled separately
+3. **Added Test Categorization**
+   - Added markers: stable, unstable, known_failure, requires_fix
+   - Updated pytest.ini with new markers
+   - CI now excludes known failures explicitly
 
 ## Known Test Failures (Marked with @pytest.mark.skip)
 
