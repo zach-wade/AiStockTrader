@@ -201,6 +201,11 @@ class Portfolio:
         Temporary bridge method to prevent runtime errors during refactoring."""
         return self.get_total_value()
 
+    @property
+    def total_equity(self) -> Money:
+        """Get total equity as a property for backward compatibility."""
+        return self.get_total_equity()
+
     def get_positions_value(self) -> Money:
         """DEPRECATED: Use PortfolioCalculator.get_positions_value() instead.
         Temporary bridge method to prevent runtime errors during refactoring."""

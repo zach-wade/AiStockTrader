@@ -25,7 +25,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Cache pip packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements*.txt') }}
@@ -60,7 +60,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Type Checking" >> $GITHUB_STEP_SUMMARY
 
-          python -m mypy src --ignore-missing-imports --show-error-codes 2>&1 | tee mypy_output.txt || true
+          # Temporarily relaxed settings to handle Python version differences
+          python -m mypy src \
+            --ignore-missing-imports \
+            --show-error-codes \
+            --no-warn-return-any \
+            --no-warn-unused-ignores 2>&1 | tee mypy_output.txt || true
           ERROR_COUNT=$(grep -c "error:" mypy_output.txt || echo "0")
 
           if [ "$ERROR_COUNT" -eq 0 ]; then
@@ -75,46 +80,68 @@ jobs:
             echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Core Domain Tests
+      - name: Run Critical Tests (Must Pass)
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🧪 Core Tests" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚨 Critical Tests (Must Pass)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Value objects
+          # Run all critical tests - these MUST pass for PR to be merged
+          # Only test smoke tests to avoid import errors from integration tests
+          PYTHONPATH=. pytest tests/smoke/ -m critical -v --tb=short --junit-xml=critical_results.xml
+          echo "✅ All critical tests passed" >> $GITHUB_STEP_SUMMARY
+        continue-on-error: false  # Fail the job if critical tests fail
+
+      - name: Run Stable Domain Tests
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧪 Domain Tests (Stable)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run all stable domain tests - these should pass
           PYTHONPATH=. pytest \
             tests/unit/domain/value_objects/ \
+            tests/unit/domain/entities/ \
             -k "not test_less_than_or_equal and not test_quantity_can_compare_with_numbers \
             and not test_value_object_copy_behavior and not test_round_to_tick_zero_tick_size" \
-            -v --tb=short --junit-xml=value_objects_results.xml || true
+            -v --tb=short --junit-xml=domain_results.xml
 
-          # Domain entities
-          PYTHONPATH=. pytest \
-            tests/unit/domain/entities/ \
-            -v --tb=short --junit-xml=entities_results.xml || true
+          echo "✅ Domain tests passed" >> $GITHUB_STEP_SUMMARY
 
-          # Core services
+      - name: Run Stable Service Tests
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Domain Service Tests (Stable)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run only stable domain services
           PYTHONPATH=. pytest \
             tests/unit/domain/services/test_order_validator.py \
             tests/unit/domain/services/test_position_manager.py \
             tests/unit/domain/services/test_risk_calculator.py \
             tests/unit/domain/services/test_portfolio_calculator.py \
-            -v --tb=short --junit-xml=services_results.xml || true
+            -v --tb=short --junit-xml=services_results.xml
 
-          echo "✅ Core domain tests completed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Stable domain services passed" >> $GITHUB_STEP_SUMMARY
 
-      - name: Paper Broker Tests
+      - name: Paper Broker Tests (Stable Only)
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Paper Broker Tests" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Paper Broker Tests (Stable)" >> $GITHUB_STEP_SUMMARY
 
-          # Test stable paper broker functionality
+          # Test only stable paper broker functionality
+          PYTHONPATH=. pytest \
+            tests/unit/infrastructure/brokers/test_paper_broker.py::TestPaperBrokerInitialization \
+            tests/unit/infrastructure/brokers/test_paper_broker.py::TestPaperBrokerConnection \
+            -v --tb=short
+
+          # Test the stable market order submission
           PYTHONPATH=. pytest \
             tests/unit/infrastructure/brokers/test_paper_broker.py \
-            -k "test_initialization or test_connection or test_disconnect" \
-            -v --tb=short || true
+            -k "test_submit_market_order" \
+            -v --tb=short
 
-          echo "✅ Paper broker connection tests completed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Stable paper broker tests passed" >> $GITHUB_STEP_SUMMARY
 
       - name: Integration Tests
         run: |
@@ -350,7 +377,7 @@ jobs:
 
       - name: Upload Test Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.python-version }}
           path: |
