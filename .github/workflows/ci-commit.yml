@@ -43,6 +43,10 @@ jobs:
         run: |
           black --check --diff .
 
+      - name: Run MyPy type checking
+        run: |
+          python -m mypy src --ignore-missing-imports --show-error-codes
+
       - name: Verify Critical Imports
         run: |
           python -c "
@@ -75,6 +79,11 @@ jobs:
           PYTHONPATH=. pytest \
             tests/unit/domain/entities/ \
             -v --tb=short --maxfail=5
+
+      - name: Run Smoke Tests
+        run: |
+          # Run all smoke tests
+          PYTHONPATH=. pytest tests/smoke/ -v --tb=short --maxfail=5
 
       - name: Quick Smoke Test
         run: |

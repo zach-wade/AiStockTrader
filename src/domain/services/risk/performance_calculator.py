@@ -189,9 +189,9 @@ class PerformanceCalculator:
             elif isinstance(avg_win_metric, Decimal):
                 avg_win_value = avg_win_metric
                 is_money = False
-            else:
+            else:  # pragma: no cover
                 # Invalid type, set expectancy to None
-                metrics["expectancy"] = None
+                metrics["expectancy"] = None  # type: ignore[unreachable]
                 return metrics
 
             if isinstance(avg_loss_metric, Money):
@@ -200,9 +200,9 @@ class PerformanceCalculator:
             elif isinstance(avg_loss_metric, Decimal):
                 avg_loss_value = abs(avg_loss_metric)
                 is_money = is_money or False
-            else:
+            else:  # pragma: no cover
                 # Invalid type, set expectancy to None
-                metrics["expectancy"] = None
+                metrics["expectancy"] = None  # type: ignore[unreachable]
                 return metrics
 
             win_rate = metrics["win_rate"] / Decimal("100")

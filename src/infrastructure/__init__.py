@@ -83,6 +83,6 @@ Example usage:
 #     PostgreSQLUnitOfWorkFactory,
 # )
 
-__all__ = [
+__all__: list[str] = [
     # Empty for now - imports disabled for CI
 ]

@@ -512,10 +512,10 @@ def handle_errors(
 
                 try:
                     return func(*args, **kwargs)
-                except Exception:
+                except Exception as exc:
                     # Convert to async for consistent handling
                     async def handle_sync_error() -> Any | None:
-                        return await error_manager.handle_error(e, context)
+                        return await error_manager.handle_error(exc, context)
 
                     # Run async handler
                     try:
