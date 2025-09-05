@@ -1,0 +1,34 @@
+[
+  {
+    "iteration": 1,
+    "symbol": "GOOGL",
+    "side": "BUY",
+    "price": 141.9145293722349
+  },
+  {
+    "iteration": 3,
+    "symbol": "MSFT",
+    "side": "BUY",
+    "price": 380.10939654121086
+  },
+  {
+    "iteration": 4,
+    "symbol": "AAPL",
+    "side": "BUY",
+    "price": 151.55521142625045
+  },
+  {
+    "iteration": 8,
+    "symbol": "GOOGL",
+    "side": "SELL",
+    "price": 138.71915895991174,
+    "pnl": -31.953704123231645
+  },
+  {
+    "iteration": 9,
+    "symbol": "AAPL",
+    "side": "SELL",
+    "price": 156.82026364210859,
+    "pnl": 52.65052215858123
+  }
+]
