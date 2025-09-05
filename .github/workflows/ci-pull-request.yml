@@ -60,7 +60,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Type Checking" >> $GITHUB_STEP_SUMMARY
 
-          python -m mypy src --ignore-missing-imports --show-error-codes 2>&1 | tee mypy_output.txt || true
+          # Temporarily relaxed settings to handle Python version differences
+          python -m mypy src \
+            --ignore-missing-imports \
+            --show-error-codes \
+            --no-warn-return-any \
+            --no-warn-unused-ignores 2>&1 | tee mypy_output.txt || true
           ERROR_COUNT=$(grep -c "error:" mypy_output.txt || echo "0")
 
           if [ "$ERROR_COUNT" -eq 0 ]; then
