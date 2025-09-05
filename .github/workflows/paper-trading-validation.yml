@@ -46,6 +46,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
 
+      - name: Install system dependencies for ta-lib
+        run: |
+          sudo apt-get update
+          wget https://github.com/TA-Lib/ta-lib/releases/download/v0.4.0/ta-lib-0.4.0-src.tar.gz
+          tar -xzf ta-lib-0.4.0-src.tar.gz
+          cd ta-lib/
+          ./configure --prefix=/usr
+          make
+          sudo make install
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -63,8 +73,8 @@ jobs:
       - name: Validate core domain entities
         run: |
           echo "Testing core domain entities..."
-          PYTHONPATH=. pytest tests/unit/domain/entities/test_order.py -v
-          PYTHONPATH=. pytest tests/unit/domain/entities/test_position.py -v
+          PYTHONPATH=. pytest tests/unit/domain/test_order.py -v
+          PYTHONPATH=. pytest tests/unit/domain/test_position.py -v
           PYTHONPATH=. pytest tests/unit/domain/entities/test_portfolio.py -v
 
       - name: Validate value objects
@@ -85,24 +95,24 @@ jobs:
           import sys
           from decimal import Decimal
           from pathlib import Path
-          
+
           sys.path.insert(0, str(Path.cwd()))
-          
+
           from src.infrastructure.brokers.paper_broker import PaperBroker
           from src.domain.entities.order import Order, OrderSide, OrderType, OrderStatus
           from src.domain.value_objects import Quantity, Price
           from uuid import uuid4
           from datetime import datetime, UTC
-          
+
           try:
               # Initialize broker
               broker = PaperBroker(initial_capital=Decimal('10000'))
               broker.connect()
-              
+
               # Update mock prices
               broker.update_market_price('AAPL', Decimal('150.00'))
               broker.update_market_price('GOOGL', Decimal('140.00'))
-              
+
               # Submit a buy order
               order = Order(
                   id=uuid4(),
@@ -113,15 +123,15 @@ jobs:
                   status=OrderStatus.PENDING,
                   created_at=datetime.now(UTC)
               )
-              
+
               result = broker.submit_order(order)
               assert result.status == OrderStatus.FILLED, 'Order should be filled'
-              
+
               # Check account
               account = broker.get_account_info()
               assert account.cash < Decimal('10000'), 'Cash should decrease after buy'
               assert len(broker.get_positions()) == 1, 'Should have one position'
-              
+
               # Submit a sell order
               sell_order = Order(
                   id=uuid4(),
@@ -132,18 +142,18 @@ jobs:
                   status=OrderStatus.PENDING,
                   created_at=datetime.now(UTC)
               )
-              
+
               sell_result = broker.submit_order(sell_order)
               assert sell_result.status == OrderStatus.FILLED, 'Sell order should be filled'
-              
+
               # Check final state
               final_account = broker.get_account_info()
               assert len(broker.get_positions()) == 0, 'Should have no positions after selling'
-              
+
               broker.disconnect()
               print('✅ Paper trading smoke test passed!')
               sys.exit(0)
-              
+
           except Exception as e:
               print(f'❌ Smoke test failed: {e}')
               import traceback
@@ -156,30 +166,30 @@ jobs:
           echo "Testing minimal paper trading (mock data)..."
           # Run for just 5 iterations to keep CI fast
           timeout 30s python -c "
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path.cwd()))
-
-from paper_trading_minimal import SimpleMomentumTrader
-from src.infrastructure.brokers.paper_broker import PaperBroker
-from decimal import Decimal
-
-broker = PaperBroker(initial_capital=Decimal('10000'))
-broker.connect()
-trader = SimpleMomentumTrader(broker, ['AAPL', 'GOOGL'])
-
-# Run synchronously for just 5 iterations
-for i in range(5):
-    for symbol in trader.symbols:
-        price = trader.get_mock_price(symbol)
-        broker.update_market_price(symbol, price)
-        signal = trader.get_signal(symbol, price)
-        if signal:
-            trader.execute_trade(symbol, signal, price)
-
-print('✅ Minimal paper trading test passed!')
-broker.disconnect()
-" || echo "Test completed"
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path.cwd()))
+          
+          from paper_trading_minimal import SimpleMomentumTrader
+          from src.infrastructure.brokers.paper_broker import PaperBroker
+          from decimal import Decimal
+          
+          broker = PaperBroker(initial_capital=Decimal('10000'))
+          broker.connect()
+          trader = SimpleMomentumTrader(broker, ['AAPL', 'GOOGL'])
+          
+          # Run synchronously for just 5 iterations
+          for i in range(5):
+              for symbol in trader.symbols:
+                  price = trader.get_mock_price(symbol)
+                  broker.update_market_price(symbol, price)
+                  signal = trader.get_signal(symbol, price)
+                  if signal:
+                      trader.execute_trade(symbol, signal, price)
+          
+          print('✅ Minimal paper trading test passed!')
+          broker.disconnect()
+          " || echo "Test completed"
 
       - name: Generate test report
         if: always()
@@ -206,6 +216,16 @@ broker.disconnect()
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Install system dependencies for ta-lib
+        run: |
+          sudo apt-get update
+          wget https://github.com/TA-Lib/ta-lib/releases/download/v0.4.0/ta-lib-0.4.0-src.tar.gz
+          tar -xzf ta-lib-0.4.0-src.tar.gz
+          cd ta-lib/
+          ./configure --prefix=/usr
+          make
+          sudo make install
 
       - name: Install dependencies
         run: |
