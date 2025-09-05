@@ -1,6 +1,4 @@
-"""
-from typing import Any
-Infrastructure Layer for AI Trading System
+"""Infrastructure Layer for AI Trading System.
 
 This module provides concrete implementations of the application layer interfaces.
 Includes PostgreSQL database repositories, Redis caching, connection management,
