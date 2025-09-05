@@ -75,10 +75,33 @@ jobs:
             echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Core Domain Tests
+      - name: Run Critical Tests (Must Pass)
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🧪 Core Tests" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚨 Critical Tests (Must Pass)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run all critical tests - these MUST pass for PR to be merged
+          PYTHONPATH=. pytest -m critical -v --tb=short --junit-xml=critical_results.xml
+          echo "✅ All critical tests passed" >> $GITHUB_STEP_SUMMARY
+        continue-on-error: false  # Fail the job if critical tests fail
+
+      - name: Run Important Tests (Should Pass)
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧪 Important Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Run important tests - report but don't fail
+          PYTHONPATH=. pytest -m important -v --tb=short --junit-xml=important_results.xml || {
+            echo "⚠️ Some important tests failed (non-blocking)" >> $GITHUB_STEP_SUMMARY
+            true
+          }
+
+      - name: Core Domain Tests (Legacy)
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Core Domain Tests" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Value objects
@@ -92,14 +115,6 @@ jobs:
           PYTHONPATH=. pytest \
             tests/unit/domain/entities/ \
             -v --tb=short --junit-xml=entities_results.xml || true
-
-          # Core services
-          PYTHONPATH=. pytest \
-            tests/unit/domain/services/test_order_validator.py \
-            tests/unit/domain/services/test_position_manager.py \
-            tests/unit/domain/services/test_risk_calculator.py \
-            tests/unit/domain/services/test_portfolio_calculator.py \
-            -v --tb=short --junit-xml=services_results.xml || true
 
           echo "✅ Core domain tests completed" >> $GITHUB_STEP_SUMMARY
 
