@@ -55,7 +55,7 @@ This document tracks the current state of the test suite and CI/CD pipeline for 
 - `test_order_validator.py` - ✅ All passing
 - `test_position_manager.py` - ✅ All passing
 - `test_risk_calculator.py` - ✅ All passing
-- `test_portfolio_service.py` - ✅ All passing
+- `test_portfolio_calculator.py` - ✅ All passing
 
 **Known Failures Excluded from CI:**
 
