@@ -21,6 +21,8 @@ from src.domain.value_objects import Money, Price, Quantity
 from src.infrastructure.brokers.paper_broker import PaperBroker
 
 
+@pytest.mark.critical
+@pytest.mark.smoke
 class TestPaperTradingSmoke:
     """Quick smoke tests for paper trading components."""
 

@@ -134,10 +134,15 @@ python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "critical: Tests that must pass for basic functionality (run always)",
+    "important: Tests that should pass for stable features (run on PR)",
     "integration: marks tests as integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "paper_trading: Paper trading specific tests",
     "unit: marks tests as unit tests",
     "smoke: marks tests as smoke tests",
+    "flaky: Tests that are known to be flaky",
+    "skip_ci: Tests to skip in CI",
 ]
 
 [tool.bandit]

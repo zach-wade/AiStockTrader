@@ -39,7 +39,7 @@ jobs:
           python-version: '3.12'
 
       - name: Cache pip packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-3.12-${{ hashFiles('requirements*.txt') }}
@@ -345,7 +345,7 @@ jobs:
 
       - name: Upload Trading Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: paper-trading-results-${{ github.run_id }}
           path: |
@@ -364,7 +364,9 @@ jobs:
               title: `Paper Trading Test Failed - ${date}`,
               body: `## Paper Trading Test Failure\n\n` +
                 `The scheduled paper trading test has failed.\n\n` +
-                `**Run:** [${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n` +
+                `**Run:** [${context.runId}](${context.serverUrl}/` +
+                `${context.repo.owner}/${context.repo.repo}/` +
+                `actions/runs/${context.runId})\n` +
                 `**Time:** ${date}\n\n` +
                 `### Action Required\n` +
                 `- [ ] Review the failure logs\n` +
